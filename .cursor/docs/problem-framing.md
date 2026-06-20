@@ -1,4 +1,4 @@
-# Sleeper — Problem Framing
+# GoodFinds — Problem Framing
 
 **Core job:** *"I want a better way to stay on top of interesting vintage Timex listings across the market."*
 

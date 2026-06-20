@@ -33,6 +33,12 @@ function huntHasAnyTaste(hunt: Hunt): boolean {
   );
 }
 
+/** Saved hunt with gender and/or attribute criteria — not an empty "both + no attrs" draft. */
+function huntHasActiveCriteria(hunt: Hunt): boolean {
+  if (hunt.gender !== "both") return true;
+  return huntHasAnyTaste(hunt);
+}
+
 function listingValueForAttr(
   listing: AppListing,
   key: string
@@ -64,7 +70,7 @@ export function scoreListingAgainstHunt(
   listing: AppListing,
   hunt: Hunt
 ): { score: number; matches: AttributeMatch[]; excluded: boolean } {
-  if (!listingMatchesHuntGender(listing.gender, hunt.gender ?? "both")) {
+  if (!listingMatchesHuntGender(listing.gender, hunt.gender ?? "both", listing.title)) {
     return { score: 0, matches: [], excluded: true };
   }
 
@@ -145,7 +151,7 @@ export function matchAllHunts(
     const matchedNames: string[] = [];
 
     for (const hunt of activeHunts) {
-      if (!huntHasAnyTaste(hunt)) continue;
+      if (!huntHasActiveCriteria(hunt)) continue;
       const { score, matches, excluded } = scoreListingAgainstHunt(listing, hunt);
       if (excluded) continue;
       if (score > 0) {

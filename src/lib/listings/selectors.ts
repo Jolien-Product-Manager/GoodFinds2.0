@@ -66,9 +66,10 @@ export function alertListings(
   let base = unseenListings(listings, ctx);
 
   if (scope === "watchlist") {
-    base = base.filter(
-      (l) => l.model != null && (ctx.modelHearts[l.model] ?? 0) >= 1
-    );
+    base = base.filter((l) => {
+      const match = ctx.matchResults?.get(l.id);
+      return match != null && match.matchedHuntIds.length > 0;
+    });
   } else if (scope === "top") {
     base = base.filter((l) => {
       const match = ctx.matchResults?.get(l.id);

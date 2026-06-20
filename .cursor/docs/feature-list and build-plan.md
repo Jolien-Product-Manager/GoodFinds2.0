@@ -1,23 +1,21 @@
-# Sleeper — Feature List & Build Plan
+# GoodFinds — Feature List & Build Plan
 
-## Build Plan & Prioritization
+**Status:** Phases 0–6 **complete** (scaffold through production deploy). App name: **GoodFinds**.
 
-**Design reference:** Before building or changing any UI, read [`design.md`](design.md) and match it — tokens (`paper`, `card`, `ink`, `brass`, `steal`, …), typography roles (Fraunces / Space Mono / Inter), spacing, and the mockup at `/design/timex-tool-mockup.html`. Behaviour specs live in the feature docs; visual treatment lives in `design.md`.
+**Design reference:** Before building or changing any UI, read [`design.md`](design.md) — tokens (`paper`, `card`, `ink`, `brass`, `steal`, …), typography (Fraunces / JetBrains Mono / Inter), spacing. Behaviour specs live in the feature docs below.
 
-1. **Connect to marketplaces** (Chrono24 & eBay) — `marketplace-queries.md`
-   → Implements **F1–F4**
-2. **Generate "Feed" screen** to display returned results — `vintage-timex-watches-feed.md` + [`design.md`](design.md)
-   → Implements **F5, F6, F8, F9** (F7 ships partially — basic scope chips; Watch-list/Top-matches fill in at step 4)
-3. **Add Hunt & preferences page** — `hunt-builder-spec.md` + [`design.md`](design.md)
-   → Implements **F10–F16, F22** (UI only; their data isn't persisted until step 5)
-4. **Implement filtering** on the Feed page — `hunt-feed-filtering-criteria.md`
-   → Implements **F17–F21**, completes **F7**
-5. **Add back-end saving** — persists data behind **F8** (dismissed), **F10–F14** (hunt specs), **F22** (purchases)
-6. **Deploy to production website** — no new features
+---
 
-**Git:** After finishing each phase above, commit before starting the next one. Use a message that names the phase and what shipped, e.g. `Phase 1: connect Chrono24 and eBay marketplace ingestion`. From the repo root: `./commit -a -p` (detailed message + push) or `git add -A && git commit -m "…"`.
+## Build Plan & Prioritization (completed)
 
-> Note: F5 (the Feed) lands at step 2 but doesn't reach its full definition — "gated, matched, ranked" — until F17–F21 arrive at step 4.
+1. **Connect to marketplaces** (Chrono24 & eBay) — `marketplace-queries.md` → **F1–F4**
+2. **Generate Feed screen** — `vintage-timex-watches-feed.md` + `design.md` → **F5, F6, F8, F9** (+ partial **F7**)
+3. **Hunt & preferences page** — `hunt-builder-spec.md` → **F10–F16, F22, F23**
+4. **Feed filtering / matching** — `hunt-feed-filtering-criteria.md` → **F17–F21**, completes **F7**
+5. **Back-end saving** — `/api/state` + localStorage → **F8**, hunts, global filters, purchases
+6. **Deploy to production** — Vercel, env vars, README
+
+**Git:** Phase commits on `main`. Use `./commit` for detailed commits with change summaries.
 
 ---
 
@@ -25,59 +23,73 @@
 
 ### Marketplace ingestion
 
-- **F1. Chrono24 scraper** — Offline Python scraper runs ~10 vintage query terms, dedupes by listing ID, writes a static JSON snapshot the app reads at load.
-- **F2. eBay Browse API** — Live single-query fetch (`vintage timex`, newlyListed) on each page load, with cached OAuth and graceful fallback to Chrono24-only if creds fail.
-- **F3. Normalize & merge** — Combines both sources, drops listings missing price or ID, namespaces eBay IDs to avoid collisions.
+- **F1. Chrono24 scraper** — Offline Python scraper (~10 vintage query terms), per-article HTML parsing, dedupes by listing ID, URL canonicalization, writes JSON snapshot.
+- **F2. eBay Browse API** — Live fetch (`timex vintage watch`, newlyListed), **400 listings** (2×200 paginated), cached OAuth, Chrono24-only fallback if creds fail.
+- **F3. Normalize & merge** — Combines sources, drops missing price/ID, namespaces eBay IDs, infers listing gender from titles.
 - **F4. Vintage filter** — Keeps listings where title says "vintage" or parsed year ≤ 2000.
 
 ### Feed (inbox)
 
-- **F5. New section** — Single pool of all unseen, gated, matched listings ranked by priority (no 24h/Older split in target).
-- **F6. View toggle (New | Interested)** — One view at a time; Interested holds saved listings, dismiss state preserved.
-- **F7. Scope chips** — All new · Watch-list · Top matches (strong-match threshold).
-- **F8. Dismiss / Restore** — Move listings to a collapsible Dismissed section and back, with undo toast.
-- **F9. Bulk + refresh actions** — "Mark all dismissed" (scoped, undoable) and "Check for new listings."
+- **F5. New section** — Single pool of unseen, gated listings ranked by best hunt score (no 24h/Older split).
+- **F6. View toggle (New | Starred | Dismissed)** — Three top-level tabs; Starred = `listingStatus.interested` (UI: Star).
+- **F7. Scope under New** — **All** | **Watch-list** (saved hunt matches). Top picks / per-hunt chips: code only, not in UI.
+- **F8. Dismiss / Restore** — Dismissed is a top-level tab; undo toast on dismiss.
+- **F9. Bulk + refresh actions** — "Mark all dismissed" (scoped) and "Check for new listings" (`router.refresh`).
 
 ### Hunt Builder
 
-- **F10. Saved hunts bar** — Chips for each saved hunt plus "New hunt"; drafts never appear as chips (avoids phantom hunts).
-- **F11. Hunt form (8 attributes)** — Collapsible form for model, collab, dial, color, era, case, movement, condition; each multi-select with free-text custom entry.
-- **F12. Summary sentence + tightness badge** — Plain-language description of the hunt and a Wide open → Very specific badge warning when a hunt is too narrow to ever fire.
-- **F13. Draft vs. saved + working copy** — New hunts are transient until Save; edits mark a hunt dirty and can revert on collapse.
-- **F14. Custom-value normalization** — Free-text runs through the same normalization as presets so "crosshair / cross-hair" collapse to one value.
+- **F10. Saved hunts bar** — Chips for saved hunts + "New hunt"; drafts never appear as chips.
+- **F11. Hunt form (8 attributes + gender)** — Collapsible form; multi-select chips + free-text per attribute.
+- **F12. Summary sentence + tightness badge** — Plain-language hunt description; Wide open → Very specific.
+- **F13. Draft vs. saved + working copy** — New hunts transient until Save; `normalizeHunt()` on load/rehydrate.
+- **F14. Custom-value normalization** — Presets and customs normalized identically before match.
+- **F23. Hunt gender filter** — Men's / Women's / Both per hunt; title + case-size inference on listings; gender-only hunts active for Watch-list.
 
 ### Global filters (gates)
 
-- **F15. Price ceiling** — Hard cap; null = no limit; targets landed cost (shipping + duties) once postal code is set.
-- **F16. Ships-to-me** — Toggle + required postal code; excludes anything that won't ship to the buyer.
+- **F15. Price ceiling** — Hard cap on landed cost; lives on `/hunts`.
+- **F16. Ships-to-me** — Toggle + postal code; excludes unshippable listings.
 
 ### Hunt → Feed matching
 
-- **F17. Feature extraction + confidence** — Reads model/dial/case/era/condition per listing, each tagged high/med/low confidence; model resolved from dial code, not title.
-- **F18. Gates exclude, taste ranks** — Gate failures are hidden; taste misses rank lower but still show (fixes the prototype's empty-feed AND-filter problem).
-- **F19. Multi-hunt scoring** — A listing matches if it clears gates and ≥1 active hunt; feed rank = best hunt score, tie-broken by recency.
-- **F20. Dealbreaker promotion** — A taste value flagged dealbreaker becomes a per-hunt gate (excludes from that hunt only).
-- **F21. "Why you're seeing this" card block** — Per-listing matched-hunt chip(s), per-attribute hit/miss/unverified, and confidence flags.
+- **F17. Feature extraction + confidence** — Model, era, condition from titles; partial extraction with unverified states.
+- **F18. Gates exclude, taste ranks** — Global gates hide listings; taste affects score.
+- **F19. Multi-hunt scoring** — Best hunt score wins; Watch-list = ≥1 hunt match.
+- **F20. Dealbreaker promotion** — Not shipped.
+- **F21. Match reasons on cards** — Why note + attribute hit/miss/unverified.
 
 ### Collection
 
-- **F22. Purchased watches** — Paste a listing link → auto-parsed into the same attribute vocabulary as hunts, with editable feature pills; foundation for "suggest hunts based on what you own."
+- **F22. Purchased watches** — Paste URL → simulated parse into feature pills on `/hunts`.
+
+### Persistence
+
+- Zustand (`caseback-state-v3`) + [`/api/state`](../src/app/api/state/route.ts) → `data/store/state.json`. On Vercel, server file is ephemeral — see [README](../README.md).
 
 ---
 
 ## User flows
 
 ### Create a hunt
-New hunt → expand form → toggle attribute chips / type customs → watch summary + tightness badge update → name it → Save → chip appears in saved bar, hunt goes live as an alert stream.
+New hunt → expand form → set gender → toggle attribute chips / type customs → watch summary + tightness → name → Save → chip in saved bar.
 
 ### Daily triage
-Land on Feed (New, sorted by best hunt score) → scan cards with match reasons → Dismiss noise / mark Interested on keepers → optionally "Mark all dismissed" to clear scope → switch to Interested view to revisit saved listings.
+Land on Feed (**New**, sorted by hunt score) → scan match reasons → Dismiss noise / **Star** keepers → **Watch-list** scope for hunt-only view → **Starred** tab to revisit saved listings.
 
 ### Narrow what you see
-Tap a scope chip (a specific hunt, or Top matches) → feed filters to that subset → tap a card's matched-hunt chip to scope to just that hunt.
+Under **New**, tap **Watch-list** → feed shows only listings matching ≥1 saved hunt (gender + taste).
 
 ### Tune buy-ability
-Open Global filters → set price ceiling and ships-to-me + postal code → gates now exclude unaffordable/unshippable listings before they ever reach the feed.
+On **Hunts** → Global filters → price ceiling and ships-to-me + postal code → gates exclude before feed.
 
 ### Log a purchase
-Paste listing URL in Purchased watches → "Reading listing…" → review/edit auto-parsed pills → saved into collection.
+Paste listing URL in Purchased watches → "Reading listing…" → review parsed pills.
+
+---
+
+## Related docs
+
+- [vintage-timex-watches-feed.md](vintage-timex-watches-feed.md) — shipped feed UI
+- [hunt-builder-spec.md](hunt-builder-spec.md) — hunts page
+- [hunt-feed-filtering-criteria.md](hunt-feed-filtering-criteria.md) — matching pipeline
+- [marketplace-queries.md](marketplace-queries.md) — Chrono24 + eBay fetch

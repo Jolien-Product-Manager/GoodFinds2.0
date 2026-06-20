@@ -1,4 +1,5 @@
 import type { Chrono24Listing } from "@/lib/chrono24/schema";
+import { canonicalizeChrono24Url } from "@/lib/chrono24/urls";
 import type { EbayItemSummary } from "@/lib/ebay/schema";
 import { shouldExcludeEbayTitle } from "@/lib/ebay/title-filter";
 import { eraFromYear, matchListingToModel } from "@/lib/models/catalog";
@@ -61,7 +62,7 @@ export function normalizeChrono24Listing(raw: Chrono24Listing): AppListing | nul
     id: raw.listing_id,
     source: "chrono24",
     title: raw.title,
-    url: raw.url,
+    url: canonicalizeChrono24Url(raw.listing_id, raw.url),
     imageUrl: raw.image_url ?? null,
     priceValue: raw.price_value,
     priceCurrency: raw.price_currency ?? "USD",

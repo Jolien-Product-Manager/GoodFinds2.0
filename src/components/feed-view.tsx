@@ -140,7 +140,15 @@ export function FeedView({ listings, ebayEnabled }: FeedViewProps) {
       ? { title: "No starred listings yet", hint: "Star listings from New to save them here." }
       : feedView === "dismissed"
         ? { title: "Nothing dismissed", hint: "Listings you dismiss will appear here." }
-        : { title: "You're all caught up", hint: "Nothing new in this view — try refreshing or widening your scope." };
+        : alertScope === "watchlist"
+          ? {
+              title: "No hunt matches yet",
+              hint:
+                hunts.filter((h) => h.saved).length === 0
+                  ? "Save a hunt on Hunts (gender, model, era, etc.) to populate Watch-list."
+                  : "Nothing unseen matches your saved hunts — try All, or broaden hunt criteria on Hunts.",
+            }
+          : { title: "You're all caught up", hint: "Nothing new in this view — try refreshing or widening your scope." };
 
   return (
     <div className="space-y-8">

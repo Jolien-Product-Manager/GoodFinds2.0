@@ -15,16 +15,16 @@ flowchart LR
     Ebay["eBay Browse API\nwatch category + brand"]
   end
   subgraph app [In-app filters]
-    Norm["Drop missing price/id"]
-    Crit["Criteria panel defaults"]
-    Alerts["Alerts scope + seen"]
+    Norm["Normalize + gender infer"]
+    Crit["Global gates from Hunts page"]
+    FeedScope["Feed scope All / Watch-list + seen"]
   end
   Chrono24 --> Norm
   Ebay --> Norm
-  Norm --> Crit --> Alerts
+  Norm --> Crit --> FeedScope
 ```
 
-**Fetch queries ≠ Criteria panel.** Fetch pulls a candidate pool from each marketplace. Global gates and feed logic shrink what you see in the Vintage Timex Watches Feed and Watch List. Feed UI spec: [vintage-timex-watches-feed.md](vintage-timex-watches-feed.md).
+**Fetch queries ≠ global gates.** Fetch pulls a candidate pool from each marketplace. Global filters on `/hunts` and feed scope shrink what you see. Feed UI: [vintage-timex-watches-feed.md](vintage-timex-watches-feed.md).
 
 ---
 
@@ -36,7 +36,7 @@ flowchart LR
 |------|----------------|
 | 1 | Python scraper runs offline: [`scripts/chrono24/chrono24_timex.py`](../scripts/chrono24/chrono24_timex.py) |
 | 2 | Output written to `scripts/chrono24/vintage_timex.json` |
-| 3 | `npm run sync:listings` copies to [`data/chrono24/vintage_timex.json`](../data/chrono24/vintage_timex.json) |
+| 3 | `npm run sync:listings` copies to [`data/chrono24/vintage_timex.json`](../data/chrono24/vintage_timex.json) — **skips copy if scraper returned 0 listings** (preserves existing sample data) |
 | 4 | Next.js reads JSON at page load — **no live Chrono24 calls** |
 
 Loader: [`src/lib/chrono24/load-listings.ts`](../src/lib/chrono24/load-listings.ts)
@@ -63,10 +63,12 @@ Without `--vintage`, the scraper uses a single default query: `Timex`.
 ### Scraper behavior
 
 - **Search URL:** `https://www.chrono24.com/search/index.htm?dosearch=true&query={q}&sortorder=5`
-- **Pagination:** Chrono24 redirects to brand-specific URLs; subsequent pages use `index-2.htm`, `index-3.htm`, etc.
-- **Per-query cap:** `--max` listings per query (default 100 in CLI; current snapshot used 120)
-- **Deduping:** Listings merged across all queries by `listing_id` (fallback: URL)
-- **Infrastructure:** Requests routed through FlareSolverr (Cloudflare bypass)
+- **Pagination:** subsequent pages use `index-2.htm`, `index-3.htm`, etc.
+- **HTML parsing:** each `data-article-id` block parsed independently — title, price, link, and image extracted from the same block (avoids mismatched URLs)
+- **Listing URLs:** `--id{listing_id}` in path must match article id; [`canonicalizeChrono24Url()`](../src/lib/chrono24/urls.ts) applied at normalize time
+- **Per-query cap:** `--max` listings per query (default 100 in CLI)
+- **Deduping:** merged across queries by `listing_id`
+- **Infrastructure:** FlareSolverr required for live scrape (Cloudflare); **sample JSON with real listing IDs** ships for local dev when scrape fails
 
 **Recommended command for a fresh snapshot:**
 
@@ -90,18 +92,24 @@ Each listing also gets an `is_vintage` flag at parse time using the same logic.
 
 ### Normalize drops (app)
 
-In [`src/lib/listings/normalize.ts`](../src/lib/listings/normalize.ts), `normalizeChrono24Listing()` skips listings with:
+In [`src/lib/listings/normalize.ts`](../src/lib/listings/normalize.ts), `normalizeChrono24Listing()`:
 
-- Missing `listing_id`, or
-- Missing `price_value`
+- Skips listings with missing `listing_id` or `price_value`
+- Sets `url` via `canonicalizeChrono24Url(listing_id, raw.url)`
+- Sets `gender` via `inferListingGender(title)` ([`src/lib/listings/gender.ts`](../src/lib/listings/gender.ts))
+
+### Images (Chrono24)
+
+Chrono24 CDN blocks browser hotlinking. Cards use [`getListingImageSrc()`](../src/lib/listings/image-url.ts) → [`/api/listing-image`](../src/app/api/listing-image/route.ts) for `*.chrono24.com` hosts. Sample snapshot may use placeholder image URLs for dev.
 
 ### Code references
 
 | What | Where |
 |------|--------|
 | Query list | `VINTAGE_QUERIES` in `scripts/chrono24/chrono24_timex.py` |
-| Search URL builder | `fetch_query()` in same file |
-| Vintage detection | `parse_listing()` + `--vintage-only` branch in `main()` |
+| Per-article parse | `parse_article_block()`, `ARTICLE_BLOCK_RE` in same file |
+| URL canonicalization | `src/lib/chrono24/urls.ts` |
+| Sync guard | `scripts/sync-listings.mjs` |
 | App loader | `src/lib/chrono24/load-listings.ts` |
 
 ### Target (draft — edit me)
@@ -135,7 +143,9 @@ Merge: [`src/lib/listings/load-all-listings.ts`](../src/lib/listings/load-all-li
 | `q` | `timex vintage watch` | Hard-coded: `EBAY_DEFAULT_QUERY` in `src/lib/ebay/schema.ts` |
 | `category_ids` | `31387` (Wristwatches) | Hard-coded: `EBAY_WRISTWATCH_CATEGORY_ID` |
 | `aspect_filter` | `categoryId:31387,Brand:{Timex}` | Built in client from category + brand |
-| `limit` | `100` | Hard-coded: `EBAY_SEARCH_LIMIT` |
+| `limit` | `200` per page (max API page size) | Hard-coded: `EBAY_PAGE_SIZE` |
+| `offset` | `0`, then `200` | Paginated until `EBAY_SEARCH_LIMIT` (400) reached |
+| Total fetched | `400` | Hard-coded: `EBAY_SEARCH_LIMIT` in `src/lib/ebay/schema.ts` |
 | `sort` | `newlyListed` | Hard-coded in client |
 | Marketplace | `EBAY_CA` | `.env.local` → `EBAY_MARKETPLACE_ID` |
 | Environment | `production` | `.env.local` → `EBAY_ENV` (`production` \| `sandbox`) |
@@ -158,9 +168,20 @@ GET /buy/browse/v1/item_summary/search
   ?q=timex+vintage+watch
   &category_ids=31387
   &aspect_filter=categoryId:31387,Brand:{Timex}
-  &limit=100
+  &limit=200
+  &offset=0
   &sort=newlyListed
 ```
+
+Second page (when more results needed):
+
+```
+  &limit=200
+  &offset=200
+  &sort=newlyListed
+```
+
+Up to **400** items total (`EBAY_SEARCH_LIMIT`); stops early if fewer are available.
 
 Headers:
 
@@ -193,7 +214,7 @@ When eBay returns domestic shipping cost on the summary, it is stored as `shippi
 
 | What | Where |
 |------|--------|
-| Query + limit constants | `src/lib/ebay/schema.ts` — `EBAY_DEFAULT_QUERY`, `EBAY_SEARCH_LIMIT`, `EBAY_WRISTWATCH_CATEGORY_ID` |
+| Query + limit constants | `src/lib/ebay/schema.ts` — `EBAY_DEFAULT_QUERY`, `EBAY_SEARCH_LIMIT` (400), `EBAY_PAGE_SIZE` (200), `EBAY_WRISTWATCH_CATEGORY_ID` |
 | Title blocklist | `src/lib/ebay/title-filter.ts` — `shouldExcludeEbayTitle()` |
 | OAuth + search | `src/lib/ebay/client.ts` — `fetchEbayListings()` |
 | Response schema | `src/lib/ebay/schema.ts` — `ebaySearchResponseSchema` |
@@ -201,7 +222,7 @@ When eBay returns domestic shipping cost on the summary, it is stored as `shippi
 ### Target (draft — edit me)
 
 - **Primary query:** `timex vintage watch` + wristwatch category + Timex brand aspect *(current)*
-- **Result limit:** 100 / 200 / split across queries
+- **Result limit:** 400 total (2 × 200-page Browse API calls) / split across queries
 - **Sort:** newlyListed / price / other
 - **Marketplace:** EBAY_CA *(current)* / EBAY_US
 - **Title blocklist:** extend if apparel or parts-only listings still leak through
@@ -214,7 +235,7 @@ When eBay returns domestic shipping cost on the summary, it is stored as `shippi
 
 Applied **after** Chrono24 and eBay listings are merged. Same rules for every listing regardless of source.
 
-Defaults from [`src/lib/criteria.ts`](../src/lib/criteria.ts):
+Defaults from global filters on `/hunts` (synced to [`src/lib/criteria.ts`](../src/lib/criteria.ts)):
 
 | Filter | Default | Applied in |
 |--------|---------|------------|
@@ -223,8 +244,9 @@ Defaults from [`src/lib/criteria.ts`](../src/lib/criteria.ts):
 | Conditions | All except **For parts** | `passesCriteria()` |
 | Hidden listings | Excluded | `passesListingFilters()` in `src/lib/listings/selectors.ts` |
 | Disliked models | Excluded | `passesListingFilters()` |
-| Seen | Excluded from Alerts inbox | `unseenListings()` |
-| Alert scope | All new / Watch-list / Top picks (3♥) | `alertListings()` |
+| Seen / starred | Excluded from **New**; starred in own tab | `unseenListings()`, `interestedListings()` |
+| Feed scope (New tab) | **All** / **Watch-list** (hunt matches) | `alertListings()` |
+| Hunt gender | Per-hunt gate (Men's / Women's / Both) | `scoreListingAgainstHunt()` in `hunt-match.ts` |
 
 **Shipping estimates:** Total cost uses seeded deterministic shipping unless eBay provides a domestic `shipping_cost` on the listing. Chrono24 listings always use the estimate model today.
 
@@ -245,7 +267,7 @@ Defaults from [`src/lib/criteria.ts`](../src/lib/criteria.ts):
 |--|----------|------|
 | Fetch mode | Static JSON (scraper) | Live Browse API |
 | Query count | 10 (with `--vintage`) | 1 |
-| Result cap | ~120 per query, deduped across queries | 100 total |
+| Result cap | ~120 per query, deduped across queries | 400 total (paginated) |
 | Vintage filter at fetch | Yes (`--vintage-only`) | Search text only; category + brand at API |
 | Non-watch exclusion | Scraper site context | Wristwatch category + title blocklist |
 | Refresh | Manual scraper + `sync:listings` | Every page load (~5 min cache) |
@@ -259,9 +281,13 @@ Defaults from [`src/lib/criteria.ts`](../src/lib/criteria.ts):
 
 - `scripts/chrono24/chrono24_timex.py` — scraper, queries, vintage filter
 - `scripts/chrono24/.env.example` — FlareSolverr config
+- `scripts/sync-listings.mjs` — copy scraper output (with empty guard)
 - `data/chrono24/vintage_timex.json` — app data snapshot
 - `src/lib/chrono24/load-listings.ts` — read JSON
 - `src/lib/chrono24/schema.ts` — Zod types
+- `src/lib/chrono24/urls.ts` — listing URL canonicalization
+- `src/lib/listings/image-url.ts` — image proxy helper
+- `src/app/api/listing-image/route.ts` — Chrono24 image proxy
 
 **eBay**
 
@@ -275,4 +301,6 @@ Defaults from [`src/lib/criteria.ts`](../src/lib/criteria.ts):
 - `src/lib/listings/normalize.ts` — map to `AppListing`
 - `src/lib/criteria.ts` — Criteria defaults
 - `src/lib/shipping.ts` — `passesCriteria()`, cost estimates
-- `src/lib/listings/selectors.ts` — Alerts / Watch List filtering
+- `src/lib/listings/selectors.ts` — feed scope, unseen, starred, dismissed
+- `src/lib/listings/hunt-match.ts` — hunt matching
+- `src/lib/listings/gender.ts` — gender inference + hunt gender gate

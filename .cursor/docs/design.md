@@ -4,9 +4,9 @@ globs: ["**/*.tsx", "**/*.jsx", "**/*.css", "**/components/**"]
 alwaysApply: true
 ---
 
-# Design System — Vintage Timex Tool
+# Design System — GoodFinds (Vintage Timex Tool)
 
-Visual reference: `/design/timex-tool-mockup.html` (static, non-production).
+Product name: **GoodFinds**. Visual reference: `/design/timex-tool-mockup.html` (static, non-production).
 All UI must match that reference. When in doubt, open it and eyeball against it.
 
 ## Direction
@@ -42,6 +42,23 @@ Map these to the Tailwind theme. **Never use raw Tailwind palette defaults**
 - `brass` and `steal` are distinct roles: `brass` = general structure/warmth,
   `steal` = the underpriced-find moment + positive user signal (star). Do not merge.
 - Backgrounds carry a faint paper grain (subtle radial-dot texture, ~2% opacity).
+
+### shadcn/ui semantic tokens
+
+shadcn components (`Button`, `Input`, `Switch`, etc.) use semantic CSS variables defined in [`src/app/globals.css`](../src/app/globals.css) and mapped to the GoodFinds palette:
+
+| Semantic | Maps to |
+|----------|---------|
+| `background` | `paper` |
+| `foreground` / `primary` | `ink` |
+| `primary-foreground` | `card` |
+| `muted-foreground` | `ink-soft` |
+| `accent` | brass tint |
+| `destructive` | `steal` |
+| `border` / `input` | `line` / `line-strong` |
+| `ring` | `steal` (focus) |
+
+Custom tokens (`paper`, `card`, `ink`, `brass`, `steal`, …) remain the source of truth for bespoke layout; semantic tokens keep shadcn primitives styled consistently.
 
 ## Typography
 

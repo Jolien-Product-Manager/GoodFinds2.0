@@ -1,6 +1,7 @@
 import {
   EBAY_BRAND,
   EBAY_DEFAULT_QUERY,
+  EBAY_PAGE_SIZE,
   EBAY_SEARCH_LIMIT,
   EBAY_WRISTWATCH_CATEGORY_ID,
   ebaySearchResponseSchema,
@@ -66,6 +67,49 @@ async function getAccessToken(config: NonNullable<ReturnType<typeof getEbayConfi
   return data.access_token;
 }
 
+async function fetchEbaySearchPage(
+  config: NonNullable<ReturnType<typeof getEbayConfig>>,
+  token: string,
+  offset: number,
+  limit: number
+): Promise<EbayItemSummary[]> {
+  const aspectFilter = `categoryId:${EBAY_WRISTWATCH_CATEGORY_ID},Brand:{${EBAY_BRAND}}`;
+  const params = new URLSearchParams({
+    q: EBAY_DEFAULT_QUERY,
+    category_ids: EBAY_WRISTWATCH_CATEGORY_ID,
+    aspect_filter: aspectFilter,
+    limit: String(limit),
+    offset: String(offset),
+    sort: "newlyListed",
+  });
+
+  const res = await fetch(
+    `${config.baseUrl}/buy/browse/v1/item_summary/search?${params}`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "X-EBAY-C-MARKETPLACE-ID": config.marketplaceId,
+        Accept: "application/json",
+      },
+      next: { revalidate: REVALIDATE_SECONDS },
+    }
+  );
+
+  if (!res.ok) {
+    console.warn("eBay search failed:", res.status, "offset", offset);
+    return [];
+  }
+
+  const json = await res.json();
+  const parsed = ebaySearchResponseSchema.safeParse(json);
+  if (!parsed.success) {
+    console.warn("eBay response validation failed:", parsed.error.message);
+    return [];
+  }
+
+  return parsed.data.itemSummaries ?? [];
+}
+
 export async function fetchEbayListings(): Promise<EbayItemSummary[]> {
   const config = getEbayConfig();
   if (!config) {
@@ -74,40 +118,19 @@ export async function fetchEbayListings(): Promise<EbayItemSummary[]> {
 
   try {
     const token = await getAccessToken(config);
-    const aspectFilter = `categoryId:${EBAY_WRISTWATCH_CATEGORY_ID},Brand:{${EBAY_BRAND}}`;
-    const params = new URLSearchParams({
-      q: EBAY_DEFAULT_QUERY,
-      category_ids: EBAY_WRISTWATCH_CATEGORY_ID,
-      aspect_filter: aspectFilter,
-      limit: String(EBAY_SEARCH_LIMIT),
-      sort: "newlyListed",
-    });
+    const results: EbayItemSummary[] = [];
+    let offset = 0;
 
-    const res = await fetch(
-      `${config.baseUrl}/buy/browse/v1/item_summary/search?${params}`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "X-EBAY-C-MARKETPLACE-ID": config.marketplaceId,
-          Accept: "application/json",
-        },
-        next: { revalidate: REVALIDATE_SECONDS },
-      }
-    );
-
-    if (!res.ok) {
-      console.warn("eBay search failed:", res.status);
-      return [];
+    while (results.length < EBAY_SEARCH_LIMIT) {
+      const pageSize = Math.min(EBAY_PAGE_SIZE, EBAY_SEARCH_LIMIT - results.length);
+      const page = await fetchEbaySearchPage(config, token, offset, pageSize);
+      if (page.length === 0) break;
+      results.push(...page);
+      offset += page.length;
+      if (page.length < pageSize) break;
     }
 
-    const json = await res.json();
-    const parsed = ebaySearchResponseSchema.safeParse(json);
-    if (!parsed.success) {
-      console.warn("eBay response validation failed:", parsed.error.message);
-      return [];
-    }
-
-    return parsed.data.itemSummaries ?? [];
+    return results;
   } catch (err) {
     console.warn("eBay fetch error:", err);
     return [];

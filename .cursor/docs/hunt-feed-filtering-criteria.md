@@ -1,19 +1,8 @@
 # Hunt → Feed filtering criteria
 
-How a user's **hunts** ([Hunt Builder](hunt-builder-spec.md)) become what they see — and in what
-order — in the [Vintage Timex Watches Feed](vintage-timex-watches-feed.md), and how the feed shows
-*why* each listing matched. Fetch stage: [marketplace-queries.md](marketplace-queries.md). Goals:
-[prd.md](prd.md).
+How a user's **hunts** ([Hunt Builder](hunt-builder-spec.md)) become what they see — and in what order — in the [Vintage Timex Watches Feed](vintage-timex-watches-feed.md). Fetch stage: [marketplace-queries.md](marketplace-queries.md). Goals: [problem-framing.md](problem-framing.md).
 
-This is the connective doc: the other three each own one stage but none owns the mapping between them.
-
----
-
-## The gap
-
-The feed currently matches listings on **model only** (`matchListingToModel()`) and sorts by recency.
-The hunt builder reasons in **hunts** — multi-attribute saved searches with a **gates vs. taste** split.
-Nothing yet says how a hunt's attributes and gates collapse into feed filtering, ranking, and display.
+This doc owns the mapping between hunt builder, matching, and feed display.
 
 ---
 
@@ -21,14 +10,13 @@ Nothing yet says how a hunt's attributes and gates collapse into feed filtering,
 
 | | Gates (hard) | Taste (soft) |
 |---|---|---|
-| Source | Global filters (all hunts) | Per-hunt attributes |
-| Effect | Fails → **never appears** | Misses → **ranks lower**, still shows |
-| Examples | Price ceiling, ships-to-me | "Crosshair", "Marlin", "late 60s" |
-| Maps to | `passesCriteria()` (`../src/lib/shipping.ts`) | new `scoreListingAgainstHunt()` |
-| Escape hatch | — | A `dealbreaker` taste value is promoted to a per-hunt gate |
+| Source | Global filters (all hunts) + per-hunt **gender** | Per-hunt attributes |
+| Effect | Fails → **never appears** (or excluded from that hunt) | Misses → **ranks lower**, still can match |
+| Examples | Price ceiling, ships-to-me; men's hunt vs ladies listing | "Crosshair", "Marlin", "late 60s" |
+| Maps to | `passesCriteria()` ([`src/lib/shipping.ts`](../src/lib/shipping.ts)) | `scoreListingAgainstHunt()` ([`src/lib/listings/hunt-match.ts`](../src/lib/listings/hunt-match.ts)) |
+| Escape hatch | — | Dealbreaker promotion (not shipped) |
 
-The prototype treats taste as an AND filter, which empties the feed the moment a user gets specific.
-Target: **rank, don't exclude.**
+Target behavior: **rank, don't exclude** on taste alone — except gender, which acts as a per-hunt gate.
 
 ---
 
@@ -36,152 +24,138 @@ Target: **rank, don't exclude.**
 
 ```mermaid
 flowchart LR
-  Fetch["Chrono24 + eBay"] --> Norm["Normalize (drop missing price/id)"]
+  Fetch["Chrono24 + eBay"] --> Norm["Normalize + infer gender"]
   Norm --> Extract["Extract features per listing"]
   Extract --> Gates["Global gates: passesCriteria + passesListingFilters"]
-  Gates --> Match["Match + score vs all active hunts (best wins)"]
-  Match --> Feed["Feed: New / Dismissed / Interested"]
+  Gates --> GenderGate["Per-hunt gender gate"]
+  GenderGate --> Match["Match + score vs active hunts"]
+  Match --> Feed["Feed: New / Starred / Dismissed"]
 ```
 
-Gates run **before** matching — a watch the user can't buy never burns an inbox slot.
+Gates run **before** matching. Gender runs **inside** `scoreListingAgainstHunt()` before taste scoring.
 
 ---
 
-## 1. Feature extraction (dependency)
+## Gender filtering (shipped)
 
-Matching is only as good as what we read off a listing. Today the feed extracts **model only**. Full
-matching needs the `ExtractedFeatures` schema ([§3, §8](hunt-builder-spec.md)) populated per listing.
+Each hunt has `gender: "mens" | "womens" | "both"` ([`src/lib/hunts/types.ts`](../src/lib/hunts/types.ts)). Each listing gets `gender` at normalize time via [`inferListingGender()`](../src/lib/listings/gender.ts) from title (and case size heuristics).
+
+At match time, [`listingMatchesHuntGender()`](../src/lib/listings/gender.ts) re-checks the **full title**:
+
+| Hunt gender | Listing handling |
+|-------------|------------------|
+| **both** | All listings pass gender gate |
+| **mens** | Exclude if women's/ladies title signals, or ≤30mm case without men's label; neutral titles pass |
+| **womens** | Exclude if men's title signals without women's; symmetric to men's |
+
+A hunt with **only gender set** (no attribute chips) is still active via `huntHasActiveCriteria()` — gender-only hunts populate **Watch-list**.
+
+Summary sentence on Hunts page includes gender when not `both` ([`buildHuntSummary`](../src/lib/hunts/summary.ts)).
+
+---
+
+## Feature extraction
+
+Matching quality depends on [`ExtractedFeatures`](../src/lib/listings/types.ts) populated in normalize. Today:
 
 | Feature | Source | Confidence |
 |---|---|---|
-| `model` | **dial/reference code**, not title | high (code) / low (title) |
-| `dial`, `case`, `mvmt` | structured specs | high |
-| `color` | specs / image | medium |
-| `era` | parsed year → bucket | medium |
-| `cond` | inferred from description | low (seller optimism) |
+| `model` | Title via `matchListingToModel()` | low |
+| `era` | Parsed year → bucket | medium |
+| `cond` | Inferred from title | low |
+| `gender` | Title + size heuristics | medium |
 
-**Degrade gracefully:** until extraction lands, hunts match on model + gates; unextracted attributes
-render **unverified**, never silent misses.
+**Degrade gracefully:** unextracted taste attributes render **unverified** on cards, not silent misses.
 
 ---
 
-## 2. Matching one listing against one hunt
+## Matching one listing against one hunt
 
-Effective value set per attribute = `picks ∪ customs`. **Within** an attribute: OR. **Across**
-attributes: a score, not an AND.
+Effective value set per attribute = `picks ∪ customs`. **Within** an attribute: OR. **Across** attributes: score ratio (hits / specified).
 
-| Attribute | Rule | Notes |
-|---|---|---|
-| `model` | code-resolved model ∈ values | title-only counts but low-confidence |
-| `collab` | listing collab ∈ values | `Any collab` / `House brand only` mutually exclusive with named partners |
-| `dial`, `color`, `case`, `mvmt` | listing value ∈ values | `Needs battery` only valid for quartz/electric |
-| `era` | parsed year in bucket | buckets need confirming (see open decisions) |
-| `cond` | **ladder-aware** | cosmetic rungs match "≥ requested"; `Needs battery`/`For parts` match exactly |
+Gender mismatch → `excluded: true`, hunt not added to `matchedHuntIds`.
 
-**Normalize** preset *and* custom values identically before comparison (so "crosshair" / "cross-hair"
-collapse), or free-text recreates keyword search ([§6.3, §8](hunt-builder-spec.md)).
+**Score:** `specified === 0` → base score `0.5` (gender-only hunt). Otherwise `hits / specified`.
 
-**Score:** `dealbreaker` miss → excluded from that hunt; otherwise sum hits weighted by importance
-(nice/want/dealbreaker, [§9 #4](hunt-builder-spec.md)). Until weights ship, every specified attribute = 1.
+Dealbreaker promotion is **not shipped**.
 
 ---
 
-## 3. Combining hunts + ranking
+## Combining hunts + ranking
 
-- A listing shows in **New** iff it passes global gates **and** matches **≥1 active hunt** (OR across hunts).
-- Feed rank = its **best** hunt score; tie-break by recency.
-- Record every matched hunt (for display + per-hunt scope).
+- **All** scope (New tab): unseen listings that pass global gates.
+- **Watch-list** scope: same pool, filtered to listings with `matchedHuntIds.length > 0` for ≥1 saved hunt.
+- Feed rank = **best** hunt score among matched hunts; tie-break by model hearts (legacy) then recency.
 
-```
-alertSort (target): 1. best matched-hunt score desc  2. recency desc
-```
+[`alertSort`](../src/lib/listings/selectors.ts): best score desc → hearts desc → `listedAt` desc.
 
 ---
 
-## 4. Display — "accurately show the user's preferences"
+## Display — "why you're seeing this"
 
-Each **New** card gets a compact "why you're seeing this" block (inline version of the deferred
-match-detail card, [§10](hunt-builder-spec.md)):
+Each **New** card shows ([`alert-listing-card.tsx`](../src/components/alert-listing-card.tsx)):
 
-1. **Matched-hunt chip(s)** — tap to scope the feed to that hunt.
-2. **Per-attribute hit / miss / unverified** — never collapse "wrong dial" into "couldn't tell."
-3. **Confidence** per shown feature (high/med/low) — flags `cond` and title-only `model`.
-4. **Match-strength** echo of the hunt's tightness badge, so rank order is legible.
+1. **Why note** from `HuntMatchResult.whyNote`
+2. **Matched hunt names** when applicable
+3. **Per-attribute hit / miss / unverified** from `attributeMatches`
 
 ---
 
-## 5. Global gates mapping
+## Global gates mapping
 
-GlobalFilters are the current Criteria defaults, relocated off the feed page. Reuse the existing gates:
+Global filters on `/hunts` sync into `criteria` in the store:
 
-| GlobalFilter | Existing gate | Where |
+| GlobalFilter | Gate | Where |
 |---|---|---|
 | `priceCeiling` | Max total cost | `passesCriteria()` |
 | `shipsToMe` + `postalCode` | Ships-to-me | `passesCriteria()` |
 | always on | Hidden / disliked excluded | `passesListingFilters()` |
 
-- Defaults migrate from `../src/lib/criteria.ts` into the GlobalFilters store.
-- **Condition leaves the gates** → it's per-hunt taste. Keep one soft default: Any-condition hunts hide
-  `For parts` unless they list it.
-- **Landed cost > sticker** when postal code is set ([§6.7](hunt-builder-spec.md)).
-- Seller location stays out of gates; if provenance returns, it's per-hunt.
+Condition is per-hunt taste, not a global gate (except soft exclusion of "For parts" via criteria defaults).
 
 ---
 
-## 6. Scope chips
+## Feed scope (shipped vs future)
 
-| Chip | Shows |
+| Scope | Shipped in UI | Behavior |
+|---|---|---|
+| `all` | Yes | All unseen gated listings |
+| `watchlist` | Yes | Unseen + ≥1 hunt match |
+| `top` | No | Score ≥ 0.7 (code only) |
+| `hunt:{id}` | No | Single hunt filter (code only) |
+
+---
+
+## Shipped vs future
+
+| Shipped | Future |
 |---|---|
-| **All hunts** | Unseen listings matching ≥1 active hunt |
-| **Per-hunt** (one chip each) | Scope to a single hunt's matches |
-| **Top matches** | Best hunt score clears a "strong match" threshold |
-
-`alertScope` value space: `all \| hunt:{id} \| top`.
-
----
-
-## Current vs. target (delta)
-
-| Target | Current |
-|---|---|
-| Full attribute matching | `matchListingToModel()` — model only |
-| Taste **ranks** survivors | Taste = AND filter (none in feed yet) |
-| Rank by best hunt score, then recency | `alertSort` — recency, no taste scoring |
-| Gates from GlobalFilters store | Hardcoded in `criteria.ts` |
-| Condition = per-hunt taste | Condition = global gate |
-| Card shows hunt + hit/miss/unverified + confidence | No match detail on card |
+| Hunt match scoring + Watch-list scope | Top picks threshold UI |
+| Gender per hunt + title inference | Dealbreaker taste weights |
+| Best hunt score sort | Per-hunt scope chips in feed |
+| Model + era + cond extraction (partial) | Full dial/case/mvmt from specs |
+| Card match reasons | Tap hunt chip to scope feed |
 
 ---
 
-## Acceptance criteria
+## Acceptance criteria (shipped)
 
-- **FC1:** Gates run before matching; gated-out listings never appear.
-- **FC2:** A listing shows in **New** iff it passes gates **and** matches ≥1 active hunt.
-- **FC3:** Rank = best hunt score, then recency; listings missing taste rank lower, don't vanish.
-- **FC4:** A `dealbreaker` miss excludes from that hunt only, not the feed.
-- **FC5:** Cosmetic condition matches "≥ requested"; `Needs battery`/`For parts` match exactly.
-- **FC6:** Custom and preset values normalized identically.
-- **FC7:** Each **New** card shows matched hunt(s), per-attribute hit/miss/**unverified**, and confidence.
-- **FC8:** Without extraction, hunts degrade to model + gates; missing attributes render **unverified**.
-- **FC9:** Scope resolves to `all` / `hunt:{id}` / `top`; unseen badge counts post-gate, post-match.
-- **FC10:** Condition judged per-hunt; only global behavior is the soft `For parts` hide.
-
----
-
-## Open decisions
-
-1. Taste weights + "Top matches" threshold.
-2. Era bucket boundaries (esp. the 60s split).
-3. Gate on item price now, switch to landed total later?
-4. `For parts` soft-hide for Any-condition hunts — confirm.
-5. Matcher home — extend `selectors.ts` or new `../src/lib/listings/hunt-match.ts` (recommend the latter).
+- **FC1:** Global gates run before listings appear in New.
+- **FC2:** Watch-list shows unseen listings matching ≥1 saved hunt (gender + taste).
+- **FC3:** Rank = best hunt score, then recency.
+- **FC4:** Gender-only hunts (e.g. Men's only) actively match listings.
+- **FC5:** Men's hunt excludes ladies/women's title signals and small-case women's heuristics.
+- **FC6:** Custom and preset values normalized identically before compare.
+- **FC7:** Cards show match note and attribute status where available.
+- **FC8:** `alertScope` resolves to `all` or `watchlist` in UI.
 
 ---
 
 ## Related files
 
-- [hunt-builder-spec.md](hunt-builder-spec.md), [vintage-timex-watches-feed.md](vintage-timex-watches-feed.md), [marketplace-queries.md](marketplace-queries.md), [prd.md](prd.md)
-- `../src/lib/listings/selectors.ts` — `unseenListings`, `alertListings`, `alertSort`, `passesListingFilters`
-- `../src/lib/shipping.ts` — `passesCriteria()` · `../src/lib/criteria.ts` — defaults (→ GlobalFilters store)
-- `../src/lib/listings/normalize.ts` — `matchListingToModel()` · `../src/store/caseback.ts` — `seen`, `listingStatus`, `alertScope` (+ `hunts`)
-- *proposed* `../src/lib/listings/hunt-match.ts` — `scoreListingAgainstHunt()`, `matchAllHunts()`
+- [hunt-builder-spec.md](hunt-builder-spec.md), [vintage-timex-watches-feed.md](vintage-timex-watches-feed.md), [marketplace-queries.md](marketplace-queries.md), [problem-framing.md](problem-framing.md)
+- [`src/lib/listings/hunt-match.ts`](../src/lib/listings/hunt-match.ts) — `scoreListingAgainstHunt()`, `matchAllHunts()`
+- [`src/lib/listings/gender.ts`](../src/lib/listings/gender.ts) — inference + hunt gender gate
+- [`src/lib/listings/selectors.ts`](../src/lib/listings/selectors.ts) — `unseenListings`, `alertListings`, `alertSort`
+- [`src/lib/shipping.ts`](../src/lib/shipping.ts) — `passesCriteria()`
+- [`src/store/caseback.ts`](../src/store/caseback.ts) — `seen`, `listingStatus`, `feedView`, `alertScope`, `hunts`

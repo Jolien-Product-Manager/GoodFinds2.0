@@ -1,10 +1,8 @@
-# Vintage Timex Watches Feed
+# GoodFinds — Vintage Timex Watches Feed
 
-Product spec for the **Vintage Timex Watches Feed** (route `/`, default landing tab). Describes **target behavior** — what Caseback is being built toward. For marketplace fetch queries, see [marketplace-queries.md](marketplace-queries.md). For overall product goals, see [prd.md](prd.md).
+Product spec for the **Vintage Timex Watches Feed** (route `/`, default landing tab). Describes **shipped behavior** in GoodFinds. For marketplace fetch queries, see [marketplace-queries.md](marketplace-queries.md). For product goals, see [problem-framing.md](problem-framing.md).
 
-The masthead nav may still show **Alerts** in the app until UI copy is updated separately.
-
-**Not covered here:** the Criteria panel (price cap, ships-to-me, condition chips) — that moves to a separate page. **Removed from the feed:** the **Older** section; all unseen listings belong in **New**.
+Global gates (price ceiling, ships-to-me) live on the **Hunts** page (`/hunts`), not on the feed. There is no 24-hour **Older** split — all unseen listings belong in **New**.
 
 ---
 
@@ -12,11 +10,11 @@ The masthead nav may still show **Alerts** in the app until UI copy is updated s
 
 The feed is the **inbox** for marketplace listings the user has not dismissed yet.
 
-**Job to be done:** *“What’s new that I haven’t looked at, and what did I already clear?”*
+**Job to be done:** *“What’s new that I haven’t looked at, what did I star, and what did I already clear?”*
 
-**User story:** As a vintage Timex hunter, I want a single inbox of unseen listings ranked by my watch-list priority, so I can scan quickly, dismiss noise, and save anything worth pursuing.
+**User story:** As a vintage Timex hunter, I want a single inbox of unseen listings ranked by hunt match score, so I can scan quickly, dismiss noise, and star anything worth pursuing.
 
-The Vintage Timex Watches Feed is the default landing tab. The masthead badge shows the **unseen** count.
+The feed is the default landing tab. Masthead nav: **Feed** | **Hunts** (no inbox badge).
 
 ---
 
@@ -24,185 +22,170 @@ The Vintage Timex Watches Feed is the default landing tab. The masthead badge sh
 
 | The feed is | The feed is not |
 |-------------|-----------------|
-| Unseen listing inbox | Criteria / budget settings (separate page) |
-| Dismiss + restore workflow | Watch List (model-centric) |
-| Optional **Interested** view via top toggle | Explore (model triage) |
+| Unseen listing inbox with hunt-ranked sort | Global filters / price settings (those live on `/hunts`) |
+| Dismiss + restore + star workflow | Model-centric “heart a model” triage (legacy `modelHearts` unused in UI) |
+| Three top-level views: New, Starred, Dismissed | Explore tab or separate Watch List page |
 
-Listings are still filtered by **global gates** in the app (price, shipping, condition, etc.), but the **Criteria UI does not live on the feed page** in the target design.
+Listings are filtered by **global gates** (price, shipping, condition) before they reach the feed. Gates sync from Global filters on the Hunts page via [`src/store/caseback.ts`](../src/store/caseback.ts).
 
 ---
 
-## Layout (target)
+## Layout
 
 ```mermaid
 flowchart TB
   subgraph header [Feed header]
-    Title[Title + subtitle]
-    ViewToggle["View toggle: New | Interested"]
-    ScopeChips["Scope: All new · Watch-list · Top picks"]
+    Title["GoodFinds + stats line"]
+    MainToggle["Main toggle: New | Starred | Dismissed"]
+    ScopeChips["New only: All | Watch-list"]
     Actions["Mark all dismissed · Check for new listings"]
   end
-  subgraph body [Main content — default New]
-    NewSection["New — all unseen listings"]
-    DismissedSection["Dismissed listings — collapsible"]
+  subgraph body [Main content]
+    Grid["Listing card grid for active view"]
   end
   header --> body
-  ViewToggle -->|Interested selected| InterestedGrid["Interested listings grid"]
 ```
-
-**Excluded:** Criteria panel, **Older** section.
 
 ---
 
-## View modes (top toggle)
+## View modes (main toggle)
 
-Two views; only one visible at a time. **New** is the default.
+Three views; only one visible at a time. **New** is the default. Stored as `feedView` in [`src/store/caseback.ts`](../src/store/caseback.ts).
 
 ### New (default)
 
-All **unseen** listings that match the current scope and global gates — **no 24-hour split**. (The current app splits “New” vs “Older” by freshness; the target merges both into one **New** pool.)
+All **unseen** listings that match the current scope and global gates.
 
-Sorted by watch-list priority (`alertSort` in [`src/lib/listings/selectors.ts`](../src/lib/listings/selectors.ts)):
+Sorted by [`alertSort`](../src/lib/listings/selectors.ts):
 
-1. Higher heart count on the listing’s model first  
-2. Then more recently added listings  
+1. Best matched-hunt score (from [`matchAllHunts`](../src/lib/listings/hunt-match.ts))
+2. Model heart count tie-break (legacy field; no UI to set hearts today)
+3. Most recently listed
 
-### Interested
+### Starred
 
-Same card grid as **New**, but only listings where the user toggled **Interested** (`listingStatus.interested`). Accessed via a **top toggle** (New | Interested), not a permanent section below New.
+Listings where the user toggled **Star** (`listingStatus.interested === true` in code). Same card grid as New; dismiss is not shown here.
+
+### Dismissed
+
+Listings in `seen[]` that are **not** starred. Full top-level tab with muted cards and **Restore** action — not a collapsible section below New.
 
 **Rules:**
 
-- Switching back to **New** preserves dismiss state.  
-- A listing marked **Interested** and **Dismissed** appears in the **Interested** view, not in **New** (see selectors: `seenListings` excludes interested; `interestedListings` includes them).  
+- Switching views preserves dismiss and star state.
+- A listing that is both **Starred** and **Dismissed** appears in **Starred**, not in New or Dismissed (selectors exclude interested from dismissed).
 
 ---
 
-## Section: New
-
-**Definition:** Every listing where `id` is not in `seen[]` and the listing passes listing filters (global gates, not hidden, model not disliked).
-
-**Header**
-
-- Title: **New**  
-- Count badge  
-- Subtitle: e.g. “listings you haven’t dismissed”  
-- Optional bulk action: **Mark all dismissed** (dismiss all unseen in current scope)
-
-**Card grid**
-
-Each card shows:
-
-- Marketplace source (eBay / Chrono24)  
-- Image, title, model/year, total cost, condition  
-- Watch-list heart badge when the model is on the list  
-
-**Card actions**
-
-| Button | Effect |
-|--------|--------|
-| **Interested** | Toggle saved state; listing appears in **Interested** view |
-| **Dismiss** | Remove from **New**; add to **Dismissed listings** |
-
-**Scope chips** (filter which unseen listings appear in **New**):
-
-| Chip | Shows |
-|------|--------|
-| All new | All unseen listings |
-| Watch-list | Unseen listings for models with ≥1 heart |
-| Top picks (3♥) | Unseen listings for models with 3 hearts |
+## New sub-scope (only when `feedView === "new"`)
 
 Stored as `alertScope` in [`src/store/caseback.ts`](../src/store/caseback.ts).
 
-**Empty state**
+| Scope | Shows |
+|-------|--------|
+| **All** | All unseen listings that pass global gates |
+| **Watch-list** | Unseen listings that match **≥1 saved hunt** (`matchResults.matchedHuntIds.length > 0`), including gender-only hunts (e.g. Men's only with no attribute chips) |
 
-When there are no unseen listings in the current scope: “You’re all caught up” or “Nothing new in this view” (e.g. narrow scope with no matches).
-
-**Stats line (target copy)**
-
-`{unseen} new · {dismissed} dismissed`
-
----
-
-## Section: Dismissed listings
-
-**Definition:** Listings the user **Dismissed** from the feed. Persisted in `seen[]` in [`src/store/caseback.ts`](../src/store/caseback.ts). (Implementation still uses “seen” in code; UI copy targets **Dismiss** / **Dismissed listings**.)
-
-**Placement:** Collapsible section at the **bottom** of the feed page (below **New** when in default view). Expanded by default is acceptable.
-
-**Behavior**
-
-- Muted cards  
-- **Restore** — remove from `seen[]`; listing returns to **New** if it still passes filters  
-- **Interested** — still available on dismissed cards  
-- Listings with `listingStatus.interested` are excluded from this section (they live in the **Interested** view instead)
-
-**Empty:** Section hidden when count is 0.
+Watch-list uses hunt matching from [`hunt-match.ts`](../src/lib/listings/hunt-match.ts) and [`alertListings()`](../src/lib/listings/selectors.ts) — **not** `modelHearts`.
 
 ---
 
-## Other header actions
+## Listing cards
 
-| Action | Target behavior |
-|--------|-----------------|
-| **Mark all dismissed** | Dismiss every unseen listing in the current scope (with undo toast) |
-| **Check for new listings** | Trigger a fresh pull from marketplaces (future: wire to fetch; today may show a placeholder toast) |
+Each card ([`alert-listing-card.tsx`](../src/components/alert-listing-card.tsx)) shows:
+
+- Marketplace source badge (eBay / Chrono24)
+- Image (Chrono24 via image proxy when needed), title, model/year, total cost, condition
+- Match reasons from hunt scoring (`whyNote`, attribute hit/miss/unverified)
+
+**Card actions (New tab)**
+
+| Button | Effect |
+|--------|--------|
+| **Star** | Toggle saved state; listing appears in **Starred** |
+| **Dismiss** | Remove from **New**; add to **Dismissed** |
+| **View listing** | Open marketplace URL in new tab |
+
+**Card actions (Dismissed tab)**
+
+| Button | Effect |
+|--------|--------|
+| **Restore** | Remove from `seen[]`; listing returns to **New** if it still passes filters |
+| **Star** | Still available on dismissed cards |
 
 ---
 
-## Persistence and undo
+## Header actions (New tab)
+
+| Action | Behavior |
+|--------|----------|
+| **Mark all dismissed** | Dismiss every unseen listing in the current scope (undo toast) |
+| **Check for new listings** | `router.refresh()` to re-fetch server listings + toast |
+
+---
+
+## Stats line
+
+`{unseen} new · {starred} starred · {dismissed} dismissed`
+
+Optional suffix when eBay credentials are missing: eBay offline hint.
+
+---
+
+## Empty states
+
+Contextual copy in [`feed-view.tsx`](../src/components/feed-view.tsx):
+
+- **New / All:** “You're all caught up”
+- **New / Watch-list:** “No hunt matches yet” — prompts to save a hunt on `/hunts` or broaden criteria
+- **Starred:** “No starred listings yet”
+- **Dismissed:** “Nothing dismissed”
+
+---
+
+## Persistence
 
 | State | Storage |
 |-------|---------|
-| `seen[]` (dismissed IDs) | `caseback-state-v3` via storage adapter |
-| `listingStatus.interested` | Same |
-| `alertScope` | Same (session may reset scope; persisted prefs TBD) |
+| `seen[]` (dismissed IDs) | `caseback-state-v3` (localStorage) + [`/api/state`](../src/app/api/state/route.ts) → `data/store/state.json` |
+| `listingStatus.interested` (starred) | Same |
+| `feedView`, `alertScope` | Same |
+| `feedView: "interested"` (legacy) | Migrated to `"starred"` on rehydrate |
 
-Dismiss and restore show a **toast with undo**, reverting the last action.
-
----
-
-## Relationship to other tabs
-
-| Tab | How it connects to the feed |
-|-----|----------------------------|
-| **Explore** | Heart a model → adds to Watch List → boosts its listings in **New** sort order |
-| **Watch List** | Heart count (1–3) drives scope chips and `alertSort` priority |
-| **Criteria** (separate page) | Global gates applied before listings reach **New**; UI not on the feed page |
-
-Listing data sources: [marketplace-queries.md](marketplace-queries.md).
+Dismiss and restore show a **toast with undo**.
 
 ---
 
-## Current implementation vs target
+## Relationship to Hunts
 
-Honest delta for builders ([`src/components/alerts-view.tsx`](../src/components/alerts-view.tsx) today):
+| Hunts page | How it connects to the feed |
+|------------|----------------------------|
+| **Saved hunts** | Define what **Watch-list** matches (gender + taste attributes) |
+| **Global filters** | Price ceiling, ships-to-me, postal code → global gates via `passesCriteria()` |
+| **Purchased watches** | Collection log; does not filter the feed today |
 
-| Target | Current code |
-|--------|--------------|
-| No Criteria on the feed page | `CriteriaPanel` still rendered |
-| **New** = all unseen | Split into **New** (24h) + **Older** |
-| **Dismissed listings** | Labeled **Seen** |
-| **Interested** via top toggle | **Interested** is a fixed section; no view toggle |
-| No **Older** | **Older** section still exists |
+Listing data sources: [marketplace-queries.md](marketplace-queries.md). Hunt → feed mapping: [hunt-feed-filtering-criteria.md](hunt-feed-filtering-criteria.md).
 
 ---
 
-## Acceptance criteria
+## Future (not shipped in UI)
 
-- **AL1:** Default view shows all unseen listings in **New** (no 24h / Older split).  
-- **AL2:** **Dismiss** moves a listing to **Dismissed listings**; **Restore** reverses.  
-- **AL3:** Top toggle switches between **New** and **Interested** (one view at a time).  
-- **AL4:** No Criteria panel on the feed page.  
-- **AL5:** No **Older** section.  
-- **AL6:** Scope chips and masthead unseen badge still work.  
+Code or specs exist but are **not exposed** in the feed UI today:
+
+- **Top picks** scope (`alertScope: "top"`) — strong-match threshold
+- **Per-hunt scope chips** (`alertScope: "hunt:{id}"`)
+- **Model hearts** UI to populate `modelHearts` (sort tie-break only)
+- **Explore** tab / model triage
+- Masthead unseen-count badge
 
 ---
 
 ## Related files
 
-- [`src/components/alerts-view.tsx`](../src/components/alerts-view.tsx) — feed UI (`AlertsView`)  
-- [`src/components/alert-listing-card.tsx`](../src/components/alert-listing-card.tsx) — listing cards  
-- [`src/lib/listings/selectors.ts`](../src/lib/listings/selectors.ts) — unseen, interested, seen, alert sort  
-- [`src/store/caseback.ts`](../src/store/caseback.ts) — `seen`, `listingStatus`, `alertScope`  
-- [`src/components/masthead.tsx`](../src/components/masthead.tsx) — unseen badge  
+- [`src/components/feed-view.tsx`](../src/components/feed-view.tsx) — feed UI
+- [`src/components/alert-listing-card.tsx`](../src/components/alert-listing-card.tsx) — listing cards
+- [`src/lib/listings/selectors.ts`](../src/lib/listings/selectors.ts) — unseen, starred, dismissed, alert sort
+- [`src/lib/listings/hunt-match.ts`](../src/lib/listings/hunt-match.ts) — hunt scoring and match reasons
+- [`src/store/caseback.ts`](../src/store/caseback.ts) — `seen`, `listingStatus`, `feedView`, `alertScope`
+- [`src/components/masthead.tsx`](../src/components/masthead.tsx) — nav
+- [`src/components/state-sync.tsx`](../src/components/state-sync.tsx) — server persistence sync

@@ -1,8 +1,7 @@
-# Sleeper — Hunt Builder & Collection: Build Spec
+# GoodFinds — Hunt Builder & Collection: Build Spec
 
-A spec for re-creating the vintage Timex hunt-builder prototype as production
-components. Written to be handed to Cursor. Adapt class names and tokens to the
-existing Sleeper Next.js / Tailwind design system rather than inventing new ones.
+Shipped spec for the vintage Timex hunt builder at `/hunts`. Adapt class names and tokens to the
+existing GoodFinds Next.js / Tailwind design system ([`design.md`](design.md)).
 
 ---
 
@@ -33,14 +32,15 @@ data model and the UI.
 
 - **Taste (soft preferences):** the per-hunt attributes (model, dial, era,
   condition grade, etc.). Multiple values allowed per attribute; within an
-  attribute they mean OR. These should ultimately *rank* listings, not hard-
-  exclude — though the prototype treats them as filters for simplicity.
-- **Gates (hard constraints):** global filters (price ceiling, ships-to-me).
-  Binary; a listing that fails a gate is excluded.
+  attribute they mean OR. These rank listings via hunt score, not hard-exclude
+  (except where noted).
+- **Gates (hard constraints):** global filters (price ceiling, ships-to-me) and
+  per-hunt **gender** (Men's / Women's / Both). Binary; a listing that fails
+  fails the gate for that hunt.
 
 ### 2.2 Per-hunt vs. global
 
-- **Per-hunt:** model, collaboration, dial pattern, dial color, era, case size,
+- **Per-hunt:** **gender**, model, collaboration, dial pattern, dial color, era, case size,
   movement, condition grade. Each hunt has its own values.
 - **Global:** price ceiling, ships-to-my-address (+ postal code). Set once,
   applied to all hunts.
@@ -76,14 +76,19 @@ interface HuntAttribute {
   customs: string[];
 }
 
+type HuntGender = 'mens' | 'womens' | 'both';
+
 interface Hunt {
   id: string;                      // uuid; assigned on first save
   name: string;
   saved: boolean;                  // false = dirty / never-saved draft
+  gender: HuntGender;              // default 'both'; acts as per-hunt gate when not 'both'
   attributes: Record<AttrKey, HuntAttribute>;
   createdAt: string;
   updatedAt: string;
 }
+
+// normalizeHunt() fills missing gender/attributes on persisted hunts (migration).
 
 interface GlobalFilters {
   priceCeiling: number | null;     // null = no limit
@@ -115,20 +120,31 @@ interface PurchasedWatch {
 The builder edits a **working copy**, not the stored object:
 
 - New hunt → a fresh `Hunt` with `saved: false`, kept in a `draft` slot.
-- Existing hunt → edit a clone of `hunts[i]`; commit back on Save.
+- Existing hunt → edit a clone via `normalizeHunt()`; commit back on Save.
 
-> The prototype edits existing hunts in place (live). The recommended production
-> behavior is a working copy for **both** new and existing, so that "unsaved
-> changes" means the same thing everywhere and collapsing without saving can
-> revert. See §9.
+Shipped: working copy for **both** new and existing hunts ([`hunt-builder-screen.tsx`](../src/components/hunt-builder-screen.tsx)).
 
 ---
 
 ## 4. Field taxonomy
 
+### Gender (per-hunt gate)
+
+Rendered above the eight attribute rows. Options ([`HUNT_GENDER_OPTIONS`](../src/lib/hunts/types.ts)):
+
+| Value | Label |
+|-------|--------|
+| `both` | Men's & Women's |
+| `mens` | Men's |
+| `womens` | Women's |
+
+Listing gender is inferred from marketplace titles at normalize time and re-checked at match time ([`src/lib/listings/gender.ts`](../src/lib/listings/gender.ts)). A gender-only hunt (no attribute chips) still drives **Watch-list** matches.
+
+### Taste attributes
+
 Per-hunt attributes and their preset options. Each is **multi-select** and also
 accepts free-text ("or type your own"). Order matters for the summary sentence
-(see §6.3).
+(see §6.4).
 
 | Key      | Label            | Icon (Tabler)   | Options |
 |----------|------------------|-----------------|---------|
@@ -151,7 +167,7 @@ selection in production.
 exclusive with the named partners (selecting one clears the others) to avoid
 contradictions like "no collabs or Peanuts edition".
 
-> Placeholder lists. Replace with the real Sleeper model/reference taxonomy. Drive
+> Placeholder lists. Replace with the real GoodFinds model/reference taxonomy. Drive
 > chip options from data, not hardcoded arrays.
 
 ---
@@ -166,6 +182,7 @@ contradictions like "no collabs or Peanuts edition".
       hunt (working copy), expanded,
       onChangeAttr, onRename, onSave, onDelete, onCollapse />
     <HuntNameRow />               // name input + collapse chevron
+    <GenderRow />                 // Men's & Women's | Men's | Women's
     <AttributeRow x8 />           // chips (multi-select) + free-text input
     <HuntSummaryCard />           // plain-language summary + tightness badge
     <HuntActions />               // [unsaved hint] [Delete] [Save hunt]
@@ -216,7 +233,7 @@ contradictions like "no collabs or Peanuts edition".
 ### 6.4 Summary sentence + tightness
 
 - Build a plain-language sentence from selected attributes in this order:
-  `era, color, dial, model, collab, case, mvmt, cond`.
+  gender (if not `both`), then `era, color, dial, model, collab, case, mvmt, cond`.
 - Within an attribute join with "or"; across attributes join with " · ".
 - `collab` rewrites: "Any collab" → "collab edition"; "House brand only" →
   "no collabs"; named → "{name} edition".
@@ -282,18 +299,16 @@ contradictions like "no collabs or Peanuts edition".
 
 ## 7. Visual / styling notes
 
-- Map everything to existing Sleeper tokens. The prototype used a warm amber
-  accent (vintage brass/patina) for the active-hunt / collection accents and the
-  product's info color for selected chips — translate to the equivalent named
-  tokens.
+- Map everything to existing GoodFinds tokens (`paper`, `card`, `ink`, `brass`, `steal`, …).
+  shadcn/ui components use semantic CSS variables mapped to the same palette in
+  [`globals.css`](../src/app/globals.css).
 - Chips: pill radius, 0.5px borders, info-tinted background when selected.
 - Cards/sections: white surface, 0.5px border, lg radius.
 - Selected chip = check icon + tinted bg; unselected = transparent + muted text.
 - Icons: Tabler outline set (names listed in §4). Decorative icons get
   `aria-hidden`; icon-only buttons get `aria-label`.
 - Sentence case throughout. Two font weights only (regular + medium).
-- No browser storage in the client unless the app already persists hunts via its
-  own backend/state layer — wire to that.
+- No browser-only persistence — hunts sync via zustand + [`/api/state`](../src/app/api/state/route.ts) ([`state-sync.tsx`](../src/components/state-sync.tsx)).
 
 ---
 
@@ -316,9 +331,7 @@ this applies to both hunt matching and purchase extraction.
 
 ## 9. Open decisions to resolve before/while building
 
-1. **Working copy for existing hunts.** Edit a clone and commit on Save (so
-   collapsing reverts), or keep live edits? Recommended: working copy for parity
-   with drafts.
+1. ~~**Working copy for existing hunts.**~~ Shipped.
 2. **Discard semantics.** New draft discards on collapse (good). Decide what an
    existing hunt with unsaved edits does on collapse: revert, prompt, or keep.
 3. **Condition: per-hunt vs. global default-with-override.** Recommended:

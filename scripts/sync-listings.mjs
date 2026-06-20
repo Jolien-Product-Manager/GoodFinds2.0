@@ -9,6 +9,16 @@ if (!fs.existsSync(src)) {
   process.exit(0);
 }
 
+const raw = JSON.parse(fs.readFileSync(src, "utf-8"));
+const count = Array.isArray(raw.listings) ? raw.listings.length : 0;
+
+if (count === 0) {
+  console.warn(
+    "Scraper returned 0 listings — keeping existing data/chrono24/vintage_timex.json."
+  );
+  process.exit(0);
+}
+
 fs.mkdirSync(path.dirname(dest), { recursive: true });
 fs.copyFileSync(src, dest);
-console.log(`Synced listings to ${dest}`);
+console.log(`Synced ${count} listings to ${dest}`);

@@ -30,6 +30,51 @@ VINTAGE_QUERIES = [
 
 DEFAULT_QUERY = "Timex"
 YEAR_RE = re.compile(r"\b(19[2-9]\d|20[0-2]\d)\b")
+ARTICLE_BLOCK_RE = re.compile(
+    r'data-article-id="(\d+)"(.*?)(?=data-article-id="|$)',
+    re.DOTALL,
+)
+LISTING_LINK_RE = re.compile(r'href="(/[^"]*--id(\d+)\.htm)"')
+TITLE_RE = re.compile(r'class="text-bold[^"]*"[^>]*>([^<]+)</')
+PRICE_RE = re.compile(r'class="text-bold[^"]*"[^>]*>\s*\$?([\d,]+(?:\.\d{2})?)')
+IMAGE_RE = re.compile(r'data-src="(https://[^"]+chrono24[^"]+)"')
+
+
+def canonicalize_chrono24_url(listing_id: str, url: str | None = None) -> str:
+    lid = listing_id.strip()
+    if url:
+        match = re.search(r"--id(\d+)\.htm", url)
+        if match and match.group(1) == lid:
+            path = url if url.startswith("/") else re.sub(r"^https?://[^/]+", "", url)
+            return f"https://www.chrono24.com{path.split('?', 1)[0]}"
+    return f"https://www.chrono24.com/timex/timex--id{lid}.htm"
+
+
+def parse_article_block(block: str, listing_id: str) -> dict[str, Any]:
+    title_match = TITLE_RE.search(block)
+    price_match = PRICE_RE.search(block)
+    image_match = IMAGE_RE.search(block)
+
+    url = None
+    for link_match in LISTING_LINK_RE.finditer(block):
+        path, link_id = link_match.group(1), link_match.group(2)
+        if link_id == listing_id:
+            url = path
+            break
+
+    title = title_match.group(1).strip() if title_match else f"Timex listing {listing_id}"
+    price_value = None
+    if price_match:
+        price_value = float(price_match.group(1).replace(",", ""))
+
+    return {
+        "listing_id": listing_id,
+        "title": title,
+        "price_value": price_value,
+        "price_currency": "USD" if price_value else None,
+        "url": canonicalize_chrono24_url(listing_id, url),
+        "image_url": image_match.group(1) if image_match else None,
+    }
 
 
 @dataclass
@@ -97,36 +142,22 @@ def fetch_query(
             print(f"  fetch failed page {page}: {exc}", file=sys.stderr)
             break
 
-        # Minimal HTML parsing — article blocks with data-article-id
-        article_ids = re.findall(r'data-article-id="(\d+)"', html)
-        if not article_ids:
+        article_blocks = list(ARTICLE_BLOCK_RE.finditer(html))
+        if not article_blocks:
             break
 
-        titles = re.findall(r'class="text-bold[^"]*"[^>]*>([^<]+)</', html)
-        prices = re.findall(r'class="text-bold[^"]*"[^>]*>\s*\$?([\d,]+(?:\.\d{2})?)', html)
-        links = re.findall(r'href="(/[^"]*--id\d+\.htm)"', html)
-        images = re.findall(r'data-src="(https://[^"]+chrono24[^"]+)"', html)
-
         new_on_page = 0
-        for i, lid in enumerate(article_ids):
+        for match in article_blocks:
             if len(listings) >= max_listings:
                 break
-            title = titles[i] if i < len(titles) else f"Timex listing {lid}"
-            price_str = prices[i].replace(",", "") if i < len(prices) else None
-            price_value = float(price_str) if price_str else None
-            path = links[i] if i < len(links) else f"/timex--id{lid}.htm"
-            full_url = f"https://www.chrono24.com{path}" if path.startswith("/") else path
-            image = images[i] if i < len(images) else None
-            year = parse_year(title)
-            vintage = is_vintage_listing(title, year)
+            lid = match.group(1)
+            block = match.group(2)
+            parsed = parse_article_block(block, lid)
+            year = parse_year(parsed["title"])
+            vintage = is_vintage_listing(parsed["title"], year)
             listings.append(
                 {
-                    "listing_id": lid,
-                    "title": title.strip(),
-                    "price_value": price_value,
-                    "price_currency": "USD" if price_value else None,
-                    "url": full_url,
-                    "image_url": image,
+                    **parsed,
                     "year": year,
                     "is_vintage": vintage,
                     "source": "chrono24",
