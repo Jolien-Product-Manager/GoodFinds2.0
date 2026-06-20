@@ -1,8 +1,16 @@
-export default function HomePage() {
+import { Masthead } from "@/components/masthead";
+import { FeedView } from "@/components/feed-view";
+import { loadAllListings } from "@/lib/listings/load-all-listings";
+
+export default async function HomePage() {
+  const { listings, ebayEnabled } = await loadAllListings();
+
   return (
-    <main className="mx-auto max-w-6xl px-4 py-8">
-      <h1 className="font-display text-3xl font-semibold text-ink">Sleeper</h1>
-      <p className="mt-2 text-ink-soft">Loading feed…</p>
-    </main>
+    <>
+      <Masthead />
+      <main className="mx-auto max-w-6xl px-4 py-8">
+        <FeedView listings={listings} ebayEnabled={ebayEnabled} />
+      </main>
+    </>
   );
 }
