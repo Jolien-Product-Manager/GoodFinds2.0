@@ -41,7 +41,7 @@ EBAY_MARKETPLACE_ID=EBAY_CA
 EBAY_ENV=production
 ```
 
-Without credentials the app runs Chrono24-only. With credentials, the feed pulls up to **400** eBay Timex wristwatch listings (paginated at 200 per Browse API request, sorted by newly listed).
+Without credentials the app runs Chrono24-only. With credentials, the feed pulls up to **10,000** eBay Timex wristwatch listings (paginated at 200 per Browse API request, sorted by newly listed).
 
 ## Commit with change details
 

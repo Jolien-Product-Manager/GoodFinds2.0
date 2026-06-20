@@ -17,6 +17,7 @@ interface AlertListingCardProps {
   match?: HuntMatchResult;
   interested?: boolean;
   muted?: boolean;
+  showHuntMatchTags?: boolean;
   onDismiss?: () => void;
   onRestore?: () => void;
   onToggleInterested?: () => void;
@@ -27,6 +28,7 @@ export function AlertListingCard({
   match,
   interested = false,
   muted = false,
+  showHuntMatchTags = false,
   onDismiss,
   onRestore,
   onToggleInterested,
@@ -37,6 +39,7 @@ export function AlertListingCard({
   const conditionOk =
     listing.condition !== "For parts / project" &&
     listing.condition !== "Unknown";
+  const huntMatchTags = match?.matchedHuntNames ?? [];
 
   return (
     <article
@@ -65,6 +68,18 @@ export function AlertListingCard({
         <Badge className="absolute left-2 top-2 border-0 bg-ink/80 text-card">
           {listing.source}
         </Badge>
+        {showHuntMatchTags && huntMatchTags.length > 0 && (
+          <div className="absolute bottom-2 left-2 right-2 flex flex-wrap gap-1">
+            {huntMatchTags.map((name) => (
+              <Badge
+                key={name}
+                className="border-0 bg-brass/95 text-card shadow-sm"
+              >
+                {name}
+              </Badge>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="flex flex-1 flex-col gap-3 p-4">
@@ -107,9 +122,9 @@ export function AlertListingCard({
           </ul>
         )}
 
-        {match?.matchedHuntNames && match.matchedHuntNames.length > 0 && (
+        {!showHuntMatchTags && huntMatchTags.length > 0 && (
           <div className="flex flex-wrap gap-1">
-            {match.matchedHuntNames.map((name) => (
+            {huntMatchTags.map((name) => (
               <Badge key={name} variant="outline" className="border-brass text-brass">
                 {name}
               </Badge>

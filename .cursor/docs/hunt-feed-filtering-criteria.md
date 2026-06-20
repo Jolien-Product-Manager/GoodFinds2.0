@@ -64,6 +64,9 @@ Matching quality depends on [`ExtractedFeatures`](../src/lib/listings/types.ts) 
 | `era` | Parsed year → bucket | medium |
 | `cond` | Inferred from title | low |
 | `gender` | Title + size heuristics | medium |
+| `collab` | Title via [`inferCollabFromTitle()`](../src/lib/listings/collab.ts) (Peanuts, Disney, Keith Haring, etc.) | medium |
+
+**Collab meta-options at match time:** "Any collab" matches any detected co-brand; "House brand only" matches listings with no collab signal; named partners match title keywords or extracted `features.collab`.
 
 **Degrade gracefully:** unextracted taste attributes render **unverified** on cards, not silent misses.
 

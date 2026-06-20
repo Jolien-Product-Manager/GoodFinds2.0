@@ -1,4 +1,5 @@
 import type { AppListing } from "./types";
+import { inferCollabFromTitle } from "./collab";
 import { eraFromYear, matchListingToModel } from "@/lib/models/catalog";
 
 export function enrichListingFeatures(listing: AppListing): AppListing {
@@ -14,6 +15,8 @@ export function enrichListingFeatures(listing: AppListing): AppListing {
       mvmt = "Manual wind";
   }
 
+  const collab = listing.features.collab ?? inferCollabFromTitle(listing.title);
+
   return {
     ...listing,
     model,
@@ -22,11 +25,13 @@ export function enrichListingFeatures(listing: AppListing): AppListing {
       model: model ?? undefined,
       era,
       mvmt,
+      collab,
       confidence: {
         ...listing.features.confidence,
         model: model ? listing.features.confidence.model ?? "low" : undefined,
         era: listing.year ? "medium" : listing.features.confidence.era,
         mvmt: mvmt ? "medium" : undefined,
+        collab: collab ? "medium" : undefined,
       },
     },
   };

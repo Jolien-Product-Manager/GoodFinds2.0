@@ -2,6 +2,7 @@ import type { AppListing } from "@/lib/listings/types";
 import type { Hunt } from "@/lib/hunts/types";
 import type { GlobalFilters } from "@/lib/hunts/types";
 import { normalizeCustomValue } from "@/lib/hunts/types";
+import { collabPickMatchesListing, resolveListingCollab } from "@/lib/listings/collab";
 import { listingMatchesHuntGender } from "@/lib/listings/gender";
 
 export type AttributeMatchStatus = "hit" | "miss" | "unverified";
@@ -34,7 +35,7 @@ function huntHasAnyTaste(hunt: Hunt): boolean {
 }
 
 /** Saved hunt with gender and/or attribute criteria — not an empty "both + no attrs" draft. */
-function huntHasActiveCriteria(hunt: Hunt): boolean {
+export function huntHasActiveCriteria(hunt: Hunt): boolean {
   if (hunt.gender !== "both") return true;
   return huntHasAnyTaste(hunt);
 }
@@ -89,6 +90,32 @@ export function scoreListingAgainstHunt(
     specified += 1;
     const listingVal = listingValueForAttr(listing, key);
     const label = key;
+
+    if (key === "collab") {
+      const hit = wanted.some((w) => collabPickMatchesListing(w, listing));
+      const inferred = resolveListingCollab(listing);
+      if (hit) {
+        hits += 1;
+        matches.push({
+          key,
+          label,
+          status: "hit",
+          confidence: inferred
+            ? (listing.features.confidence.collab ?? "medium")
+            : listing.features.confidence.collab,
+        });
+      } else if (!inferred && wanted.every((w) => normalizeCustomValue(w) !== "any collab")) {
+        matches.push({
+          key,
+          label,
+          status: "unverified",
+          confidence: listing.features.confidence.collab,
+        });
+      } else {
+        matches.push({ key, label, status: "miss" });
+      }
+      continue;
+    }
 
     if (!listingVal) {
       matches.push({
