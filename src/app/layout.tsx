@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { Fraunces, Inter, JetBrains_Mono } from "next/font/google";
+import { Toaster } from "@/components/ui/sonner";
+import { StateSync } from "@/components/state-sync";
 import "./globals.css";
 
 const fraunces = Fraunces({
@@ -33,7 +35,11 @@ export default function RootLayout({
       lang="en"
       className={`${fraunces.variable} ${inter.variable} ${jetbrainsMono.variable}`}
     >
-      <body className="min-h-screen">{children}</body>
+      <body className="min-h-screen">
+        <StateSync />
+        {children}
+        <Toaster position="bottom-center" />
+      </body>
     </html>
   );
 }
