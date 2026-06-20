@@ -1,46 +1,64 @@
-# GoodFinds 2.0
+# Sleeper (Good Finds 2.0)
 
-Public project repository for Good Finds 2.0.
+Vintage Timex hunting assistant — aggregate listings from Chrono24 and eBay, triage in a feed, and define hunts for what you're looking for.
 
 **Remote:** https://github.com/Jolien-Product-Manager/GoodFinds2.0
 
-## Committing with change details
-
-Use the `commit` command to create commits that include a structured summary of what changed:
+## Quick start
 
 ```bash
-./commit "Your short commit title"
+npm install
+cp .env.local.example .env.local   # add eBay API keys (optional)
+npm run dev
 ```
 
-Or with npm:
+Open [http://localhost:3000](http://localhost:3000) for the feed. Hunts live at `/hunts`.
+
+## Chrono24 data
+
+The app reads a static JSON snapshot (no live Chrono24 calls):
 
 ```bash
-npm run commit -- "Your short commit title"
+cd scripts/chrono24
+pip install -r requirements.txt
+python3 chrono24_timex.py --vintage --vintage-only --max 120 --out vintage_timex.json
+cd ../..
+npm run sync:listings
 ```
 
-### What it does
+Sample data ships in `data/chrono24/vintage_timex.json` for local dev.
 
-1. Shows your current changes (staged and unstaged)
-2. Prompts you to stage files (all, pick files, or use already-staged only)
-3. Opens your editor so you can add an optional longer description
-4. Appends an auto-generated **Changes** section listing every modified file and line counts
-5. Commits and optionally pushes to GitHub
+## eBay (optional)
 
-### Options
+Set in `.env.local`:
+
+```
+EBAY_CLIENT_ID=
+EBAY_CLIENT_SECRET=
+EBAY_MARKETPLACE_ID=EBAY_CA
+EBAY_ENV=production
+```
+
+Without credentials the app runs Chrono24-only.
+
+## Commit with change details
 
 ```bash
-./commit "Fix login bug"              # commit with title only
-./commit "Fix login bug" --push       # commit and push to origin
-./commit "Fix login bug" --all        # stage all tracked changes before committing
-./commit --push --all "Update UI"     # stage all, commit, and push
+./commit "Your commit title" --all --push
 ```
 
-### Push to GitHub
+## Deploy (Vercel)
 
-After committing:
+1. Push to GitHub and import the repo in [Vercel](https://vercel.com).
+2. Set environment variables: `EBAY_CLIENT_ID`, `EBAY_CLIENT_SECRET`, `EBAY_MARKETPLACE_ID`, `EBAY_ENV`.
+3. Deploy — `vercel.json` is included.
 
-```bash
-git push
-```
+**Note:** User state (dismissed, hunts, purchases) persists to `data/store/state.json` on the server. On Vercel's ephemeral filesystem this resets between cold starts unless you mount persistent storage. For production persistence, use Vercel Postgres/KV or deploy to a platform with a persistent disk.
 
-Or use `--push` on the commit command to push in one step.
+## Scripts
+
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Development server |
+| `npm run build` | Production build |
+| `npm run sync:listings` | Copy scraper output into `data/chrono24/` |
