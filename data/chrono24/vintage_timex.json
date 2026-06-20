@@ -1,0 +1,51 @@
+{
+  "scraped_at": "2026-06-20T12:00:00Z",
+  "query_count": 10,
+  "listing_count": 4,
+  "listings": [
+    {
+      "listing_id": "100001",
+      "title": "Vintage Timex Marlin Mechanical 1960s",
+      "price_value": 35,
+      "price_currency": "USD",
+      "url": "https://www.chrono24.com/timex/vintage-marlin--id100001.htm",
+      "image_url": "https://img.chrono24.com/images/uhren/sample-marlin.jpg",
+      "year": 1968,
+      "is_vintage": true,
+      "source": "chrono24"
+    },
+    {
+      "listing_id": "100002",
+      "title": "Timex Viscount Automatic 1972",
+      "price_value": 42,
+      "price_currency": "USD",
+      "url": "https://www.chrono24.com/timex/viscount--id100002.htm",
+      "image_url": "https://img.chrono24.com/images/uhren/sample-viscount.jpg",
+      "year": 1972,
+      "is_vintage": true,
+      "source": "chrono24"
+    },
+    {
+      "listing_id": "100003",
+      "title": "Timex Electric Day-Date 1970s",
+      "price_value": 28,
+      "price_currency": "USD",
+      "url": "https://www.chrono24.com/timex/electric--id100003.htm",
+      "image_url": "https://img.chrono24.com/images/uhren/sample-electric.jpg",
+      "year": 1975,
+      "is_vintage": true,
+      "source": "chrono24"
+    },
+    {
+      "listing_id": "100004",
+      "title": "Timex Mercury Hand-wind 1960s",
+      "price_value": 38,
+      "price_currency": "USD",
+      "url": "https://www.chrono24.com/timex/mercury--id100004.htm",
+      "image_url": "https://img.chrono24.com/images/uhren/sample-mercury.jpg",
+      "year": 1965,
+      "is_vintage": true,
+      "source": "chrono24"
+    }
+  ]
+}

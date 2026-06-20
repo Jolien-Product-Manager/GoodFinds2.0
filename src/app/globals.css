@@ -1,0 +1,50 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-paper: #e8e1d3;
+  --color-card: #f4efe4;
+  --color-ink: #2a2118;
+  --color-ink-soft: #6f6052;
+  --color-brass: #97681e;
+  --color-steal: #7e2b23;
+  --color-ok: #4f6043;
+  --color-line: rgba(42, 33, 24, 0.14);
+  --color-line-strong: rgba(42, 33, 24, 0.28);
+
+  --font-display: var(--font-fraunces);
+  --font-sans: var(--font-inter);
+  --font-mono: var(--font-jetbrains-mono);
+
+  --radius-sm: 2px;
+  --radius-md: 4px;
+}
+
+@layer base {
+  * {
+    @apply border-line;
+  }
+
+  body {
+    @apply bg-paper text-ink font-sans antialiased;
+    background-image: radial-gradient(
+      circle at 1px 1px,
+      rgba(42, 33, 24, 0.02) 1px,
+      transparent 0
+    );
+    background-size: 24px 24px;
+  }
+
+  :focus-visible {
+    @apply outline-2 outline-steal outline-offset-2;
+  }
+}
+
+@layer utilities {
+  .font-display {
+    font-family: var(--font-fraunces), serif;
+  }
+
+  .font-mono-data {
+    font-family: var(--font-jetbrains-mono), monospace;
+  }
+}
