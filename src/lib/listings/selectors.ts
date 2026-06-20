@@ -1,5 +1,10 @@
 import { DEFAULT_CRITERIA } from "@/lib/criteria";
-import type { AppListing, AlertScope, CriteriaSettings } from "@/lib/listings/types";
+import type {
+  AppListing,
+  AlertScope,
+  CriteriaSettings,
+  MarketplaceFilter,
+} from "@/lib/listings/types";
 import type { Hunt } from "@/lib/hunts/types";
 import { passesCriteria } from "@/lib/shipping";
 import type { HuntMatchResult } from "@/lib/listings/hunt-match";
@@ -13,6 +18,7 @@ interface FilterContext {
   hiddenListings: string[];
   dislikedModels: string[];
   criteria?: CriteriaSettings;
+  marketplaceFilter?: MarketplaceFilter;
   matchResults?: Map<string, HuntMatchResult>;
   hunts?: Hunt[];
 }
@@ -23,6 +29,13 @@ export function passesListingFilters(
 ): boolean {
   if (ctx.hiddenListings.includes(listing.id)) return false;
   if (listing.model && ctx.dislikedModels.includes(listing.model)) return false;
+  if (
+    ctx.marketplaceFilter &&
+    ctx.marketplaceFilter !== "all" &&
+    listing.source !== ctx.marketplaceFilter
+  ) {
+    return false;
+  }
   const criteria = ctx.criteria ?? DEFAULT_CRITERIA;
   return passesCriteria(listing, criteria);
 }

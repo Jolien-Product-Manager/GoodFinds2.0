@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { AlertListingCard } from "@/components/alert-listing-card";
 import { FeedSidebar } from "@/components/feed-sidebar";
-import type { AppListing, AlertScope } from "@/lib/listings/types";
+import type { AppListing, AlertScope, MarketplaceFilter } from "@/lib/listings/types";
 import { huntHasActiveCriteria, matchAllHunts } from "@/lib/listings/hunt-match";
 import {
   alertListings,
@@ -25,18 +25,26 @@ interface FeedViewProps {
 function feedContextSuffix(
   feedView: FeedView,
   alertScope: AlertScope,
+  marketplaceFilter: MarketplaceFilter,
   activeHunts: { id: string; name: string }[]
 ): string {
   if (feedView === "starred") return "starred";
   if (feedView === "dismissed") return "dismissed";
-  if (alertScope === "top") return "new · top matches";
-  if (alertScope.startsWith("hunt:")) {
+
+  let suffix = "new";
+  if (alertScope === "top") suffix = "new · top matches";
+  else if (alertScope.startsWith("hunt:")) {
     const huntId = alertScope.slice(5);
     const hunt = activeHunts.find((h) => h.id === huntId);
-    return `new · matching ${hunt?.name ?? "this hunt"}`;
+    suffix = `new · matching ${hunt?.name ?? "this hunt"}`;
+  } else if (alertScope === "watchlist") {
+    suffix = "new · matching any of your hunts";
   }
-  if (alertScope === "watchlist") return "new · matching any of your hunts";
-  return "new";
+
+  if (marketplaceFilter === "ebay") suffix += " · eBay";
+  else if (marketplaceFilter === "chrono24") suffix += " · Chrono24";
+
+  return suffix;
 }
 
 export function FeedView({ listings, ebayEnabled }: FeedViewProps) {
@@ -45,6 +53,7 @@ export function FeedView({ listings, ebayEnabled }: FeedViewProps) {
   const seen = useCasebackStore((s) => s.seen);
   const listingStatus = useCasebackStore((s) => s.listingStatus);
   const alertScope = useCasebackStore((s) => s.alertScope);
+  const marketplaceFilter = useCasebackStore((s) => s.marketplaceFilter);
   const feedView = useCasebackStore((s) => s.feedView);
   const criteria = useCasebackStore((s) => s.criteria);
   const hunts = useCasebackStore((s) => s.hunts);
@@ -56,6 +65,7 @@ export function FeedView({ listings, ebayEnabled }: FeedViewProps) {
   const restoreListing = useCasebackStore((s) => s.restoreListing);
   const toggleInterested = useCasebackStore((s) => s.toggleInterested);
   const setAlertScope = useCasebackStore((s) => s.setAlertScope);
+  const setMarketplaceFilter = useCasebackStore((s) => s.setMarketplaceFilter);
   const setFeedView = useCasebackStore((s) => s.setFeedView);
 
   const ctx = useMemo(
@@ -65,8 +75,9 @@ export function FeedView({ listings, ebayEnabled }: FeedViewProps) {
       hiddenListings,
       dislikedModels,
       criteria,
+      marketplaceFilter,
     }),
-    [seen, listingStatus, hiddenListings, dislikedModels, criteria]
+    [seen, listingStatus, hiddenListings, dislikedModels, criteria, marketplaceFilter]
   );
 
   const matchResults = useMemo(
@@ -113,6 +124,10 @@ export function FeedView({ listings, ebayEnabled }: FeedViewProps) {
         ctxWithMatches
       ).length;
     }
+
+    const ctxWithoutMarketplace = { ...ctx, marketplaceFilter: "all" as const };
+    const unseenForMarketplace = unseenListings(listings, ctxWithoutMarketplace);
+
     return {
       new: unseenAll.length,
       starred: starred.length,
@@ -120,8 +135,21 @@ export function FeedView({ listings, ebayEnabled }: FeedViewProps) {
       top: alertListings(listings, "top", ctxWithMatches).length,
       huntMatches: alertListings(listings, "watchlist", ctxWithMatches).length,
       perHunt,
+      marketplace: {
+        all: unseenForMarketplace.length,
+        ebay: unseenForMarketplace.filter((l) => l.source === "ebay").length,
+        chrono24: unseenForMarketplace.filter((l) => l.source === "chrono24").length,
+      },
     };
-  }, [listings, ctxWithMatches, unseenAll.length, starred.length, dismissed.length, activeHunts]);
+  }, [
+    listings,
+    ctx,
+    ctxWithMatches,
+    unseenAll.length,
+    starred.length,
+    dismissed.length,
+    activeHunts,
+  ]);
 
   const isHuntFindsScope =
     alertScope === "watchlist" || alertScope.startsWith("hunt:");
@@ -179,7 +207,12 @@ export function FeedView({ listings, ebayEnabled }: FeedViewProps) {
                   hint: "Nothing new in this view — try refreshing or widening your scope.",
                 };
 
-  const contextSuffix = feedContextSuffix(feedView, alertScope, activeHunts);
+  const contextSuffix = feedContextSuffix(
+    feedView,
+    alertScope,
+    marketplaceFilter,
+    activeHunts
+  );
 
   return (
     <div className="space-y-6">
@@ -203,10 +236,12 @@ export function FeedView({ listings, ebayEnabled }: FeedViewProps) {
         <FeedSidebar
           feedView={feedView}
           alertScope={alertScope}
+          marketplaceFilter={marketplaceFilter}
           counts={sidebarCounts}
           activeHunts={activeHunts}
           onFeedViewChange={setFeedView}
           onScopeChange={setAlertScope}
+          onMarketplaceChange={setMarketplaceFilter}
           className="md:sticky md:top-4 md:col-start-2 md:row-start-1"
         />
 

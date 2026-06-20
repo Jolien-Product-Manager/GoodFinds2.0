@@ -279,21 +279,18 @@ export function AlertListingCard({
           )}
         </div>
 
-        <div>
-          <div className="flex items-baseline justify-between gap-2">
-            <span className="text-sm text-ink-soft">To door</span>
-            <span
-              className={cn(
-                "font-display font-semibold tabular-nums text-ink",
-                compact ? "text-xl" : "text-2xl"
-              )}
-            >
-              ${costs.total.toFixed(2)}
-            </span>
-          </div>
+        <div className="text-right">
+          <span
+            className={cn(
+              "font-display font-semibold tabular-nums text-ink",
+              compact ? "text-xl" : "text-2xl"
+            )}
+          >
+            ${costs.total.toFixed(2)}
+          </span>
           <p
             className={cn(
-              "mt-0.5 text-right text-ink-soft",
+              "mt-0.5 text-ink-soft",
               compact ? "text-[11px]" : "text-xs"
             )}
           >

@@ -1,5 +1,10 @@
 import { DEFAULT_CRITERIA } from "@/lib/criteria";
-import type { AlertScope, CriteriaSettings, ListingStatus } from "@/lib/listings/types";
+import type {
+  AlertScope,
+  CriteriaSettings,
+  ListingStatus,
+  MarketplaceFilter,
+} from "@/lib/listings/types";
 import {
   createDraftHunt,
   emptyHuntAttributes,
@@ -20,6 +25,7 @@ interface CasebackState {
   seen: string[];
   listingStatus: Record<string, ListingStatus>;
   alertScope: AlertScope;
+  marketplaceFilter: MarketplaceFilter;
   feedView: FeedView;
   hiddenListings: string[];
   dislikedModels: string[];
@@ -33,6 +39,7 @@ interface CasebackState {
   dismissAllUnseen: (ids: string[]) => void;
   restoreAll: (ids: string[]) => void;
   setAlertScope: (scope: AlertScope) => void;
+  setMarketplaceFilter: (filter: MarketplaceFilter) => void;
   setFeedView: (view: FeedView) => void;
   setCriteria: (criteria: Partial<CriteriaSettings>) => void;
   setHunts: (hunts: Hunt[]) => void;
@@ -91,6 +98,7 @@ export const useCasebackStore = create<CasebackState>()(
       seen: [],
       listingStatus: {},
       alertScope: "all",
+      marketplaceFilter: "all",
       feedView: "new",
       hiddenListings: [],
       dislikedModels: [],
@@ -133,6 +141,7 @@ export const useCasebackStore = create<CasebackState>()(
         })),
 
       setAlertScope: (scope) => set({ alertScope: scope }),
+      setMarketplaceFilter: (filter) => set({ marketplaceFilter: filter }),
       setFeedView: (view) => set({ feedView: view }),
       setCriteria: (criteria) =>
         set((s) => ({ criteria: { ...s.criteria, ...criteria } })),

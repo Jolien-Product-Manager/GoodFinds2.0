@@ -1,4 +1,9 @@
-import type { CriteriaSettings, ListingStatus, AlertScope } from "@/lib/listings/types";
+import type {
+  CriteriaSettings,
+  ListingStatus,
+  AlertScope,
+  MarketplaceFilter,
+} from "@/lib/listings/types";
 import type { Hunt, GlobalFilters, PurchasedWatch } from "@/lib/hunts/types";
 import type { FeedView } from "@/store/caseback";
 
@@ -6,6 +11,7 @@ export interface PersistedState {
   seen: string[];
   listingStatus: Record<string, ListingStatus>;
   alertScope: AlertScope;
+  marketplaceFilter: MarketplaceFilter;
   feedView: FeedView;
   hiddenListings: string[];
   dislikedModels: string[];
@@ -19,6 +25,7 @@ export const DEFAULT_PERSISTED_STATE: PersistedState = {
   seen: [],
   listingStatus: {},
   alertScope: "all",
+  marketplaceFilter: "all",
   feedView: "new",
   hiddenListings: [],
   dislikedModels: [],

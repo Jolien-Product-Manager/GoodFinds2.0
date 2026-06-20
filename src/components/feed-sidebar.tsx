@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Pencil, Plus } from "lucide-react";
 import { HuntHeartsPicker } from "@/components/hunt-hearts";
-import type { AlertScope } from "@/lib/listings/types";
+import type { AlertScope, MarketplaceFilter } from "@/lib/listings/types";
 import type { Hunt } from "@/lib/hunts/types";
 import type { FeedView } from "@/store/caseback";
 import { cn } from "@/lib/utils";
@@ -76,6 +76,7 @@ function SidebarRow({
 interface FeedSidebarProps {
   feedView: FeedView;
   alertScope: AlertScope;
+  marketplaceFilter: MarketplaceFilter;
   counts: {
     new: number;
     starred: number;
@@ -83,26 +84,34 @@ interface FeedSidebarProps {
     top: number;
     huntMatches: number;
     perHunt: Record<string, number>;
+    marketplace: {
+      all: number;
+      ebay: number;
+      chrono24: number;
+    };
   };
   activeHunts: Hunt[];
   onFeedViewChange: (view: FeedView) => void;
   onScopeChange: (scope: AlertScope) => void;
+  onMarketplaceChange: (filter: MarketplaceFilter) => void;
   className?: string;
 }
 
 export function FeedSidebar({
   feedView,
   alertScope,
+  marketplaceFilter,
   counts,
   activeHunts,
   onFeedViewChange,
   onScopeChange,
+  onMarketplaceChange,
   className,
 }: FeedSidebarProps) {
   const isHuntScope =
     alertScope === "watchlist" || alertScope.startsWith("hunt:");
 
-  const hasActiveFilter = alertScope !== "all";
+  const hasActiveFilter = alertScope !== "all" || marketplaceFilter !== "all";
 
   const selectNewWithScope = (scope: AlertScope) => {
     onFeedViewChange("new");
@@ -114,7 +123,15 @@ export function FeedSidebar({
     onScopeChange(alertScope === scope ? "all" : scope);
   };
 
-  const clearFilters = () => selectNewWithScope("all");
+  const toggleMarketplace = (filter: MarketplaceFilter) => {
+    onFeedViewChange("new");
+    onMarketplaceChange(marketplaceFilter === filter ? "all" : filter);
+  };
+
+  const clearFilters = () => {
+    selectNewWithScope("all");
+    onMarketplaceChange("all");
+  };
 
   return (
     <aside className={cn("w-full shrink-0", className)}>
@@ -230,6 +247,32 @@ export function FeedSidebar({
                 </div>
               )}
             </div>
+          </div>
+        )}
+
+        {feedView === "new" && (
+          <div className="space-y-1 border-t border-line pt-4">
+            <p className="px-1 text-xs font-medium uppercase tracking-wider text-ink-soft">
+              Marketplace
+            </p>
+            <SidebarRow
+              label="All marketplaces"
+              count={counts.marketplace.all}
+              selected={marketplaceFilter === "all"}
+              onClick={() => onMarketplaceChange("all")}
+            />
+            <SidebarRow
+              label="eBay"
+              count={counts.marketplace.ebay}
+              selected={marketplaceFilter === "ebay"}
+              onClick={() => toggleMarketplace("ebay")}
+            />
+            <SidebarRow
+              label="Chrono24"
+              count={counts.marketplace.chrono24}
+              selected={marketplaceFilter === "chrono24"}
+              onClick={() => toggleMarketplace("chrono24")}
+            />
           </div>
         )}
       </div>

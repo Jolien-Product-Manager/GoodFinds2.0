@@ -63,3 +63,5 @@ export interface ListingStatus {
 }
 
 export type AlertScope = "all" | "watchlist" | "top" | `hunt:${string}`;
+
+export type MarketplaceFilter = "all" | ListingSource;

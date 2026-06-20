@@ -20,6 +20,10 @@ export async function loadAllListings(): Promise<LoadAllListingsResult> {
     .map(normalizeChrono24Listing)
     .filter((l): l is AppListing => l != null);
 
+  if (chronoRaw.length > 0 && chronoNormalized.length === 0) {
+    console.warn("Chrono24 listings failed normalization — check data/chrono24/vintage_timex.json");
+  }
+
   let ebayNormalized: AppListing[] = [];
   const ebayEnabled = hasEbayCredentials();
 

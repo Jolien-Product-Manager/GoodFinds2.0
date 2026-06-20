@@ -219,6 +219,14 @@ def main() -> None:
     if args.vintage_only:
         results = [r for r in results if r.get("is_vintage")]
 
+    if len(results) == 0 and os.path.exists(args.out):
+        print(
+            f"No listings scraped (Chrono24 blocks direct requests — use FlareSolverr). "
+            f"Keeping existing {args.out}",
+            file=sys.stderr,
+        )
+        return
+
     output = {
         "scraped_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "query_count": len(queries),
