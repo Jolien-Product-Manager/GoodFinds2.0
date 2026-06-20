@@ -28,6 +28,13 @@ export const ebayItemSummarySchema = z.object({
       imageUrl: z.string().optional(),
     })
     .optional(),
+  additionalImages: z
+    .array(
+      z.object({
+        imageUrl: z.string().optional(),
+      })
+    )
+    .optional(),
   condition: z.string().optional(),
   itemLocation: z
     .object({

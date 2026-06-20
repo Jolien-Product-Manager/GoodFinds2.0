@@ -52,19 +52,47 @@ function buildFeatures(
   };
 }
 
+function collectImageUrls(urls: Array<string | null | undefined>, max = 3): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const url of urls) {
+    if (!url || seen.has(url)) continue;
+    seen.add(url);
+    result.push(url);
+    if (result.length >= max) break;
+  }
+  return result;
+}
+
+function chrono24ImageUrls(raw: Chrono24Listing): string[] {
+  if (raw.image_urls?.length) {
+    return collectImageUrls(raw.image_urls);
+  }
+  return collectImageUrls([raw.image_url]);
+}
+
+function ebayImageUrls(raw: EbayItemSummary): string[] {
+  return collectImageUrls([
+    raw.image?.imageUrl,
+    ...(raw.additionalImages ?? []).map((img) => img.imageUrl),
+  ]);
+}
+
 export function normalizeChrono24Listing(raw: Chrono24Listing): AppListing | null {
   if (!raw.listing_id || raw.price_value == null) return null;
 
   const year = raw.year ?? parseYearFromTitle(raw.title);
   const model = matchListingToModel(raw.title);
   const condition = inferCondition(raw.title);
+  const imageUrls = chrono24ImageUrls(raw);
 
   return {
     id: raw.listing_id,
     source: "chrono24",
     title: raw.title,
     url: canonicalizeChrono24Url(raw.listing_id, raw.url),
-    imageUrl: raw.image_url ?? null,
+    imageUrl: imageUrls[0] ?? null,
+    imageUrls,
     priceValue: raw.price_value,
     priceCurrency: raw.price_currency ?? "USD",
     year,
@@ -99,13 +127,15 @@ export function normalizeEbayListing(raw: EbayItemSummary): AppListing | null {
     : null;
 
   const namespacedId = `ebay-${raw.itemId.replace(/\|/g, "-")}`;
+  const imageUrls = ebayImageUrls(raw);
 
   return {
     id: namespacedId,
     source: "ebay",
     title: raw.title,
     url: raw.itemWebUrl ?? `https://www.ebay.com/itm/${raw.itemId}`,
-    imageUrl: raw.image?.imageUrl ?? null,
+    imageUrl: imageUrls[0] ?? null,
+    imageUrls,
     priceValue,
     priceCurrency: raw.price.currency ?? "USD",
     year,

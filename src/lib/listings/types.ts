@@ -34,6 +34,7 @@ export interface AppListing {
   title: string;
   url: string;
   imageUrl: string | null;
+  imageUrls: string[];
   priceValue: number;
   priceCurrency: string;
   year: number | null;

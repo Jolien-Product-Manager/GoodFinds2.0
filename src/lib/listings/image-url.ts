@@ -27,3 +27,16 @@ export function getListingImageSrc(imageUrl: string | null): string | null {
 
   return imageUrl;
 }
+
+export function getListingImageSrcs(imageUrls: string[], max = 3): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const url of imageUrls) {
+    if (!url || seen.has(url)) continue;
+    seen.add(url);
+    const src = getListingImageSrc(url);
+    if (src) result.push(src);
+    if (result.length >= max) break;
+  }
+  return result;
+}

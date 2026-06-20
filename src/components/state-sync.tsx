@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import { useCasebackStore, migrateModelHeartsToHunts, type FeedView } from "@/store/caseback";
 import type { PersistedState } from "@/lib/persistence/types";
-import { isPersistedStateEmpty } from "@/lib/persistence/db-store";
+import { isPersistedStateEmpty } from "@/lib/persistence/state-utils";
 import { normalizeHunt, type Hunt, type PurchasedWatch } from "@/lib/hunts/types";
 import { normalizePurchasedWatch } from "@/lib/hunts/purchased-watch";
 

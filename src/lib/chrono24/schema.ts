@@ -7,6 +7,7 @@ export const chrono24ListingSchema = z.object({
   price_currency: z.string().nullable(),
   url: z.string(),
   image_url: z.string().nullable().optional(),
+  image_urls: z.array(z.string()).optional(),
   year: z.number().nullable().optional(),
   is_vintage: z.boolean().optional(),
   source: z.literal("chrono24").optional(),

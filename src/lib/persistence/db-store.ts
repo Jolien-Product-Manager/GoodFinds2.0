@@ -3,21 +3,15 @@ import {
   DEFAULT_PERSISTED_STATE,
   type PersistedState,
 } from "@/lib/persistence/types";
+import { isPersistedStateEmpty } from "@/lib/persistence/state-utils";
+
+export { isPersistedStateEmpty };
 
 function mergeWithDefaults(raw: unknown): PersistedState {
   if (!raw || typeof raw !== "object") {
     return DEFAULT_PERSISTED_STATE;
   }
   return { ...DEFAULT_PERSISTED_STATE, ...(raw as Partial<PersistedState>) };
-}
-
-export function isPersistedStateEmpty(state: PersistedState): boolean {
-  return (
-    state.seen.length === 0 &&
-    state.hunts.length === 0 &&
-    state.purchasedWatches.length === 0 &&
-    Object.keys(state.listingStatus).length === 0
-  );
 }
 
 export async function readUserStateFromDb(

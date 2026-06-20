@@ -54,6 +54,7 @@ def parse_article_block(block: str, listing_id: str) -> dict[str, Any]:
     title_match = TITLE_RE.search(block)
     price_match = PRICE_RE.search(block)
     image_match = IMAGE_RE.search(block)
+    image_urls = list(dict.fromkeys(IMAGE_RE.findall(block)))[:3]
 
     url = None
     for link_match in LISTING_LINK_RE.finditer(block):
@@ -73,7 +74,8 @@ def parse_article_block(block: str, listing_id: str) -> dict[str, Any]:
         "price_value": price_value,
         "price_currency": "USD" if price_value else None,
         "url": canonicalize_chrono24_url(listing_id, url),
-        "image_url": image_match.group(1) if image_match else None,
+        "image_url": image_urls[0] if image_urls else (image_match.group(1) if image_match else None),
+        "image_urls": image_urls or ([image_match.group(1)] if image_match else []),
     }
 
 

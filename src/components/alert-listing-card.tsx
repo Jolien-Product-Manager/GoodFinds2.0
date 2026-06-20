@@ -2,81 +2,192 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { ChevronDown, ExternalLink, Star, X } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { Check, ChevronLeft, ChevronRight, ExternalLink, Square, Star, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
 import type { AppListing } from "@/lib/listings/types";
-import type { HuntMatchResult, ScoreBreakdown } from "@/lib/listings/hunt-match";
+import type { AttributeMatch, HuntMatchResult } from "@/lib/listings/hunt-match";
 import { FEED_SCORE_MAX } from "@/lib/listings/hunt-match";
-import { getListingImageSrc } from "@/lib/listings/image-url";
+import { ATTR_OPTIONS, type AttrKey } from "@/lib/hunts/types";
+import { getListingImageSrcs } from "@/lib/listings/image-url";
 import { getTotalCost } from "@/lib/shipping";
 import { DEFAULT_CRITERIA } from "@/lib/criteria";
 import { cn } from "@/lib/utils";
 
-function completenessLabel(b: ScoreBreakdown): string {
-  if (b.specified === 0) return "gender-only";
-  return `${b.hits}/${b.specified} hits`;
+const ATTR_SHORT: Partial<Record<AttrKey, string>> = {
+  dial: "Dial",
+  color: "Colour",
+  collab: "Collab",
+  era: "Era",
+  model: "Model",
+  case: "Case",
+  mvmt: "Movement",
+  cond: "Condition",
+  storeFind: "Store find",
+};
+
+function listingFeatureValue(listing: AppListing, key: string): string | undefined {
+  const f = listing.features;
+  switch (key) {
+    case "model":
+      return f.model ?? listing.model ?? undefined;
+    case "collab":
+      return f.collab;
+    case "dial":
+      return f.dial;
+    case "color":
+      return f.color;
+    case "era":
+      return f.era;
+    case "case":
+      return f.case;
+    case "mvmt":
+      return f.mvmt;
+    case "cond":
+      return f.cond;
+    case "storeFind":
+      return f.storeFind;
+    default:
+      return undefined;
+  }
 }
 
-function MatchScoreDetails({
-  score,
-  breakdown,
+function attributeTagLabel(match: AttributeMatch, listing: AppListing): string {
+  const short = ATTR_SHORT[match.key as AttrKey];
+  const full = ATTR_OPTIONS[match.key as AttrKey]?.label ?? match.label;
+
+  if (match.status === "hit") {
+    return listingFeatureValue(listing, match.key) ?? short ?? full;
+  }
+  if (match.status === "unverified") {
+    return `${short ?? full}?`;
+  }
+  return short ?? full;
+}
+
+function matchQualityLabel(score: number): string {
+  if (score >= FEED_SCORE_MAX * 0.5) return "Good match";
+  if (score > 0) return "Match";
+  return "";
+}
+
+function ListingPhotoCarousel({
+  listing,
+  compact,
 }: {
-  score: number;
-  breakdown: ScoreBreakdown;
+  listing: AppListing;
+  compact: boolean;
 }) {
-  const { completeness, specificity, hearts } = breakdown;
+  const [index, setIndex] = useState(0);
+  const [failed, setFailed] = useState<Set<number>>(() => new Set());
+  const urls =
+    (listing.imageUrls ?? []).length > 0
+      ? listing.imageUrls
+      : listing.imageUrl
+        ? [listing.imageUrl]
+        : [];
+  const imageSrcs = getListingImageSrcs(urls);
+  const safeIndex = Math.min(index, Math.max(0, imageSrcs.length - 1));
+  const currentSrc = imageSrcs[safeIndex];
+  const currentFailed = failed.has(safeIndex);
+  const hasMultiple = imageSrcs.length > 1;
+  const anyLoaded = imageSrcs.some((_, i) => !failed.has(i));
+
+  if (imageSrcs.length === 0 || !anyLoaded) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center bg-[#c9b896]/35">
+        <Square className="h-10 w-10 text-ink/15" strokeWidth={1.25} />
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-1.5 rounded-sm border border-line bg-paper/60 p-2.5 font-mono-data text-xs">
-      <div className="text-ink">
-        {completeness.toFixed(completeness === 1 ? 1 : 2)} × {specificity.toFixed(1)} × {hearts}♥
-        {" = "}
-        {score.toFixed(1)}
+    <>
+      <div className="absolute inset-0 bg-[#c9b896]/20">
+        {currentSrc && !currentFailed ? (
+          <Image
+            src={currentSrc}
+            alt={`${listing.title} photo ${safeIndex + 1}`}
+            fill
+            className="object-cover"
+            sizes={
+              compact ? "(max-width: 640px) 50vw, 25vw" : "(max-width: 680px) 100vw, 33vw"
+            }
+            unoptimized
+            onError={() =>
+              setFailed((prev) => {
+                const next = new Set(prev);
+                next.add(safeIndex);
+                return next;
+              })
+            }
+          />
+        ) : (
+          <div className="flex h-full items-center justify-center bg-[#c9b896]/35 text-xs text-ink-soft">
+            Photo unavailable
+          </div>
+        )}
       </div>
-      <dl className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5 text-[10px] leading-relaxed text-ink-soft">
-        <dt>C</dt>
-        <dd>
-          {completenessLabel(breakdown)} ({completeness.toFixed(completeness === 1 ? 1 : 2)})
-        </dd>
-        <dt>S</dt>
-        <dd>
-          {breakdown.specificityLabel} ({specificity.toFixed(1)})
-        </dd>
-        <dt>H</dt>
-        <dd>{hearts}♥ desire</dd>
-        <dt>Hunt</dt>
-        <dd className="text-ink">{breakdown.bestHuntName}</dd>
-      </dl>
-    </div>
+
+      {hasMultiple && (
+        <>
+          <button
+            type="button"
+            aria-label="Previous photo"
+            disabled={safeIndex === 0}
+            onClick={(e) => {
+              e.stopPropagation();
+              setIndex((i) => Math.max(0, i - 1));
+            }}
+            className="absolute left-2 top-1/2 z-10 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md bg-ink/55 text-card hover:bg-ink/75 disabled:pointer-events-none disabled:opacity-0"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            aria-label="Next photo"
+            disabled={safeIndex >= imageSrcs.length - 1}
+            onClick={(e) => {
+              e.stopPropagation();
+              setIndex((i) => Math.min(imageSrcs.length - 1, i + 1));
+            }}
+            className="absolute right-2 top-1/2 z-10 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md bg-ink/55 text-card hover:bg-ink/75 disabled:pointer-events-none disabled:opacity-0"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        </>
+      )}
+    </>
   );
 }
 
-function MatchScoreCollapsible({
-  score,
-  breakdown,
+function AttributeTag({
+  match,
+  listing,
 }: {
-  score: number;
-  breakdown: ScoreBreakdown;
+  match: AttributeMatch;
+  listing: AppListing;
 }) {
+  const label = attributeTagLabel(match, listing);
+  const isHit = match.status === "hit";
+  const isUnverified = match.status === "unverified";
+
+  if (!isHit && !isUnverified) return null;
+
   return (
-    <Collapsible>
-      <CollapsibleTrigger className="flex w-full items-center justify-between rounded-sm border border-line bg-paper/40 px-2.5 py-1.5 font-mono-data text-xs text-steal hover:bg-paper/70 [&[data-state=open]_svg]:rotate-180">
-        <span>
-          <span className="uppercase tracking-wider text-ink-soft">match </span>
-          {score.toFixed(1)}/{FEED_SCORE_MAX}
-        </span>
-        <ChevronDown className="h-3.5 w-3.5 text-ink-soft transition-transform" />
-      </CollapsibleTrigger>
-      <CollapsibleContent className="pt-2">
-        <MatchScoreDetails score={score} breakdown={breakdown} />
-      </CollapsibleContent>
-    </Collapsible>
+    <span
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px] leading-none",
+        isHit && "border border-line-strong bg-brass/10 text-ink",
+        isUnverified && "border border-dashed border-line bg-card/50 text-ink-soft"
+      )}
+    >
+      {isHit ? (
+        <Check className="h-3 w-3 shrink-0 text-brass" strokeWidth={2.5} />
+      ) : (
+        <Square className="h-3 w-3 shrink-0 opacity-40" strokeWidth={1.5} />
+      )}
+      {label}
+    </span>
   );
 }
 
@@ -103,153 +214,134 @@ export function AlertListingCard({
   onRestore,
   onToggleInterested,
 }: AlertListingCardProps) {
-  const [imageFailed, setImageFailed] = useState(false);
-  const imageSrc = getListingImageSrc(listing.imageUrl);
   const costs = getTotalCost(listing, DEFAULT_CRITERIA.postalCode);
-  const conditionOk =
-    listing.condition !== "For parts / project" &&
-    listing.condition !== "Unknown";
-  const huntMatchTags = match?.matchedHuntNames ?? [];
+  const conditionLabel = listing.condition;
+  const matchLabel = match && match.score > 0 ? matchQualityLabel(match.score) : "";
+  const bestHuntName =
+    match?.scoreBreakdown?.bestHuntName ?? match?.matchedHuntNames[0];
+  const attributeMatches = match?.attributeMatches ?? [];
+  const visibleAttributes = attributeMatches.filter(
+    (m) => m.status === "hit" || m.status === "unverified"
+  );
+  const showMatchFooter = Boolean(bestHuntName && match && match.score > 0);
 
-  const conditionLabel = conditionOk ? "Likely working" : listing.condition;
+  const metaLine = [listing.features.era, listing.year].filter(Boolean).join(" · ");
 
   return (
     <article
       className={cn(
-        "flex flex-col overflow-hidden rounded-sm border border-line-strong bg-card",
+        "flex flex-col overflow-hidden rounded-lg border border-line bg-card shadow-sm",
         muted && "opacity-60"
       )}
     >
-      <div
-        className={cn(
-          "relative bg-paper",
-          compact ? "aspect-square" : "aspect-[4/3]"
-        )}
-      >
-        {imageSrc && !imageFailed ? (
-          <Image
-            src={imageSrc}
-            alt={listing.title}
-            fill
-            className="object-cover"
-            sizes={compact ? "(max-width: 640px) 50vw, 20vw" : "(max-width: 680px) 100vw, 33vw"}
-            unoptimized
-            onError={() => setImageFailed(true)}
-          />
-        ) : (
-          <div className="flex h-full flex-col items-center justify-center gap-2 px-4 text-center text-ink-soft">
-            <span className="font-display text-sm text-ink">{listing.model ?? "Timex"}</span>
-            <span className="text-xs">Photo unavailable</span>
-          </div>
-        )}
-        <Badge
-          className={cn(
-            "absolute left-1.5 top-1.5 border-0 bg-ink/80 text-card",
-            compact && "px-1.5 py-0 text-[10px]"
-          )}
-        >
+      <div className={cn("relative", compact ? "aspect-[4/3]" : "aspect-[4/3]")}>
+        <ListingPhotoCarousel listing={listing} compact={compact} />
+
+        <span className="absolute left-3 top-3 rounded-full bg-ink px-2.5 py-0.5 text-[11px] font-medium lowercase tracking-wide text-card">
           {listing.source}
-        </Badge>
-        {showHuntMatchTags && huntMatchTags.length > 0 && (
+        </span>
+
+        {matchLabel && (
+          <span className="absolute right-3 top-3 inline-flex items-center gap-1.5 rounded-full border border-line bg-card/95 px-2.5 py-1 text-[11px] font-medium text-ink shadow-sm">
+            <span className="h-2 w-2 rounded-full bg-brass" />
+            {matchLabel}
+          </span>
+        )}
+
+        {showHuntMatchTags && (match?.matchedHuntNames.length ?? 0) > 0 && (
           <div className="absolute bottom-2 left-2 right-2 flex flex-wrap gap-1">
-            {huntMatchTags.map((name) => (
-              <Badge
+            {match!.matchedHuntNames.map((name) => (
+              <span
                 key={name}
-                className="border-0 bg-brass/95 text-card shadow-sm"
+                className="rounded-full bg-ink/75 px-2 py-0.5 text-[10px] text-card"
               >
                 {name}
-              </Badge>
+              </span>
             ))}
           </div>
         )}
       </div>
 
-      <div
-        className={cn(
-          "flex flex-1 flex-col",
-          compact ? "gap-2 p-2.5" : "gap-3 p-4"
-        )}
-      >
-        {match && match.score > 0 && match.scoreBreakdown && (
-          <MatchScoreCollapsible score={match.score} breakdown={match.scoreBreakdown} />
-        )}
-        {match && match.score > 0 && !match.scoreBreakdown && (
-          <div className="font-mono-data text-xs text-steal">
-            <span className="uppercase tracking-wider text-ink-soft">match </span>
-            {match.score.toFixed(1)}/{FEED_SCORE_MAX}
-          </div>
-        )}
-
-        <h3
-          className={cn(
-            "font-display font-medium leading-snug text-ink",
-            compact ? "line-clamp-2 text-sm" : "text-lg"
+      <div className={cn("flex flex-1 flex-col", compact ? "gap-2.5 p-3" : "gap-3 p-4")}>
+        <div>
+          <h3
+            className={cn(
+              "font-display font-semibold leading-snug text-ink",
+              compact ? "line-clamp-2 text-[15px]" : "text-lg"
+            )}
+          >
+            {listing.title}
+          </h3>
+          {metaLine && (
+            <p className={cn("mt-1 text-ink-soft", compact ? "text-xs" : "text-sm")}>
+              {metaLine}
+            </p>
           )}
-        >
-          {listing.model ?? listing.title}
-        </h3>
+        </div>
 
-        <p className={cn("text-ink-soft", compact ? "truncate text-xs" : "text-sm")}>
-          {[listing.features.era, listing.features.mvmt, listing.year]
-            .filter(Boolean)
-            .join(" · ") || listing.title}
-        </p>
-
-        {!showHuntMatchTags && huntMatchTags.length > 0 && (
-          <div className="flex flex-wrap gap-1">
-            {huntMatchTags.map((name) => (
-              <Badge
-                key={name}
-                variant="outline"
-                className={cn("border-brass text-brass", compact && "px-1.5 py-0 text-[10px]")}
-              >
-                {name}
-              </Badge>
-            ))}
-          </div>
-        )}
-
-        <div className={cn("font-mono-data", compact ? "text-xs" : "text-sm")}>
-          <div className="flex justify-between gap-2">
-            <span className="text-ink-soft">{compact ? "To door" : "Total to door"}</span>
-            <span className="font-medium text-ink">${costs.total.toFixed(2)}</span>
+        <div>
+          <div className="flex items-baseline justify-between gap-2">
+            <span className="text-sm text-ink-soft">To door</span>
+            <span
+              className={cn(
+                "font-display font-semibold tabular-nums text-ink",
+                compact ? "text-xl" : "text-2xl"
+              )}
+            >
+              ${costs.total.toFixed(2)}
+            </span>
           </div>
           <p
             className={cn(
-              "mt-0.5 text-ink-soft",
-              compact ? "text-[10px] leading-tight" : "text-xs"
+              "mt-0.5 text-right text-ink-soft",
+              compact ? "text-[11px]" : "text-xs"
             )}
           >
-            ${costs.item.toFixed(2)} cost · ${costs.shipping.toFixed(2)} shipping
+            ${costs.item.toFixed(2)} + ${costs.shipping.toFixed(2)} shipping
             {!costs.shippingConfirmed && " (est.)"}
           </p>
         </div>
 
-        <div className={cn("flex items-center gap-1.5", compact ? "text-[11px]" : "text-xs")}>
+        <div className={cn("flex items-center gap-2", compact ? "text-xs" : "text-sm")}>
           <span className="text-ink-soft">Condition</span>
-          <span
-            className={cn(
-              "rounded-sm px-1.5 py-0.5",
-              conditionOk ? "bg-ok/15 text-ok" : "bg-brass/15 text-brass"
-            )}
-          >
+          <span className="rounded-full bg-brass/12 px-2.5 py-0.5 text-[11px] font-medium text-ink">
             {conditionLabel}
           </span>
         </div>
 
-        <div className={cn("mt-auto flex flex-wrap gap-1.5", compact ? "pt-1" : "pt-2")}>
+        {showMatchFooter && (
+          <div className="border-t border-line pt-2.5">
+            <p className={cn("flex items-center gap-2 text-ink-soft", compact ? "text-xs" : "text-sm")}>
+              <Check className="h-3.5 w-3.5 shrink-0 text-brass" strokeWidth={2.5} />
+              <span>
+                Matches your{" "}
+                <span className="font-medium text-steal">{bestHuntName}</span> hunt
+              </span>
+            </p>
+
+            {visibleAttributes.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {visibleAttributes.map((m) => (
+                  <AttributeTag key={m.key} match={m} listing={listing} />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className={cn("mt-auto flex gap-2", compact ? "pt-1" : "pt-2")}>
           <Button
             type="button"
             variant="outline"
             size="sm"
             className={cn(
-              "border-ink",
-              compact && "h-7 px-2 text-xs",
-              interested && "border-steal bg-steal/10 text-steal"
+              "flex-1 rounded-lg border-line-strong bg-card text-ink hover:bg-paper",
+              compact && "h-8 text-xs",
+              interested && "border-steal/40 bg-steal/5 text-steal"
             )}
             onClick={onToggleInterested}
           >
-            <Star className={cn("mr-1 h-3 w-3", interested && "fill-steal", compact && "mr-0.5")} />
+            <Star className={cn("mr-1.5 h-3.5 w-3.5", interested && "fill-steal")} />
             {interested ? "Starred" : "Star"}
           </Button>
           {onDismiss && (
@@ -257,10 +349,13 @@ export function AlertListingCard({
               type="button"
               variant="outline"
               size="sm"
-              className={cn(compact && "h-7 px-2 text-xs")}
+              className={cn(
+                "flex-1 rounded-lg border-line-strong bg-card text-ink hover:bg-paper",
+                compact && "h-8 text-xs"
+              )}
               onClick={onDismiss}
             >
-              <X className={cn("mr-1 h-3 w-3", compact && "mr-0.5")} />
+              <X className="mr-1.5 h-3.5 w-3.5" />
               Dismiss
             </Button>
           )}
@@ -269,7 +364,10 @@ export function AlertListingCard({
               type="button"
               variant="outline"
               size="sm"
-              className={cn(compact && "h-7 px-2 text-xs")}
+              className={cn(
+                "flex-1 rounded-lg border-line-strong bg-card text-ink hover:bg-paper",
+                compact && "h-8 text-xs"
+              )}
               onClick={onRestore}
             >
               Restore
@@ -278,12 +376,15 @@ export function AlertListingCard({
           <Button
             type="button"
             size="sm"
-            className={cn("ml-auto bg-ink text-card", compact && "h-7 px-2 text-xs")}
+            className={cn(
+              "flex-1 rounded-lg bg-ink text-card hover:bg-ink/90",
+              compact && "h-8 text-xs"
+            )}
             asChild
           >
             <a href={listing.url} target="_blank" rel="noopener noreferrer">
               View
-              <ExternalLink className={cn("ml-1 h-3 w-3", compact && "ml-0.5 h-2.5 w-2.5")} />
+              <ExternalLink className="ml-1.5 h-3 w-3" />
             </a>
           </Button>
         </div>

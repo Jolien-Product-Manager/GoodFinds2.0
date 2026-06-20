@@ -20,7 +20,7 @@ export function getTotalCost(
   listing: AppListing,
   postalCode: string
 ): { item: number; shipping: number; total: number; shippingConfirmed: boolean } {
-  const item = listing.priceValue;
+  const item = listing.priceValue ?? 0;
   const shipping =
     listing.shippingCost != null
       ? listing.shippingCost

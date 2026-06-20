@@ -29,9 +29,9 @@ export function AuthButton() {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
       setUser(session?.user ?? null);
-      if (session?.user) {
+      if (event === "SIGNED_IN" && session?.user) {
         setOpen(false);
         window.location.reload();
       }
