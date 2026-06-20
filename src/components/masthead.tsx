@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { AuthButton } from "@/components/auth-button";
 import { cn } from "@/lib/utils";
 
 const NAV_LINKS = [
@@ -39,6 +40,7 @@ export function Masthead() {
             })}
           </nav>
         </div>
+        <AuthButton />
       </div>
     </header>
   );

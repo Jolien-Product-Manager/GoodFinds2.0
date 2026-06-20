@@ -224,10 +224,11 @@ export function FeedView({ listings, ebayEnabled }: FeedViewProps) {
               <p className="mt-2 text-sm text-ink-soft">{emptyMessage.hint}</p>
             </div>
           ) : (
-            <div className="flex flex-col gap-4">
+            <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4">
               {displayListings.map((listing) => (
                 <AlertListingCard
                   key={listing.id}
+                  compact
                   listing={listing}
                   match={matchResults.get(listing.id)}
                   interested={listingStatus[listing.id]?.interested}

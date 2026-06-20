@@ -2,9 +2,14 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { ExternalLink, Star, X } from "lucide-react";
+import { ChevronDown, ExternalLink, Star, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import type { AppListing } from "@/lib/listings/types";
 import type { HuntMatchResult, ScoreBreakdown } from "@/lib/listings/hunt-match";
 import { FEED_SCORE_MAX } from "@/lib/listings/hunt-match";
@@ -18,7 +23,7 @@ function completenessLabel(b: ScoreBreakdown): string {
   return `${b.hits}/${b.specified} hits`;
 }
 
-function MatchScoreBreakdown({
+function MatchScoreDetails({
   score,
   breakdown,
 }: {
@@ -29,10 +34,6 @@ function MatchScoreBreakdown({
 
   return (
     <div className="space-y-1.5 rounded-sm border border-line bg-paper/60 p-2.5 font-mono-data text-xs">
-      <div className="text-steal">
-        <span className="uppercase tracking-wider text-ink-soft">match </span>
-        {score.toFixed(1)}/{FEED_SCORE_MAX}
-      </div>
       <div className="text-ink">
         {completeness.toFixed(completeness === 1 ? 1 : 2)} × {specificity.toFixed(1)} × {hearts}♥
         {" = "}
@@ -56,11 +57,35 @@ function MatchScoreBreakdown({
   );
 }
 
+function MatchScoreCollapsible({
+  score,
+  breakdown,
+}: {
+  score: number;
+  breakdown: ScoreBreakdown;
+}) {
+  return (
+    <Collapsible>
+      <CollapsibleTrigger className="flex w-full items-center justify-between rounded-sm border border-line bg-paper/40 px-2.5 py-1.5 font-mono-data text-xs text-steal hover:bg-paper/70 [&[data-state=open]_svg]:rotate-180">
+        <span>
+          <span className="uppercase tracking-wider text-ink-soft">match </span>
+          {score.toFixed(1)}/{FEED_SCORE_MAX}
+        </span>
+        <ChevronDown className="h-3.5 w-3.5 text-ink-soft transition-transform" />
+      </CollapsibleTrigger>
+      <CollapsibleContent className="pt-2">
+        <MatchScoreDetails score={score} breakdown={breakdown} />
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}
+
 interface AlertListingCardProps {
   listing: AppListing;
   match?: HuntMatchResult;
   interested?: boolean;
   muted?: boolean;
+  compact?: boolean;
   showHuntMatchTags?: boolean;
   onDismiss?: () => void;
   onRestore?: () => void;
@@ -72,6 +97,7 @@ export function AlertListingCard({
   match,
   interested = false,
   muted = false,
+  compact = false,
   showHuntMatchTags = false,
   onDismiss,
   onRestore,
@@ -85,6 +111,8 @@ export function AlertListingCard({
     listing.condition !== "Unknown";
   const huntMatchTags = match?.matchedHuntNames ?? [];
 
+  const conditionLabel = conditionOk ? "Likely working" : listing.condition;
+
   return (
     <article
       className={cn(
@@ -92,14 +120,19 @@ export function AlertListingCard({
         muted && "opacity-60"
       )}
     >
-      <div className="relative aspect-[4/3] bg-paper">
+      <div
+        className={cn(
+          "relative bg-paper",
+          compact ? "aspect-square" : "aspect-[4/3]"
+        )}
+      >
         {imageSrc && !imageFailed ? (
           <Image
             src={imageSrc}
             alt={listing.title}
             fill
             className="object-cover"
-            sizes="(max-width: 680px) 100vw, 33vw"
+            sizes={compact ? "(max-width: 640px) 50vw, 20vw" : "(max-width: 680px) 100vw, 33vw"}
             unoptimized
             onError={() => setImageFailed(true)}
           />
@@ -109,7 +142,12 @@ export function AlertListingCard({
             <span className="text-xs">Photo unavailable</span>
           </div>
         )}
-        <Badge className="absolute left-2 top-2 border-0 bg-ink/80 text-card">
+        <Badge
+          className={cn(
+            "absolute left-1.5 top-1.5 border-0 bg-ink/80 text-card",
+            compact && "px-1.5 py-0 text-[10px]"
+          )}
+        >
           {listing.source}
         </Badge>
         {showHuntMatchTags && huntMatchTags.length > 0 && (
@@ -126,9 +164,14 @@ export function AlertListingCard({
         )}
       </div>
 
-      <div className="flex flex-1 flex-col gap-3 p-4">
+      <div
+        className={cn(
+          "flex flex-1 flex-col",
+          compact ? "gap-2 p-2.5" : "gap-3 p-4"
+        )}
+      >
         {match && match.score > 0 && match.scoreBreakdown && (
-          <MatchScoreBreakdown score={match.score} breakdown={match.scoreBreakdown} />
+          <MatchScoreCollapsible score={match.score} breakdown={match.scoreBreakdown} />
         )}
         {match && match.score > 0 && !match.scoreBreakdown && (
           <div className="font-mono-data text-xs text-steal">
@@ -137,107 +180,110 @@ export function AlertListingCard({
           </div>
         )}
 
-        <h3 className="font-display text-lg font-medium leading-snug text-ink">
+        <h3
+          className={cn(
+            "font-display font-medium leading-snug text-ink",
+            compact ? "line-clamp-2 text-sm" : "text-lg"
+          )}
+        >
           {listing.model ?? listing.title}
         </h3>
 
-        <p className="text-sm text-ink-soft">
+        <p className={cn("text-ink-soft", compact ? "truncate text-xs" : "text-sm")}>
           {[listing.features.era, listing.features.mvmt, listing.year]
             .filter(Boolean)
             .join(" · ") || listing.title}
         </p>
 
-        {match?.attributeMatches && match.attributeMatches.length > 0 && (
-          <ul className="space-y-1 text-xs text-ink-soft">
-            {match.attributeMatches.map((m) => (
-              <li key={m.key} className="flex gap-2">
-                <span
-                  className={cn(
-                    m.status === "hit" && "text-ok",
-                    m.status === "miss" && "text-steal",
-                    m.status === "unverified" && "text-brass"
-                  )}
-                >
-                  {m.status}
-                </span>
-                <span>{m.label}</span>
-                {m.confidence && (
-                  <span className="font-mono-data text-[10px]">({m.confidence})</span>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-
         {!showHuntMatchTags && huntMatchTags.length > 0 && (
           <div className="flex flex-wrap gap-1">
             {huntMatchTags.map((name) => (
-              <Badge key={name} variant="outline" className="border-brass text-brass">
+              <Badge
+                key={name}
+                variant="outline"
+                className={cn("border-brass text-brass", compact && "px-1.5 py-0 text-[10px]")}
+              >
                 {name}
               </Badge>
             ))}
           </div>
         )}
 
-        {match?.whyNote && (
-          <p className="border-l-2 border-brass pl-3 font-display text-sm italic text-ink-soft">
-            {match.whyNote}
-          </p>
-        )}
-
-        <div className="font-mono-data text-sm">
-          <div className="flex justify-between">
-            <span className="text-ink-soft">Total to door</span>
+        <div className={cn("font-mono-data", compact ? "text-xs" : "text-sm")}>
+          <div className="flex justify-between gap-2">
+            <span className="text-ink-soft">{compact ? "To door" : "Total to door"}</span>
             <span className="font-medium text-ink">${costs.total.toFixed(2)}</span>
           </div>
-          <div className="flex justify-between text-xs text-ink-soft">
-            <span>
-              ${costs.item.toFixed(2)} item + ${costs.shipping.toFixed(2)} ship
-              {!costs.shippingConfirmed && " (est.)"}
-            </span>
-          </div>
+          <p
+            className={cn(
+              "mt-0.5 text-ink-soft",
+              compact ? "text-[10px] leading-tight" : "text-xs"
+            )}
+          >
+            ${costs.item.toFixed(2)} cost · ${costs.shipping.toFixed(2)} shipping
+            {!costs.shippingConfirmed && " (est.)"}
+          </p>
         </div>
 
-        <div className="flex items-center gap-2 text-xs">
+        <div className={cn("flex items-center gap-1.5", compact ? "text-[11px]" : "text-xs")}>
+          <span className="text-ink-soft">Condition</span>
           <span
             className={cn(
-              "rounded-sm px-2 py-0.5",
+              "rounded-sm px-1.5 py-0.5",
               conditionOk ? "bg-ok/15 text-ok" : "bg-brass/15 text-brass"
             )}
           >
-            {conditionOk ? "Likely working" : listing.condition}
+            {conditionLabel}
           </span>
         </div>
 
-        <div className="mt-auto flex flex-wrap gap-2 pt-2">
+        <div className={cn("mt-auto flex flex-wrap gap-1.5", compact ? "pt-1" : "pt-2")}>
           <Button
             type="button"
             variant="outline"
             size="sm"
             className={cn(
               "border-ink",
+              compact && "h-7 px-2 text-xs",
               interested && "border-steal bg-steal/10 text-steal"
             )}
             onClick={onToggleInterested}
           >
-            <Star className={cn("mr-1 h-3 w-3", interested && "fill-steal")} />
+            <Star className={cn("mr-1 h-3 w-3", interested && "fill-steal", compact && "mr-0.5")} />
             {interested ? "Starred" : "Star"}
           </Button>
           {onDismiss && (
-            <Button type="button" variant="outline" size="sm" onClick={onDismiss}>
-              <X className="mr-1 h-3 w-3" />
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className={cn(compact && "h-7 px-2 text-xs")}
+              onClick={onDismiss}
+            >
+              <X className={cn("mr-1 h-3 w-3", compact && "mr-0.5")} />
               Dismiss
             </Button>
           )}
           {onRestore && (
-            <Button type="button" variant="outline" size="sm" onClick={onRestore}>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className={cn(compact && "h-7 px-2 text-xs")}
+              onClick={onRestore}
+            >
               Restore
             </Button>
           )}
-          <Button type="button" size="sm" className="ml-auto bg-ink text-card" asChild>
+          <Button
+            type="button"
+            size="sm"
+            className={cn("ml-auto bg-ink text-card", compact && "h-7 px-2 text-xs")}
+            asChild
+          >
             <a href={listing.url} target="_blank" rel="noopener noreferrer">
-              View on {listing.source}
-              <ExternalLink className="ml-1 h-3 w-3" />
+              View
+              <ExternalLink className={cn("ml-1 h-3 w-3", compact && "ml-0.5 h-2.5 w-2.5")} />
             </a>
           </Button>
         </div>
