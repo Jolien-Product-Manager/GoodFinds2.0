@@ -1,0 +1,13 @@
+{
+  "name": "good-finds-2.0",
+  "version": "0.1.0",
+  "private": false,
+  "description": "Good Finds 2.0",
+  "scripts": {
+    "commit": "./commit"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Jolien-Product-Manager/GoodFinds2.0.git"
+  }
+}

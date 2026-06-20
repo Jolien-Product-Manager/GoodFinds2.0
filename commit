@@ -1,0 +1,160 @@
+#!/usr/bin/env bash
+# Create a git commit with an auto-generated summary of file changes.
+set -euo pipefail
+
+PUSH=false
+STAGE_ALL=false
+TITLE=""
+
+usage() {
+  cat <<'EOF'
+Usage: ./commit [options] "Commit title"
+
+Create a commit with a detailed list of changes appended to the message body.
+
+Options:
+  --push    Push to origin after committing
+  --all     Stage all tracked file changes before committing
+  -h        Show this help
+
+Examples:
+  ./commit "Add user profile page"
+  ./commit --all --push "Fix checkout validation"
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --push) PUSH=true; shift ;;
+    --all) STAGE_ALL=true; shift ;;
+    -h|--help) usage; exit 0 ;;
+    -*) echo "Unknown option: $1" >&2; usage; exit 1 ;;
+    *)
+      if [[ -n "$TITLE" ]]; then
+        echo "Error: only one commit title is allowed." >&2
+        exit 1
+      fi
+      TITLE="$1"
+      shift
+      ;;
+  esac
+done
+
+if [[ -z "$TITLE" ]]; then
+  echo "Error: commit title is required." >&2
+  echo >&2
+  usage
+  exit 1
+fi
+
+if ! git rev-parse --git-dir >/dev/null 2>&1; then
+  echo "Error: not inside a git repository." >&2
+  exit 1
+fi
+
+echo "=== Current status ==="
+git status --short
+echo
+
+if $STAGE_ALL; then
+  git add -u
+  echo "Staged all tracked changes."
+  echo
+fi
+
+if git diff --cached --quiet; then
+  echo "Nothing staged yet."
+  echo "  [a] Stage all tracked changes"
+  echo "  [i] Stage changes interactively"
+  echo "  [q] Quit"
+  read -r -p "Choose an option [a/i/q]: " choice
+  case "$choice" in
+    a|A) git add -u ;;
+    i|I) git add -p ;;
+    *) echo "Aborted."; exit 1 ;;
+  esac
+  echo
+fi
+
+if git diff --cached --quiet; then
+  echo "Error: no staged changes to commit." >&2
+  exit 1
+fi
+
+echo "=== Staged changes ==="
+git diff --cached --stat
+echo
+
+build_change_details() {
+  local details=""
+  details+="Changes:"$'\n'
+  details+=$'\n'
+
+  while IFS=$'\t' read -r status path extra; do
+    [[ -z "$path" ]] && continue
+    case "$status" in
+      A) details+="  + $path (added)"$'\n' ;;
+      D) details+="  - $path (deleted)"$'\n' ;;
+      R*)
+        details+="  ~ $path -> ${extra:-unknown} (renamed)"$'\n'
+        ;;
+      *)
+        local stat
+        stat=$(git diff --cached --numstat -- "$path" 2>/dev/null | head -1)
+        if [[ -n "$stat" ]]; then
+          local added removed
+          read -r added removed _ <<< "$stat"
+          added=${added:-0}
+          removed=${removed:-0}
+          details+="  ~ $path (+$added / -$removed lines)"$'\n'
+        else
+          details+="  ~ $path (modified)"$'\n'
+        fi
+        ;;
+    esac
+  done < <(git diff --cached --name-status)
+
+  details+=$'\n'
+  details+="Diff stat:"$'\n'
+  details+=$(git diff --cached --stat | tail -n +1)
+  echo "$details"
+}
+
+TEMP_MSG=$(mktemp)
+trap 'rm -f "$TEMP_MSG"' EXIT
+
+cat > "$TEMP_MSG" <<EOF
+$TITLE
+
+<!-- Add optional details about why you made these changes below this line -->
+
+
+EOF
+
+${EDITOR:-nano} "$TEMP_MSG"
+
+# Strip comment lines the user left in place
+BODY=$(grep -v '^<!--' "$TEMP_MSG" | sed '/^-->$/d' || true)
+TITLE_LINE=$(echo "$BODY" | head -1)
+USER_BODY=$(echo "$BODY" | tail -n +2 | sed '/./,$!d')
+
+CHANGE_DETAILS=$(build_change_details)
+
+FULL_MSG="$TITLE_LINE"
+if [[ -n "${USER_BODY//[$' \t\r\n']/}" ]]; then
+  FULL_MSG+=$'\n\n'"$USER_BODY"
+fi
+FULL_MSG+=$'\n\n'"$CHANGE_DETAILS"
+
+git commit -F - <<< "$FULL_MSG"
+
+echo
+echo "Committed: $TITLE_LINE"
+
+if $PUSH; then
+  echo "Pushing to origin..."
+  git push -u origin HEAD
+  echo "Pushed successfully."
+else
+  echo "Run 'git push' to publish this commit to GitHub."
+fi
