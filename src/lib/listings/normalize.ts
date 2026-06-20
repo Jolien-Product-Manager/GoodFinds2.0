@@ -24,6 +24,7 @@ function inferCondition(title: string, sourceCondition?: string): ConditionGrade
     return "For parts / project";
   }
   if (lower.includes("needs battery")) return "Needs battery";
+  if (lower.includes("deadstock") || lower.includes("dead stock")) return "Deadstock";
   if (lower.includes("nos") || lower.includes("unworn")) return "NOS / unworn";
   if (lower.includes("excellent")) return "Excellent";
   if (lower.includes("patina")) return "Honest patina";

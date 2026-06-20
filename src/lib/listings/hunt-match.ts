@@ -2,8 +2,13 @@ import type { AppListing } from "@/lib/listings/types";
 import type { Hunt } from "@/lib/hunts/types";
 import type { GlobalFilters } from "@/lib/hunts/types";
 import { normalizeCustomValue } from "@/lib/hunts/types";
+import { specificityMultiplier, huntTightness } from "@/lib/hunts/summary";
 import { collabPickMatchesListing, resolveListingCollab } from "@/lib/listings/collab";
 import { listingMatchesHuntGender } from "@/lib/listings/gender";
+import {
+  resolveListingStoreFind,
+  storeFindPickMatchesListing,
+} from "@/lib/listings/store-find";
 
 export type AttributeMatchStatus = "hit" | "miss" | "unverified";
 
@@ -14,13 +19,27 @@ export interface AttributeMatch {
   confidence?: "high" | "medium" | "low";
 }
 
+export interface ScoreBreakdown {
+  completeness: number;
+  specificity: number;
+  hearts: number;
+  hits: number;
+  specified: number;
+  specificityLabel: string;
+  bestHuntName: string;
+}
+
 export interface HuntMatchResult {
   score: number;
   matchedHuntIds: string[];
   matchedHuntNames: string[];
   attributeMatches: AttributeMatch[];
   whyNote: string;
+  scoreBreakdown?: ScoreBreakdown;
 }
+
+/** Maximum per-hunt score: C(1) × S(2) × H(4). */
+export const FEED_SCORE_MAX = 8;
 
 function effectiveValues(hunt: Hunt, key: keyof Hunt["attributes"]): string[] {
   const attr = hunt.attributes[key];
@@ -62,6 +81,8 @@ function listingValueForAttr(
       return f.mvmt?.toLowerCase();
     case "cond":
       return f.cond?.toLowerCase();
+    case "storeFind":
+      return f.storeFind?.toLowerCase();
     default:
       return undefined;
   }
@@ -70,9 +91,26 @@ function listingValueForAttr(
 export function scoreListingAgainstHunt(
   listing: AppListing,
   hunt: Hunt
-): { score: number; matches: AttributeMatch[]; excluded: boolean } {
+): {
+  score: number;
+  matches: AttributeMatch[];
+  excluded: boolean;
+  breakdown: Omit<ScoreBreakdown, "bestHuntName">;
+} {
   if (!listingMatchesHuntGender(listing.gender, hunt.gender ?? "both", listing.title)) {
-    return { score: 0, matches: [], excluded: true };
+    return {
+      score: 0,
+      matches: [],
+      excluded: true,
+      breakdown: {
+        completeness: 0,
+        specificity: 0,
+        hearts: hunt.hearts ?? 2,
+        hits: 0,
+        specified: 0,
+        specificityLabel: huntTightness(hunt).label,
+      },
+    };
   }
 
   const matches: AttributeMatch[] = [];
@@ -117,6 +155,32 @@ export function scoreListingAgainstHunt(
       continue;
     }
 
+    if (key === "storeFind") {
+      const hit = wanted.some((w) => storeFindPickMatchesListing(w, listing));
+      const inferred = resolveListingStoreFind(listing);
+      if (hit) {
+        hits += 1;
+        matches.push({
+          key,
+          label,
+          status: "hit",
+          confidence: inferred
+            ? (listing.features.confidence.storeFind ?? "medium")
+            : listing.features.confidence.storeFind,
+        });
+      } else if (!inferred) {
+        matches.push({
+          key,
+          label,
+          status: "unverified",
+          confidence: listing.features.confidence.storeFind,
+        });
+      } else {
+        matches.push({ key, label, status: "miss" });
+      }
+      continue;
+    }
+
     if (!listingVal) {
       matches.push({
         key,
@@ -146,8 +210,23 @@ export function scoreListingAgainstHunt(
     }
   }
 
-  const score = specified === 0 ? 0.5 : hits / specified;
-  return { score, matches, excluded };
+  const C = specified === 0 ? 1.0 : hits / specified;
+  const S = specificityMultiplier(hunt);
+  const H = hunt.hearts ?? 2;
+  const score = C * S * H;
+  return {
+    score,
+    matches,
+    excluded,
+    breakdown: {
+      completeness: C,
+      specificity: S,
+      hearts: H,
+      hits,
+      specified,
+      specificityLabel: huntTightness(hunt).label,
+    },
+  };
 }
 
 export function matchAllHunts(
@@ -174,12 +253,16 @@ export function matchAllHunts(
 
     let bestScore = 0;
     let bestMatches: AttributeMatch[] = [];
+    let bestBreakdown: ScoreBreakdown | undefined;
     const matchedIds: string[] = [];
     const matchedNames: string[] = [];
 
     for (const hunt of activeHunts) {
       if (!huntHasActiveCriteria(hunt)) continue;
-      const { score, matches, excluded } = scoreListingAgainstHunt(listing, hunt);
+      const { score, matches, excluded, breakdown } = scoreListingAgainstHunt(
+        listing,
+        hunt
+      );
       if (excluded) continue;
       if (score > 0) {
         matchedIds.push(hunt.id);
@@ -188,6 +271,7 @@ export function matchAllHunts(
       if (score > bestScore) {
         bestScore = score;
         bestMatches = matches;
+        bestBreakdown = { ...breakdown, bestHuntName: hunt.name };
       }
     }
 
@@ -204,6 +288,7 @@ export function matchAllHunts(
       matchedHuntNames: matchedNames,
       attributeMatches: bestMatches,
       whyNote,
+      scoreBreakdown: bestBreakdown,
     });
   }
 

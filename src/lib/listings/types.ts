@@ -22,6 +22,7 @@ export interface ExtractedFeatures {
   mvmt?: string;
   cond?: ConditionGrade;
   collab?: string;
+  storeFind?: string;
   confidence: Partial<
     Record<keyof Omit<ExtractedFeatures, "confidence">, "high" | "medium" | "low">
   >;

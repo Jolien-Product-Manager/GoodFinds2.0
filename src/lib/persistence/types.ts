@@ -7,7 +7,6 @@ export interface PersistedState {
   listingStatus: Record<string, ListingStatus>;
   alertScope: AlertScope;
   feedView: FeedView;
-  modelHearts: Record<string, number>;
   hiddenListings: string[];
   dislikedModels: string[];
   criteria: CriteriaSettings;
@@ -21,7 +20,6 @@ export const DEFAULT_PERSISTED_STATE: PersistedState = {
   listingStatus: {},
   alertScope: "all",
   feedView: "new",
-  modelHearts: {},
   hiddenListings: [],
   dislikedModels: [],
   criteria: {

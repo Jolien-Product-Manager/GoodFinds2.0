@@ -17,7 +17,7 @@ flowchart LR
   subgraph app [In-app filters]
     Norm["Normalize + gender infer"]
     Crit["Global gates from Hunts page"]
-    FeedScope["Feed scope All / Watch-list + seen"]
+    FeedScope["Feed scope All / Hunt Finds + per-hunt"]
   end
   Chrono24 --> Norm
   Ebay --> Norm
@@ -245,7 +245,8 @@ Defaults from global filters on `/hunts` (synced to [`src/lib/criteria.ts`](../s
 | Hidden listings | Excluded | `passesListingFilters()` in `src/lib/listings/selectors.ts` |
 | Disliked models | Excluded | `passesListingFilters()` |
 | Seen / starred | Excluded from **New**; starred in own tab | `unseenListings()`, `interestedListings()` |
-| Feed scope (New tab) | **All** / **Watch-list** (hunt matches) | `alertListings()` |
+| Feed scope (New tab) | **All** / **Hunt Finds** + per-hunt (`hunt:{id}`) | `alertListings()` |
+| Hunt scoring | `C × S × H` (0–8); hearts in `H` | `scoreListingAgainstHunt()` |
 | Hunt gender | Per-hunt gate (Men's / Women's / Both) | `scoreListingAgainstHunt()` in `hunt-match.ts` |
 
 **Shipping estimates:** Total cost uses seeded deterministic shipping unless eBay provides a domestic `shipping_cost` on the listing. Chrono24 listings always use the estimate model today.

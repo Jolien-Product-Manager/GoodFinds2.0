@@ -16,7 +16,7 @@ export function Masthead() {
     <header className="border-b border-line bg-card/80 backdrop-blur-sm">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4">
         <div className="flex items-center gap-6">
-          <Link href="/" className="font-display text-xl font-semibold text-ink">
+          <Link href="/" className="font-display text-2xl font-semibold tracking-tight text-ink">
             GoodFinds
           </Link>
           <nav className="flex gap-4 text-sm">

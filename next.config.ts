@@ -8,7 +8,8 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "**.chrono24.com" },
       { protocol: "https", hostname: "img.chrono24.com" },
       { protocol: "https", hostname: "picsum.photos" },
-      { protocol: "https", hostname: "fastly.picsum.photos" },
+      { protocol: "https", hostname: "**.etsystatic.com" },
+      { protocol: "https", hostname: "i.etsystatic.com" },
     ],
   },
 };

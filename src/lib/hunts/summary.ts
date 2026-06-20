@@ -9,8 +9,17 @@ const SUMMARY_ORDER: AttrKey[] = [
   "collab",
   "case",
   "mvmt",
+  "storeFind",
   "cond",
 ];
+
+function formatStoreFind(value: string): string {
+  if (value === "Deadstock") return "deadstock / tagged";
+  if (value === "Tags attached") return "tags on";
+  if (value === "With original box") return "with box";
+  if (value === "Open box") return "open box";
+  return value.toLowerCase();
+}
 
 function formatCollab(value: string): string {
   if (value === "Any collab") return "collab edition";
@@ -24,6 +33,20 @@ function attributeValues(hunt: Hunt, key: AttrKey): string[] {
   return [...attr.picks, ...attr.customs.filter(Boolean)];
 }
 
+export function specificityMultiplier(hunt: Hunt): number {
+  const { level } = huntTightness(hunt);
+  switch (level) {
+    case "wide":
+      return 0.5;
+    case "loose":
+      return 1.0;
+    case "focused":
+      return 1.5;
+    case "specific":
+      return 2.0;
+  }
+}
+
 export function buildHuntSummary(hunt: Hunt): string {
   const parts: string[] = [];
 
@@ -31,7 +54,7 @@ export function buildHuntSummary(hunt: Hunt): string {
   else if (hunt.gender === "womens") parts.push("Women's");
 
   for (const key of SUMMARY_ORDER) {
-    if (key === "cond") continue;
+    if (key === "cond" || key === "storeFind") continue;
     const values = attributeValues(hunt, key);
     if (values.length === 0) continue;
 
@@ -42,6 +65,7 @@ export function buildHuntSummary(hunt: Hunt): string {
     }
   }
 
+  const storeFindValues = attributeValues(hunt, "storeFind");
   const condValues = attributeValues(hunt, "cond");
   let sentence =
     parts.length > 0
@@ -52,9 +76,16 @@ export function buildHuntSummary(hunt: Hunt): string {
     sentence = sentence === "Any vintage Timex" ? "Any vintage Timex" : `${sentence} Timex`;
   }
 
+  if (storeFindValues.length > 0) {
+    sentence += ` · ${storeFindValues.map(formatStoreFind).join(" or ")}`;
+  }
+
   if (condValues.length > 0) {
     sentence += ` in ${condValues.join(" or ")} condition`;
   }
+
+  const hearts = hunt.hearts ?? 2;
+  sentence += ` · ${hearts}♥`;
 
   return sentence;
 }

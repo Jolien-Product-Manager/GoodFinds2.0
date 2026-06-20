@@ -1,16 +1,20 @@
 import { DEFAULT_CRITERIA } from "@/lib/criteria";
 import type { AppListing, AlertScope, CriteriaSettings } from "@/lib/listings/types";
+import type { Hunt } from "@/lib/hunts/types";
 import { passesCriteria } from "@/lib/shipping";
 import type { HuntMatchResult } from "@/lib/listings/hunt-match";
+
+/** Strong-match threshold for `top` scope (0–8 scale). */
+export const TOP_MATCH_SCORE_THRESHOLD = 4.0;
 
 interface FilterContext {
   seen: string[];
   listingStatus: Record<string, { interested?: boolean }>;
   hiddenListings: string[];
   dislikedModels: string[];
-  modelHearts: Record<string, number>;
   criteria?: CriteriaSettings;
   matchResults?: Map<string, HuntMatchResult>;
+  hunts?: Hunt[];
 }
 
 export function passesListingFilters(
@@ -73,7 +77,7 @@ export function alertListings(
   } else if (scope === "top") {
     base = base.filter((l) => {
       const match = ctx.matchResults?.get(l.id);
-      return match != null && match.score >= 0.7;
+      return match != null && match.score >= TOP_MATCH_SCORE_THRESHOLD;
     });
   } else if (scope.startsWith("hunt:")) {
     const huntId = scope.slice(5);
@@ -96,10 +100,6 @@ export function alertSort(
     const scoreA = matchA?.score ?? 0;
     const scoreB = matchB?.score ?? 0;
     if (scoreB !== scoreA) return scoreB - scoreA;
-
-    const heartsA = a.model ? (ctx.modelHearts[a.model] ?? 0) : 0;
-    const heartsB = b.model ? (ctx.modelHearts[b.model] ?? 0) : 0;
-    if (heartsB !== heartsA) return heartsB - heartsA;
 
     return new Date(b.listedAt).getTime() - new Date(a.listedAt).getTime();
   });

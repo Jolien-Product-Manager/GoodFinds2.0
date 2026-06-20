@@ -6,11 +6,55 @@ import { ExternalLink, Star, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { AppListing } from "@/lib/listings/types";
-import type { HuntMatchResult } from "@/lib/listings/hunt-match";
+import type { HuntMatchResult, ScoreBreakdown } from "@/lib/listings/hunt-match";
+import { FEED_SCORE_MAX } from "@/lib/listings/hunt-match";
 import { getListingImageSrc } from "@/lib/listings/image-url";
 import { getTotalCost } from "@/lib/shipping";
 import { DEFAULT_CRITERIA } from "@/lib/criteria";
 import { cn } from "@/lib/utils";
+
+function completenessLabel(b: ScoreBreakdown): string {
+  if (b.specified === 0) return "gender-only";
+  return `${b.hits}/${b.specified} hits`;
+}
+
+function MatchScoreBreakdown({
+  score,
+  breakdown,
+}: {
+  score: number;
+  breakdown: ScoreBreakdown;
+}) {
+  const { completeness, specificity, hearts } = breakdown;
+
+  return (
+    <div className="space-y-1.5 rounded-sm border border-line bg-paper/60 p-2.5 font-mono-data text-xs">
+      <div className="text-steal">
+        <span className="uppercase tracking-wider text-ink-soft">match </span>
+        {score.toFixed(1)}/{FEED_SCORE_MAX}
+      </div>
+      <div className="text-ink">
+        {completeness.toFixed(completeness === 1 ? 1 : 2)} × {specificity.toFixed(1)} × {hearts}♥
+        {" = "}
+        {score.toFixed(1)}
+      </div>
+      <dl className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5 text-[10px] leading-relaxed text-ink-soft">
+        <dt>C</dt>
+        <dd>
+          {completenessLabel(breakdown)} ({completeness.toFixed(completeness === 1 ? 1 : 2)})
+        </dd>
+        <dt>S</dt>
+        <dd>
+          {breakdown.specificityLabel} ({specificity.toFixed(1)})
+        </dd>
+        <dt>H</dt>
+        <dd>{hearts}♥ desire</dd>
+        <dt>Hunt</dt>
+        <dd className="text-ink">{breakdown.bestHuntName}</dd>
+      </dl>
+    </div>
+  );
+}
 
 interface AlertListingCardProps {
   listing: AppListing;
@@ -83,10 +127,13 @@ export function AlertListingCard({
       </div>
 
       <div className="flex flex-1 flex-col gap-3 p-4">
-        {match && match.score > 0 && (
+        {match && match.score > 0 && match.scoreBreakdown && (
+          <MatchScoreBreakdown score={match.score} breakdown={match.scoreBreakdown} />
+        )}
+        {match && match.score > 0 && !match.scoreBreakdown && (
           <div className="font-mono-data text-xs text-steal">
             <span className="uppercase tracking-wider text-ink-soft">match </span>
-            {Math.round(match.score * 100)}%
+            {match.score.toFixed(1)}/{FEED_SCORE_MAX}
           </div>
         )}
 

@@ -23,7 +23,7 @@ The feed is the default landing tab. Masthead nav: **Feed** | **Hunts** (no inbo
 | The feed is | The feed is not |
 |-------------|-----------------|
 | Unseen listing inbox with hunt-ranked sort | Global filters / price settings (those live on `/hunts`) |
-| Dismiss + restore + star workflow | Model-centric “heart a model” triage (legacy `modelHearts` unused in UI) |
+| Dismiss + restore + star workflow | Model-centric “heart a model” triage (`modelHearts` retired; migrated to hunts) |
 | Three top-level views: New, Starred, Dismissed | Explore tab or separate Watch List page |
 
 Listings are filtered by **global gates** (price, shipping, condition) before they reach the feed. Gates sync from Global filters on the Hunts page via [`src/store/caseback.ts`](../src/store/caseback.ts).
@@ -37,8 +37,8 @@ flowchart TB
   subgraph header [Feed header]
     Title["GoodFinds + stats line"]
     MainToggle["Main toggle: New | Starred | Dismissed"]
-    ScopeChips["New only: All | Watch-list"]
-    Actions["Mark all dismissed · Check for new listings"]
+    ScopeChips["New only: All | Hunt Finds · per-hunt chips"]
+    Actions["Check for new listings (top-right)"]
   end
   subgraph body [Main content]
     Grid["Listing card grid for active view"]
@@ -58,9 +58,10 @@ All **unseen** listings that match the current scope and global gates.
 
 Sorted by [`alertSort`](../src/lib/listings/selectors.ts):
 
-1. Best matched-hunt score (from [`matchAllHunts`](../src/lib/listings/hunt-match.ts))
-2. Model heart count tie-break (legacy field; no UI to set hearts today)
-3. Most recently listed
+1. Best feed score (`C × S × H`, max over matched hunts — see [hunt-feed-filtering-criteria.md](hunt-feed-filtering-criteria.md))
+2. Most recently listed (`listedAt` desc)
+
+Hunt desire (`hearts` 1–4) is baked into the score via `H`; there is no separate model-hearts tie-break.
 
 ### Starred
 
@@ -84,9 +85,10 @@ Stored as `alertScope` in [`src/store/caseback.ts`](../src/store/caseback.ts).
 | Scope | Shows |
 |-------|--------|
 | **All** | All unseen listings that pass global gates |
-| **Watch-list** | Unseen listings that match **≥1 saved hunt** (`matchResults.matchedHuntIds.length > 0`), including gender-only hunts (e.g. Men's only with no attribute chips) |
+| **Hunt Finds** (`watchlist`) | Unseen listings that match **≥1 saved hunt** (`matchResults.matchedHuntIds.length > 0`), including gender-only hunts |
+| **Per-hunt chips** (`hunt:{id}`) | Sub-filter under Hunt Finds — single saved hunt |
 
-Watch-list uses hunt matching from [`hunt-match.ts`](../src/lib/listings/hunt-match.ts) and [`alertListings()`](../src/lib/listings/selectors.ts) — **not** `modelHearts`.
+Hunt Finds uses hunt matching from [`hunt-match.ts`](../src/lib/listings/hunt-match.ts) and [`alertListings()`](../src/lib/listings/selectors.ts). Legacy `modelHearts` is retired.
 
 ---
 
@@ -96,7 +98,8 @@ Each card ([`alert-listing-card.tsx`](../src/components/alert-listing-card.tsx))
 
 - Marketplace source badge (eBay / Chrono24)
 - Image (Chrono24 via image proxy when needed), title, model/year, total cost, condition
-- Match reasons from hunt scoring (`whyNote`, attribute hit/miss/unverified)
+- Match score on 0–8 scale (e.g. `6.0/8`) plus reasons from hunt scoring (`whyNote`, attribute hit/miss/unverified)
+- Matched hunt name badge(s) on Hunt Finds cards
 
 **Card actions (New tab)**
 
@@ -115,12 +118,11 @@ Each card ([`alert-listing-card.tsx`](../src/components/alert-listing-card.tsx))
 
 ---
 
-## Header actions (New tab)
+## Header actions
 
 | Action | Behavior |
 |--------|----------|
-| **Mark all dismissed** | Dismiss every unseen listing in the current scope (undo toast) |
-| **Check for new listings** | `router.refresh()` to re-fetch server listings + toast |
+| **Check for new listings** | Top-right button; `router.refresh()` + toast |
 
 ---
 
@@ -137,7 +139,7 @@ Optional suffix when eBay credentials are missing: eBay offline hint.
 Contextual copy in [`feed-view.tsx`](../src/components/feed-view.tsx):
 
 - **New / All:** “You're all caught up”
-- **New / Watch-list:** “No hunt matches yet” — prompts to save a hunt on `/hunts` or broaden criteria
+- **New / Hunt Finds:** “No hunt matches yet” — prompts to save a hunt on `/hunts` or broaden criteria
 - **Starred:** “No starred listings yet”
 - **Dismissed:** “Nothing dismissed”
 
@@ -160,7 +162,7 @@ Dismiss and restore show a **toast with undo**.
 
 | Hunts page | How it connects to the feed |
 |------------|----------------------------|
-| **Saved hunts** | Define what **Watch-list** matches (gender + taste attributes) |
+| **Saved hunts** | Define what **Hunt Finds** matches (gender + taste + hearts) |
 | **Global filters** | Price ceiling, ships-to-me, postal code → global gates via `passesCriteria()` |
 | **Purchased watches** | Collection log; does not filter the feed today |
 
@@ -172,11 +174,11 @@ Listing data sources: [marketplace-queries.md](marketplace-queries.md). Hunt →
 
 Code or specs exist but are **not exposed** in the feed UI today:
 
-- **Top picks** scope (`alertScope: "top"`) — strong-match threshold
-- **Per-hunt scope chips** (`alertScope: "hunt:{id}"`)
-- **Model hearts** UI to populate `modelHearts` (sort tie-break only)
+- **Top matches** scope (`alertScope: "top"`) — `feedScore ≥ 4.0` threshold (code only)
 - **Explore** tab / model triage
 - Masthead unseen-count badge
+
+Retired: model-hearts (`modelHearts`), Top picks (3♥) chip.
 
 ---
 

@@ -4,8 +4,8 @@ import { useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { AlertListingCard } from "@/components/alert-listing-card";
+import { FeedSidebar } from "@/components/feed-sidebar";
 import type { AppListing, AlertScope } from "@/lib/listings/types";
 import { huntHasActiveCriteria, matchAllHunts } from "@/lib/listings/hunt-match";
 import {
@@ -16,23 +16,28 @@ import {
   unseenListings,
 } from "@/lib/listings/selectors";
 import { useCasebackStore, type FeedView } from "@/store/caseback";
-import { cn } from "@/lib/utils";
 
 interface FeedViewProps {
   listings: AppListing[];
   ebayEnabled: boolean;
 }
 
-const MAIN_VIEWS: { id: FeedView; label: string }[] = [
-  { id: "new", label: "New" },
-  { id: "starred", label: "Starred" },
-  { id: "dismissed", label: "Dismissed" },
-];
-
-const NEW_SCOPES: { id: AlertScope; label: string }[] = [
-  { id: "all", label: "All" },
-  { id: "watchlist", label: "Hunt Finds" },
-];
+function feedContextSuffix(
+  feedView: FeedView,
+  alertScope: AlertScope,
+  activeHunts: { id: string; name: string }[]
+): string {
+  if (feedView === "starred") return "starred";
+  if (feedView === "dismissed") return "dismissed";
+  if (alertScope === "top") return "new · top matches";
+  if (alertScope.startsWith("hunt:")) {
+    const huntId = alertScope.slice(5);
+    const hunt = activeHunts.find((h) => h.id === huntId);
+    return `new · matching ${hunt?.name ?? "this hunt"}`;
+  }
+  if (alertScope === "watchlist") return "new · matching any of your hunts";
+  return "new";
+}
 
 export function FeedView({ listings, ebayEnabled }: FeedViewProps) {
   const router = useRouter();
@@ -41,7 +46,6 @@ export function FeedView({ listings, ebayEnabled }: FeedViewProps) {
   const listingStatus = useCasebackStore((s) => s.listingStatus);
   const alertScope = useCasebackStore((s) => s.alertScope);
   const feedView = useCasebackStore((s) => s.feedView);
-  const modelHearts = useCasebackStore((s) => s.modelHearts);
   const criteria = useCasebackStore((s) => s.criteria);
   const hunts = useCasebackStore((s) => s.hunts);
   const globalFilters = useCasebackStore((s) => s.globalFilters);
@@ -60,10 +64,9 @@ export function FeedView({ listings, ebayEnabled }: FeedViewProps) {
       listingStatus,
       hiddenListings,
       dislikedModels,
-      modelHearts,
       criteria,
     }),
-    [seen, listingStatus, hiddenListings, dislikedModels, modelHearts, criteria]
+    [seen, listingStatus, hiddenListings, dislikedModels, criteria]
   );
 
   const matchResults = useMemo(
@@ -72,8 +75,8 @@ export function FeedView({ listings, ebayEnabled }: FeedViewProps) {
   );
 
   const ctxWithMatches = useMemo(
-    () => ({ ...ctx, matchResults }),
-    [ctx, matchResults]
+    () => ({ ...ctx, matchResults, hunts }),
+    [ctx, matchResults, hunts]
   );
 
   const newListings = useMemo(
@@ -91,8 +94,8 @@ export function FeedView({ listings, ebayEnabled }: FeedViewProps) {
     [listings, ctx]
   );
 
-  const unseenCount = useMemo(
-    () => unseenListings(listings, ctx).length,
+  const unseenAll = useMemo(
+    () => unseenListings(listings, ctx),
     [listings, ctx]
   );
 
@@ -100,6 +103,25 @@ export function FeedView({ listings, ebayEnabled }: FeedViewProps) {
     () => hunts.filter((h) => h.saved && huntHasActiveCriteria(h)),
     [hunts]
   );
+
+  const sidebarCounts = useMemo(() => {
+    const perHunt: Record<string, number> = {};
+    for (const hunt of activeHunts) {
+      perHunt[hunt.id] = alertListings(
+        listings,
+        `hunt:${hunt.id}` as AlertScope,
+        ctxWithMatches
+      ).length;
+    }
+    return {
+      new: unseenAll.length,
+      starred: starred.length,
+      dismissed: dismissed.length,
+      top: alertListings(listings, "top", ctxWithMatches).length,
+      huntMatches: alertListings(listings, "watchlist", ctxWithMatches).length,
+      perHunt,
+    };
+  }, [listings, ctxWithMatches, unseenAll.length, starred.length, dismissed.length, activeHunts]);
 
   const isHuntFindsScope =
     alertScope === "watchlist" || alertScope.startsWith("hunt:");
@@ -144,165 +166,91 @@ export function FeedView({ listings, ebayEnabled }: FeedViewProps) {
                 title: "No hunt matches yet",
                 hint:
                   activeHunts.length === 0
-                    ? "Save a hunt on Hunts (gender, model, era, etc.) to populate Hunt Finds."
-                    : "Nothing unseen matches your saved hunts — try All, or broaden hunt criteria on Hunts.",
+                    ? "Save a hunt on Hunts to populate Hunt matches."
+                    : "Nothing unseen matches your saved hunts — try Top matches, or broaden hunt criteria.",
               }
-            : { title: "You're all caught up", hint: "Nothing new in this view — try refreshing or widening your scope." };
+            : alertScope === "top"
+              ? {
+                  title: "No top matches yet",
+                  hint: "Top matches need a feed score of 4.0 or higher from a saved hunt.",
+                }
+              : {
+                  title: "You're all caught up",
+                  hint: "Nothing new in this view — try refreshing or widening your scope.",
+                };
+
+  const contextSuffix = feedContextSuffix(feedView, alertScope, activeHunts);
 
   return (
-    <div className="space-y-8">
-      <div className="space-y-4">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h1 className="font-display text-3xl font-semibold text-ink">GoodFinds</h1>
-            <p className="mt-2 font-mono-data text-xs text-ink-soft">
-              {unseenCount} new · {starred.length} starred · {dismissed.length} dismissed
-              {!ebayEnabled &&
-                " · eBay offline — save EBAY_CLIENT_ID and EBAY_CLIENT_SECRET in .env.local, then restart npm"}
-            </p>
-          </div>
-          <Button variant="outline" size="sm" onClick={handleRefresh} className="shrink-0">
-            Check for new listings
-          </Button>
-        </div>
-
-        <div className="flex flex-wrap items-start gap-3">
-          <div className="flex flex-col gap-2">
-            <button
-              type="button"
-              onClick={() => setFeedView("new")}
-              className={cn(
-                "rounded-sm border border-line-strong px-4 py-2 text-sm transition-colors",
-                feedView === "new"
-                  ? "bg-ink text-card"
-                  : "bg-card text-ink-soft hover:border-ink/40 hover:text-ink"
-              )}
-            >
-              New
-            </button>
-
-            {feedView === "new" && (
-              <div className="flex flex-col gap-1.5">
-                <div className="flex flex-wrap gap-1.5">
-                  {NEW_SCOPES.map((scope) => {
-                    const isHuntFinds = scope.id === "watchlist";
-                    const isActive = isHuntFinds
-                      ? isHuntFindsScope
-                      : alertScope === scope.id;
-
-                    return (
-                      <button
-                        key={scope.id}
-                        type="button"
-                        onClick={() => setAlertScope(scope.id)}
-                        className={cn(
-                          "rounded-sm border px-2 py-1 text-xs transition-colors",
-                          isActive
-                            ? "border-brass bg-brass/10 text-ink"
-                            : "border-line-strong bg-card/80 text-ink-soft hover:border-ink/30 hover:text-ink"
-                        )}
-                      >
-                        {scope.label}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {isHuntFindsScope && activeHunts.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => setAlertScope("watchlist")}
-                      className={cn(
-                        "rounded-sm border px-2 py-0.5 text-[11px] transition-colors",
-                        alertScope === "watchlist"
-                          ? "border-ink bg-ink/5 text-ink"
-                          : "border-line bg-card/60 text-ink-soft hover:border-ink/30 hover:text-ink"
-                      )}
-                    >
-                      All hunts
-                    </button>
-                    {activeHunts.map((hunt) => {
-                      const huntScope = `hunt:${hunt.id}` as AlertScope;
-                      return (
-                        <button
-                          key={hunt.id}
-                          type="button"
-                          onClick={() => setAlertScope(huntScope)}
-                          className={cn(
-                            "rounded-sm border px-2 py-0.5 text-[11px] transition-colors",
-                            alertScope === huntScope
-                              ? "border-ink bg-ink/5 text-ink"
-                              : "border-line bg-card/60 text-ink-soft hover:border-ink/30 hover:text-ink"
-                          )}
-                        >
-                          {hunt.name}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {MAIN_VIEWS.filter((view) => view.id !== "new").map((view) => (
-            <button
-              key={view.id}
-              type="button"
-              onClick={() => setFeedView(view.id)}
-              className={cn(
-                "rounded-sm border border-line-strong px-4 py-2 text-sm transition-colors",
-                feedView === view.id
-                  ? "bg-ink text-card"
-                  : "bg-card text-ink-soft hover:border-ink/40 hover:text-ink"
-              )}
-            >
-              {view.label}
-            </button>
-          ))}
-        </div>
+    <div className="space-y-6">
+      <div className="flex items-start justify-between gap-4">
+        <h1 className="font-display text-4xl font-semibold tracking-tight text-ink sm:text-5xl">
+          GoodFinds
+        </h1>
+        <Button variant="outline" size="sm" onClick={handleRefresh} className="shrink-0">
+          Check for new listings
+        </Button>
       </div>
 
-      {displayListings.length === 0 ? (
-        <div className="rounded-sm border border-dashed border-line-strong bg-card/50 p-12 text-center">
-          <p className="font-display text-lg text-ink">{emptyMessage.title}</p>
-          <p className="mt-2 text-sm text-ink-soft">{emptyMessage.hint}</p>
-        </div>
-      ) : (
-        <section>
-          <div className="mb-4 flex items-center gap-2">
-            <h2 className="font-display text-xl font-medium text-ink">
-              {MAIN_VIEWS.find((v) => v.id === feedView)?.label}
-            </h2>
-            <Badge variant="outline">{displayListings.length}</Badge>
-          </div>
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {displayListings.map((listing) => (
-              <AlertListingCard
-                key={listing.id}
-                listing={listing}
-                match={matchResults.get(listing.id)}
-                interested={listingStatus[listing.id]?.interested}
-                muted={feedView === "dismissed"}
-                showHuntMatchTags={feedView === "new" && isHuntFindsScope}
-                onDismiss={
-                  feedView === "new" ? () => handleDismiss(listing.id) : undefined
-                }
-                onRestore={
-                  feedView === "dismissed"
-                    ? () => {
-                        restoreListing(listing.id);
-                        toast("Restored to New");
-                      }
-                    : undefined
-                }
-                onToggleInterested={() => toggleInterested(listing.id)}
-              />
-            ))}
-          </div>
-        </section>
+      {!ebayEnabled && (
+        <p className="font-mono-data text-xs text-ink-soft">
+          eBay offline — save EBAY_CLIENT_ID and EBAY_CLIENT_SECRET in .env.local, then restart
+          npm
+        </p>
       )}
+
+      <div className="grid grid-cols-1 items-start gap-6 md:grid-cols-[minmax(0,1fr)_17.5rem] md:gap-8">
+        <FeedSidebar
+          feedView={feedView}
+          alertScope={alertScope}
+          counts={sidebarCounts}
+          activeHunts={activeHunts}
+          onFeedViewChange={setFeedView}
+          onScopeChange={setAlertScope}
+          className="md:sticky md:top-4 md:col-start-2 md:row-start-1"
+        />
+
+        <div className="min-w-0 space-y-4 md:col-start-1 md:row-start-1">
+          <p className="font-mono-data text-sm text-ink-soft">
+            <span className="mr-1.5 inline-block rounded-sm bg-paper px-1.5 py-0.5 font-medium text-ink">
+              {displayListings.length.toLocaleString()}
+            </span>
+            {contextSuffix}
+          </p>
+
+          {displayListings.length === 0 ? (
+            <div className="rounded-sm border border-dashed border-line-strong bg-card/50 p-12 text-center">
+              <p className="font-display text-lg text-ink">{emptyMessage.title}</p>
+              <p className="mt-2 text-sm text-ink-soft">{emptyMessage.hint}</p>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-4">
+              {displayListings.map((listing) => (
+                <AlertListingCard
+                  key={listing.id}
+                  listing={listing}
+                  match={matchResults.get(listing.id)}
+                  interested={listingStatus[listing.id]?.interested}
+                  muted={feedView === "dismissed"}
+                  showHuntMatchTags={feedView === "new" && isHuntFindsScope}
+                  onDismiss={
+                    feedView === "new" ? () => handleDismiss(listing.id) : undefined
+                  }
+                  onRestore={
+                    feedView === "dismissed"
+                      ? () => {
+                          restoreListing(listing.id);
+                          toast("Restored to New");
+                        }
+                      : undefined
+                  }
+                  onToggleInterested={() => toggleInterested(listing.id)}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

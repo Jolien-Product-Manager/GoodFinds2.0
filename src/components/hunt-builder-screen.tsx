@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useState } from "react";
-import { ChevronDown, Plus, Trash2 } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { ChevronDown, Pencil, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,9 +16,17 @@ import {
   normalizeHunt,
   type AttrKey,
   type Hunt,
+  type HuntHearts,
   type PurchasedWatch,
 } from "@/lib/hunts/types";
 import { buildHuntSummary, huntTightness, simulateListingParse } from "@/lib/hunts/summary";
+import {
+  backfillPurchasedWatchImages,
+  findListingImageForPurchaseUrl,
+  type ListingImageRef,
+} from "@/lib/hunts/purchased-watch";
+import { HuntHeartsPicker } from "@/components/hunt-hearts";
+import { PurchasedWatchRow } from "@/components/purchased-watch-row";
 import { useCasebackStore } from "@/store/caseback";
 import { Masthead } from "@/components/masthead";
 import { cn } from "@/lib/utils";
@@ -37,6 +45,7 @@ export function HuntBuilderScreen() {
   const [workingCopy, setWorkingCopy] = useState<Hunt | null>(null);
   const [savedFlash, setSavedFlash] = useState(false);
   const [purchaseUrl, setPurchaseUrl] = useState("");
+  const [listingImages, setListingImages] = useState<ListingImageRef[]>([]);
 
   const expanded = editingId != null || draft != null;
   const activeHunt = workingCopy ?? draft;
@@ -48,12 +57,7 @@ export function HuntBuilderScreen() {
     setEditingId(null);
   };
 
-  const selectHunt = (hunt: Hunt) => {
-    if (editingId === hunt.id) {
-      setEditingId(null);
-      setWorkingCopy(null);
-      return;
-    }
+  const openEdit = (hunt: Hunt) => {
     setDraft(null);
     setEditingId(hunt.id);
     setWorkingCopy(normalizeHunt(JSON.parse(JSON.stringify(hunt)) as Hunt));
@@ -142,19 +146,51 @@ export function HuntBuilderScreen() {
     if (!url) return;
     if (!/^https?:\/\//i.test(url)) url = `https://${url}`;
     const id = crypto.randomUUID();
-    const item: PurchasedWatch = { id, url, parsing: true, features: null };
+    const item: PurchasedWatch = {
+      id,
+      url,
+      parsing: true,
+      features: null,
+      imageUrl: null,
+    };
     setPurchasedWatches([item, ...purchasedWatches]);
     setPurchaseUrl("");
     setTimeout(() => {
+      const imageUrl = findListingImageForPurchaseUrl(url, listingImages);
       setPurchasedWatches(
         useCasebackStore.getState().purchasedWatches.map((p) =>
           p.id === id
-            ? { ...p, parsing: false, features: simulateListingParse(url) }
+            ? {
+                ...p,
+                parsing: false,
+                features: simulateListingParse(url),
+                imageUrl,
+              }
             : p
         )
       );
     }, 1200);
-  }, [purchaseUrl, purchasedWatches, setPurchasedWatches]);
+  }, [purchaseUrl, purchasedWatches, setPurchasedWatches, listingImages]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/listing-images")
+      .then((res) => res.json())
+      .then((images: ListingImageRef[]) => {
+        if (cancelled || !Array.isArray(images)) return;
+        setListingImages(images);
+        const current = useCasebackStore.getState().purchasedWatches;
+        if (current.length === 0) return;
+        const next = backfillPurchasedWatchImages(current, images);
+        if (next !== current) {
+          setPurchasedWatches(next);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [setPurchasedWatches]);
 
   const tightness = activeHunt ? huntTightness(activeHunt) : null;
 
@@ -169,27 +205,10 @@ export function HuntBuilderScreen() {
           </p>
         </div>
 
-        {/* Saved hunts bar */}
+        {/* Saved hunts */}
         <section className="space-y-3">
-          <div className="flex flex-wrap items-center gap-2">
-            {hunts.filter((h) => h.saved).map((hunt) => (
-              <button
-                key={hunt.id}
-                type="button"
-                onClick={() => selectHunt(hunt)}
-                className={cn(
-                  "rounded-sm border px-3 py-1.5 text-sm",
-                  editingId === hunt.id
-                    ? "border-brass bg-brass/15 text-ink"
-                    : "border-line-strong text-ink-soft hover:text-ink"
-                )}
-              >
-                {hunt.name}
-                {editingId === hunt.id && workingCopy && !workingCopy.saved && (
-                  <span className="ml-1 text-brass">•</span>
-                )}
-              </button>
-            ))}
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="font-display text-xl font-medium text-ink">Defined hunts</h2>
             <Button variant="outline" size="sm" onClick={startNewHunt}>
               <Plus className="mr-1 h-3 w-3" />
               New hunt
@@ -198,15 +217,68 @@ export function HuntBuilderScreen() {
               )}
             </Button>
           </div>
+
+          {hunts.filter((h) => h.saved).length === 0 ? (
+            <p className="text-sm text-ink-soft">No saved hunts yet.</p>
+          ) : (
+            <ul className="space-y-3">
+              {hunts
+                .filter((h) => h.saved)
+                .map((hunt) => {
+                  const tightnessForHunt = huntTightness(hunt);
+                  const isEditing = editingId === hunt.id && !draft;
+
+                  return (
+                    <li
+                      key={hunt.id}
+                      className={cn(
+                        "rounded-sm border bg-card p-4",
+                        isEditing
+                          ? "border-brass bg-brass/5"
+                          : "border-line-strong"
+                      )}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0 space-y-2">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h3 className="font-display text-lg font-medium text-ink">
+                              {hunt.name}
+                            </h3>
+                            <HuntHeartsPicker value={hunt.hearts ?? 2} size="xs" />
+                          </div>
+                          <p className="font-display text-sm italic text-ink-soft">
+                            {buildHuntSummary(hunt)}
+                          </p>
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              tightnessForHunt.level === "specific" &&
+                                "border-steal text-steal"
+                            )}
+                          >
+                            {tightnessForHunt.label}
+                          </Badge>
+                        </div>
+                        {!isEditing && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="shrink-0"
+                            onClick={() => openEdit(hunt)}
+                          >
+                            <Pencil className="mr-1 h-3 w-3" />
+                            Edit
+                          </Button>
+                        )}
+                      </div>
+                    </li>
+                  );
+                })}
+            </ul>
+          )}
         </section>
 
-        {/* Hunt form */}
-        {!expanded && (
-          <p className="text-sm italic text-ink-soft">
-            Select a saved hunt to edit, or start a New hunt.
-          </p>
-        )}
-
+        {/* Hunt editor */}
         {expanded && activeHunt && (
           <section className="space-y-6 rounded-sm border border-line-strong bg-card p-6">
             <div className="flex items-center gap-2">
@@ -252,6 +324,23 @@ export function HuntBuilderScreen() {
                   </button>
                 ))}
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-brass">How badly do you want this hunt?</Label>
+              <p className="text-xs text-ink-soft">
+                1 heart = keeping an eye out · 4 hearts = must-find
+              </p>
+              <HuntHeartsPicker
+                value={activeHunt.hearts ?? 2}
+                onChange={(hearts: HuntHearts) =>
+                  setWorkingCopy({
+                    ...activeHunt,
+                    hearts,
+                    saved: false,
+                  })
+                }
+              />
             </div>
 
             {ATTR_KEYS.map((key) => (
@@ -378,38 +467,20 @@ export function HuntBuilderScreen() {
           </div>
           <ul className="space-y-3">
             {purchasedWatches.map((p) => (
-              <li
+              <PurchasedWatchRow
                 key={p.id}
-                className="flex flex-wrap items-center gap-2 rounded-sm border border-line p-3 text-sm"
-              >
-                <a
-                  href={p.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="truncate text-ink underline"
-                >
-                  {p.url}
-                </a>
-                {p.parsing && (
-                  <span className="text-ink-soft italic">Reading listing…</span>
-                )}
-                {p.features &&
-                  Object.entries(p.features).map(([k, v]) => (
-                    <Badge key={k} variant="outline">
-                      {k}: {v}
-                    </Badge>
-                  ))}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="ml-auto text-steal"
-                  onClick={() =>
-                    setPurchasedWatches(purchasedWatches.filter((x) => x.id !== p.id))
-                  }
-                >
-                  Remove
-                </Button>
-              </li>
+                watch={p}
+                onRemove={() =>
+                  setPurchasedWatches(purchasedWatches.filter((x) => x.id !== p.id))
+                }
+                onImageChange={(imageUrl) =>
+                  setPurchasedWatches(
+                    purchasedWatches.map((x) =>
+                      x.id === p.id ? { ...x, imageUrl } : x
+                    )
+                  )
+                }
+              />
             ))}
           </ul>
         </section>

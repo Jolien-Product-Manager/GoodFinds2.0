@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { useCasebackStore, type FeedView } from "@/store/caseback";
+import { useCasebackStore, migrateModelHeartsToHunts, type FeedView } from "@/store/caseback";
 import type { PersistedState } from "@/lib/persistence/types";
-import { normalizeHunt, type Hunt } from "@/lib/hunts/types";
+import { normalizeHunt, type Hunt, type PurchasedWatch } from "@/lib/hunts/types";
+import { normalizePurchasedWatch } from "@/lib/hunts/purchased-watch";
 
 function migrateFeedView(raw: string | undefined): FeedView {
   if (raw === "interested" || raw === "starred") return "starred";
@@ -18,7 +19,6 @@ function pickPersistedState(): PersistedState {
     listingStatus: s.listingStatus,
     alertScope: s.alertScope,
     feedView: s.feedView,
-    modelHearts: s.modelHearts,
     hiddenListings: s.hiddenListings,
     dislikedModels: s.dislikedModels,
     criteria: s.criteria,
@@ -35,19 +35,24 @@ export function StateSync() {
   useEffect(() => {
     fetch("/api/state")
       .then((r) => r.json())
-      .then((state: PersistedState & { feedView?: string }) => {
+      .then((state: PersistedState & { feedView?: string; modelHearts?: Record<string, number> }) => {
+        const hunts = migrateModelHeartsToHunts(
+          (state.hunts ?? []).map((h) => normalizeHunt(h as Hunt)),
+          state.modelHearts
+        );
         useCasebackStore.setState({
           seen: state.seen ?? [],
           listingStatus: state.listingStatus ?? {},
           alertScope: state.alertScope ?? "all",
           feedView: migrateFeedView(state.feedView),
-          modelHearts: state.modelHearts ?? {},
           hiddenListings: state.hiddenListings ?? [],
           dislikedModels: state.dislikedModels ?? [],
           criteria: state.criteria ?? useCasebackStore.getState().criteria,
-          hunts: (state.hunts ?? []).map((h) => normalizeHunt(h as Hunt)),
+          hunts,
           globalFilters: state.globalFilters ?? useCasebackStore.getState().globalFilters,
-          purchasedWatches: state.purchasedWatches ?? [],
+          purchasedWatches: (state.purchasedWatches ?? []).map((p) =>
+            normalizePurchasedWatch(p as PurchasedWatch)
+          ),
         });
         hydrated.current = true;
       })

@@ -1,6 +1,16 @@
 import { DEFAULT_CRITERIA } from "@/lib/criteria";
 import type { AlertScope, CriteriaSettings, ListingStatus } from "@/lib/listings/types";
-import { normalizeHunt, type GlobalFilters, type Hunt, type PurchasedWatch } from "@/lib/hunts/types";
+import {
+  createDraftHunt,
+  emptyHuntAttributes,
+  normalizeCustomValue,
+  normalizeHunt,
+  type GlobalFilters,
+  type Hunt,
+  type HuntHearts,
+  type PurchasedWatch,
+} from "@/lib/hunts/types";
+import { normalizePurchasedWatch } from "@/lib/hunts/purchased-watch";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
@@ -11,7 +21,6 @@ interface CasebackState {
   listingStatus: Record<string, ListingStatus>;
   alertScope: AlertScope;
   feedView: FeedView;
-  modelHearts: Record<string, number>;
   hiddenListings: string[];
   dislikedModels: string[];
   criteria: CriteriaSettings;
@@ -25,21 +34,64 @@ interface CasebackState {
   restoreAll: (ids: string[]) => void;
   setAlertScope: (scope: AlertScope) => void;
   setFeedView: (view: FeedView) => void;
-  setModelHearts: (model: string, hearts: number) => void;
   setCriteria: (criteria: Partial<CriteriaSettings>) => void;
   setHunts: (hunts: Hunt[]) => void;
   setGlobalFilters: (filters: Partial<GlobalFilters>) => void;
   setPurchasedWatches: (watches: PurchasedWatch[]) => void;
 }
 
+function huntTargetsModel(hunt: Hunt, model: string): boolean {
+  const normalized = normalizeCustomValue(model);
+  const picks = hunt.attributes.model?.picks ?? [];
+  const customs = hunt.attributes.model?.customs ?? [];
+  return [...picks, ...customs].some(
+    (v) => normalizeCustomValue(v) === normalized
+  );
+}
+
+function modelHeartsToHuntHearts(legacyHearts: number): HuntHearts {
+  const mapped = Math.min(4, Math.max(1, legacyHearts + 1));
+  return mapped as HuntHearts;
+}
+
+export function migrateModelHeartsToHunts(
+  hunts: Hunt[],
+  modelHearts: Record<string, number> | undefined
+): Hunt[] {
+  if (!modelHearts || Object.keys(modelHearts).length === 0) {
+    return hunts;
+  }
+
+  const next = [...hunts];
+  for (const [model, legacyHearts] of Object.entries(modelHearts)) {
+    if (!model.trim() || legacyHearts <= 0) continue;
+    const already = next.some((h) => h.saved && huntTargetsModel(h, model));
+    if (already) continue;
+
+    const draft = createDraftHunt();
+    next.push(
+      normalizeHunt({
+        ...draft,
+        name: `${model} hunt`,
+        saved: true,
+        hearts: modelHeartsToHuntHearts(legacyHearts),
+        attributes: {
+          ...emptyHuntAttributes(),
+          model: { picks: [model], customs: [] },
+        },
+      })
+    );
+  }
+  return next;
+}
+
 export const useCasebackStore = create<CasebackState>()(
   persist(
-    (set, get) => ({
+    (set) => ({
       seen: [],
       listingStatus: {},
       alertScope: "all",
       feedView: "new",
-      modelHearts: {},
       hiddenListings: [],
       dislikedModels: [],
       criteria: DEFAULT_CRITERIA,
@@ -82,10 +134,6 @@ export const useCasebackStore = create<CasebackState>()(
 
       setAlertScope: (scope) => set({ alertScope: scope }),
       setFeedView: (view) => set({ feedView: view }),
-      setModelHearts: (model, hearts) =>
-        set((s) => ({
-          modelHearts: { ...s.modelHearts, [model]: hearts },
-        })),
       setCriteria: (criteria) =>
         set((s) => ({ criteria: { ...s.criteria, ...criteria } })),
       setHunts: (hunts) => set({ hunts: hunts.map((h) => normalizeHunt(h)) }),
@@ -109,7 +157,17 @@ export const useCasebackStore = create<CasebackState>()(
       name: "caseback-state-v3",
       onRehydrateStorage: () => (state) => {
         if (!state) return;
-        state.hunts = (state.hunts ?? []).map((h) => normalizeHunt(h));
+        const legacy = state as CasebackState & {
+          modelHearts?: Record<string, number>;
+        };
+        legacy.hunts = migrateModelHeartsToHunts(
+          (legacy.hunts ?? []).map((h) => normalizeHunt(h)),
+          legacy.modelHearts
+        );
+        delete legacy.modelHearts;
+        legacy.purchasedWatches = (legacy.purchasedWatches ?? []).map((p) =>
+          normalizePurchasedWatch(p)
+        );
         const feedView = state.feedView as string;
         if (feedView === "interested") {
           state.feedView = "starred";
