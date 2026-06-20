@@ -9,7 +9,7 @@
       "price_value": 35,
       "price_currency": "USD",
       "url": "https://www.chrono24.com/timex/vintage-marlin--id100001.htm",
-      "image_url": "https://img.chrono24.com/images/uhren/sample-marlin.jpg",
+      "image_url": "https://picsum.photos/seed/timex-marlin-100001/800/600",
       "year": 1968,
       "is_vintage": true,
       "source": "chrono24"
@@ -20,7 +20,7 @@
       "price_value": 42,
       "price_currency": "USD",
       "url": "https://www.chrono24.com/timex/viscount--id100002.htm",
-      "image_url": "https://img.chrono24.com/images/uhren/sample-viscount.jpg",
+      "image_url": "https://picsum.photos/seed/timex-viscount-100002/800/600",
       "year": 1972,
       "is_vintage": true,
       "source": "chrono24"
@@ -31,7 +31,7 @@
       "price_value": 28,
       "price_currency": "USD",
       "url": "https://www.chrono24.com/timex/electric--id100003.htm",
-      "image_url": "https://img.chrono24.com/images/uhren/sample-electric.jpg",
+      "image_url": "https://picsum.photos/seed/timex-electric-100003/800/600",
       "year": 1975,
       "is_vintage": true,
       "source": "chrono24"
@@ -42,7 +42,7 @@
       "price_value": 38,
       "price_currency": "USD",
       "url": "https://www.chrono24.com/timex/mercury--id100004.htm",
-      "image_url": "https://img.chrono24.com/images/uhren/sample-mercury.jpg",
+      "image_url": "https://picsum.photos/seed/timex-mercury-100004/800/600",
       "year": 1965,
       "is_vintage": true,
       "source": "chrono24"

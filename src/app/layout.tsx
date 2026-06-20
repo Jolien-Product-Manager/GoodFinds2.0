@@ -21,7 +21,7 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Sleeper — Vintage Timex Feed",
+  title: "GoodFinds — Vintage Timex Feed",
   description: "Stay on top of interesting vintage Timex listings across the market.",
 };
 

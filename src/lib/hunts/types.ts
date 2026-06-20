@@ -13,10 +13,13 @@ export interface HuntAttribute {
   customs: string[];
 }
 
+export type HuntGender = "mens" | "womens" | "both";
+
 export interface Hunt {
   id: string;
   name: string;
   saved: boolean;
+  gender: HuntGender;
   attributes: Record<AttrKey, HuntAttribute>;
   createdAt: string;
   updatedAt: string;
@@ -99,6 +102,12 @@ export const ATTR_OPTIONS: Record<
 
 export const ATTR_KEYS = Object.keys(ATTR_OPTIONS) as AttrKey[];
 
+export const HUNT_GENDER_OPTIONS: { value: HuntGender; label: string }[] = [
+  { value: "both", label: "Men's & Women's" },
+  { value: "mens", label: "Men's" },
+  { value: "womens", label: "Women's" },
+];
+
 export function emptyHuntAttributes(): Record<AttrKey, HuntAttribute> {
   const attrs = {} as Record<AttrKey, HuntAttribute>;
   for (const k of ATTR_KEYS) {
@@ -113,9 +122,31 @@ export function createDraftHunt(): Hunt {
     id: crypto.randomUUID(),
     name: "Untitled hunt",
     saved: false,
+    gender: "both",
     attributes: emptyHuntAttributes(),
     createdAt: now,
     updatedAt: now,
+  };
+}
+
+export function normalizeHunt(hunt: Partial<Hunt> & Pick<Hunt, "id" | "name">): Hunt {
+  const base = emptyHuntAttributes();
+  const merged = { ...base, ...(hunt.attributes ?? {}) };
+  for (const k of ATTR_KEYS) {
+    merged[k] = {
+      picks: hunt.attributes?.[k]?.picks ?? [],
+      customs: hunt.attributes?.[k]?.customs ?? [],
+    };
+  }
+  const now = new Date().toISOString();
+  return {
+    id: hunt.id,
+    name: hunt.name,
+    saved: hunt.saved ?? false,
+    gender: hunt.gender ?? "both",
+    attributes: merged,
+    createdAt: hunt.createdAt ?? now,
+    updatedAt: hunt.updatedAt ?? now,
   };
 }
 

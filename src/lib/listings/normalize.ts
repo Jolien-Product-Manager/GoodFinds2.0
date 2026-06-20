@@ -2,6 +2,7 @@ import type { Chrono24Listing } from "@/lib/chrono24/schema";
 import type { EbayItemSummary } from "@/lib/ebay/schema";
 import { shouldExcludeEbayTitle } from "@/lib/ebay/title-filter";
 import { eraFromYear, matchListingToModel } from "@/lib/models/catalog";
+import { inferListingGender } from "./gender";
 import type { AppListing, ConditionGrade, ExtractedFeatures } from "./types";
 
 const YEAR_RE = /\b(19[2-9]\d|20[0-2]\d)\b/;
@@ -72,6 +73,7 @@ export function normalizeChrono24Listing(raw: Chrono24Listing): AppListing | nul
     shippingConfirmed: false,
     sellerCountry: null,
     listedAt: new Date().toISOString(),
+    gender: inferListingGender(raw.title),
     features: buildFeatures(raw.title, year, model, condition),
   };
 }
@@ -112,6 +114,7 @@ export function normalizeEbayListing(raw: EbayItemSummary): AppListing | null {
     shippingConfirmed: shippingCost != null,
     sellerCountry: raw.itemLocation?.country ?? null,
     listedAt: new Date().toISOString(),
+    gender: inferListingGender(raw.title),
     features: buildFeatures(raw.title, year, model, condition),
   };
 }

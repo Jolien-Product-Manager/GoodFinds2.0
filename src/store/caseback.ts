@@ -1,10 +1,10 @@
 import { DEFAULT_CRITERIA } from "@/lib/criteria";
 import type { AlertScope, CriteriaSettings, ListingStatus } from "@/lib/listings/types";
-import type { Hunt, GlobalFilters, PurchasedWatch } from "@/lib/hunts/types";
+import { normalizeHunt, type GlobalFilters, type Hunt, type PurchasedWatch } from "@/lib/hunts/types";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
-export type FeedView = "new" | "interested";
+export type FeedView = "new" | "starred" | "dismissed";
 
 interface CasebackState {
   seen: string[];
@@ -88,7 +88,7 @@ export const useCasebackStore = create<CasebackState>()(
         })),
       setCriteria: (criteria) =>
         set((s) => ({ criteria: { ...s.criteria, ...criteria } })),
-      setHunts: (hunts) => set({ hunts }),
+      setHunts: (hunts) => set({ hunts: hunts.map((h) => normalizeHunt(h)) }),
       setGlobalFilters: (filters) =>
         set((s) => {
           const next = { ...s.globalFilters, ...filters };
@@ -105,7 +105,17 @@ export const useCasebackStore = create<CasebackState>()(
         }),
       setPurchasedWatches: (purchasedWatches) => set({ purchasedWatches }),
     }),
-    { name: "caseback-state-v3" }
+    {
+      name: "caseback-state-v3",
+      onRehydrateStorage: () => (state) => {
+        if (!state) return;
+        state.hunts = (state.hunts ?? []).map((h) => normalizeHunt(h));
+        const feedView = state.feedView as string;
+        if (feedView === "interested") {
+          state.feedView = "starred";
+        }
+      },
+    }
   )
 );
 

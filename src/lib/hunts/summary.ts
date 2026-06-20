@@ -20,11 +20,15 @@ function formatCollab(value: string): string {
 
 function attributeValues(hunt: Hunt, key: AttrKey): string[] {
   const attr = hunt.attributes[key];
+  if (!attr) return [];
   return [...attr.picks, ...attr.customs.filter(Boolean)];
 }
 
 export function buildHuntSummary(hunt: Hunt): string {
   const parts: string[] = [];
+
+  if (hunt.gender === "mens") parts.push("Men's");
+  else if (hunt.gender === "womens") parts.push("Women's");
 
   for (const key of SUMMARY_ORDER) {
     if (key === "cond") continue;

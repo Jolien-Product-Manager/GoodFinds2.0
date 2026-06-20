@@ -1,8 +1,15 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { useCasebackStore } from "@/store/caseback";
+import { useCasebackStore, type FeedView } from "@/store/caseback";
 import type { PersistedState } from "@/lib/persistence/types";
+import { normalizeHunt, type Hunt } from "@/lib/hunts/types";
+
+function migrateFeedView(raw: string | undefined): FeedView {
+  if (raw === "interested" || raw === "starred") return "starred";
+  if (raw === "dismissed") return "dismissed";
+  return "new";
+}
 
 function pickPersistedState(): PersistedState {
   const s = useCasebackStore.getState();
@@ -28,17 +35,17 @@ export function StateSync() {
   useEffect(() => {
     fetch("/api/state")
       .then((r) => r.json())
-      .then((state: PersistedState) => {
+      .then((state: PersistedState & { feedView?: string }) => {
         useCasebackStore.setState({
           seen: state.seen ?? [],
           listingStatus: state.listingStatus ?? {},
           alertScope: state.alertScope ?? "all",
-          feedView: state.feedView ?? "new",
+          feedView: migrateFeedView(state.feedView),
           modelHearts: state.modelHearts ?? {},
           hiddenListings: state.hiddenListings ?? [],
           dislikedModels: state.dislikedModels ?? [],
           criteria: state.criteria ?? useCasebackStore.getState().criteria,
-          hunts: state.hunts ?? [],
+          hunts: (state.hunts ?? []).map((h) => normalizeHunt(h as Hunt)),
           globalFilters: state.globalFilters ?? useCasebackStore.getState().globalFilters,
           purchasedWatches: state.purchasedWatches ?? [],
         });

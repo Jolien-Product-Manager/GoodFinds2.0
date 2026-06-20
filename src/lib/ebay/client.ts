@@ -115,5 +115,7 @@ export async function fetchEbayListings(): Promise<EbayItemSummary[]> {
 }
 
 export function hasEbayCredentials(): boolean {
-  return Boolean(process.env.EBAY_CLIENT_ID && process.env.EBAY_CLIENT_SECRET);
+  const id = process.env.EBAY_CLIENT_ID?.trim();
+  const secret = process.env.EBAY_CLIENT_SECRET?.trim();
+  return Boolean(id && secret);
 }

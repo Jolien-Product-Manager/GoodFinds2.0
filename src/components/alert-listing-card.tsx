@@ -1,11 +1,13 @@
 "use client";
 
+import { useState } from "react";
 import Image from "next/image";
 import { ExternalLink, Star, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { AppListing } from "@/lib/listings/types";
 import type { HuntMatchResult } from "@/lib/listings/hunt-match";
+import { getListingImageSrc } from "@/lib/listings/image-url";
 import { getTotalCost } from "@/lib/shipping";
 import { DEFAULT_CRITERIA } from "@/lib/criteria";
 import { cn } from "@/lib/utils";
@@ -29,6 +31,8 @@ export function AlertListingCard({
   onRestore,
   onToggleInterested,
 }: AlertListingCardProps) {
+  const [imageFailed, setImageFailed] = useState(false);
+  const imageSrc = getListingImageSrc(listing.imageUrl);
   const costs = getTotalCost(listing, DEFAULT_CRITERIA.postalCode);
   const conditionOk =
     listing.condition !== "For parts / project" &&
@@ -42,18 +46,20 @@ export function AlertListingCard({
       )}
     >
       <div className="relative aspect-[4/3] bg-paper">
-        {listing.imageUrl ? (
+        {imageSrc && !imageFailed ? (
           <Image
-            src={listing.imageUrl}
+            src={imageSrc}
             alt={listing.title}
             fill
             className="object-cover"
             sizes="(max-width: 680px) 100vw, 33vw"
             unoptimized
+            onError={() => setImageFailed(true)}
           />
         ) : (
-          <div className="flex h-full items-center justify-center text-ink-soft">
-            No image
+          <div className="flex h-full flex-col items-center justify-center gap-2 px-4 text-center text-ink-soft">
+            <span className="font-display text-sm text-ink">{listing.model ?? "Timex"}</span>
+            <span className="text-xs">Photo unavailable</span>
           </div>
         )}
         <Badge className="absolute left-2 top-2 border-0 bg-ink/80 text-card">
@@ -153,7 +159,7 @@ export function AlertListingCard({
             onClick={onToggleInterested}
           >
             <Star className={cn("mr-1 h-3 w-3", interested && "fill-steal")} />
-            {interested ? "Interested" : "Star"}
+            {interested ? "Starred" : "Star"}
           </Button>
           {onDismiss && (
             <Button type="button" variant="outline" size="sm" onClick={onDismiss}>

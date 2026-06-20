@@ -2,6 +2,7 @@ import type { AppListing } from "@/lib/listings/types";
 import type { Hunt } from "@/lib/hunts/types";
 import type { GlobalFilters } from "@/lib/hunts/types";
 import { normalizeCustomValue } from "@/lib/hunts/types";
+import { listingMatchesHuntGender } from "@/lib/listings/gender";
 
 export type AttributeMatchStatus = "hit" | "miss" | "unverified";
 
@@ -63,6 +64,10 @@ export function scoreListingAgainstHunt(
   listing: AppListing,
   hunt: Hunt
 ): { score: number; matches: AttributeMatch[]; excluded: boolean } {
+  if (!listingMatchesHuntGender(listing.gender, hunt.gender ?? "both")) {
+    return { score: 0, matches: [], excluded: true };
+  }
+
   const matches: AttributeMatch[] = [];
   let specified = 0;
   let hits = 0;

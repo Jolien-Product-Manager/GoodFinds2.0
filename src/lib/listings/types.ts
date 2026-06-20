@@ -1,5 +1,7 @@
 export type ListingSource = "chrono24" | "ebay";
 
+export type ListingGender = "mens" | "womens" | "unisex" | "unknown";
+
 export type ConditionGrade =
   | "Deadstock"
   | "NOS / unworn"
@@ -41,6 +43,7 @@ export interface AppListing {
   shippingConfirmed: boolean;
   sellerCountry: string | null;
   listedAt: string;
+  gender: ListingGender;
   features: ExtractedFeatures;
 }
 

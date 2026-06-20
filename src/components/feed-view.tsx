@@ -1,15 +1,10 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
 import { AlertListingCard } from "@/components/alert-listing-card";
 import type { AppListing, AlertScope } from "@/lib/listings/types";
 import { matchAllHunts } from "@/lib/listings/hunt-match";
@@ -20,7 +15,7 @@ import {
   interestedListings,
   unseenListings,
 } from "@/lib/listings/selectors";
-import { useCasebackStore } from "@/store/caseback";
+import { useCasebackStore, type FeedView } from "@/store/caseback";
 import { cn } from "@/lib/utils";
 
 interface FeedViewProps {
@@ -28,9 +23,19 @@ interface FeedViewProps {
   ebayEnabled: boolean;
 }
 
+const MAIN_VIEWS: { id: FeedView; label: string }[] = [
+  { id: "new", label: "New" },
+  { id: "starred", label: "Starred" },
+  { id: "dismissed", label: "Dismissed" },
+];
+
+const NEW_SCOPES: { id: AlertScope; label: string }[] = [
+  { id: "all", label: "All" },
+  { id: "watchlist", label: "Watch-list" },
+];
+
 export function FeedView({ listings, ebayEnabled }: FeedViewProps) {
   const router = useRouter();
-  const [dismissedOpen, setDismissedOpen] = useState(true);
 
   const seen = useCasebackStore((s) => s.seen);
   const listingStatus = useCasebackStore((s) => s.listingStatus);
@@ -78,7 +83,7 @@ export function FeedView({ listings, ebayEnabled }: FeedViewProps) {
     [listings, alertScope, ctxWithMatches]
   );
 
-  const interested = useMemo(
+  const starred = useMemo(
     () => interestedListings(listings, ctx),
     [listings, ctx]
   );
@@ -123,68 +128,70 @@ export function FeedView({ listings, ebayEnabled }: FeedViewProps) {
     toast("Checking for new listings…");
   }, [router]);
 
-  const scopeChips: { id: AlertScope; label: string }[] = [
-    { id: "all", label: "All new" },
-    { id: "watchlist", label: "Watch-list" },
-    { id: "top", label: "Top matches" },
-    ...hunts
-      .filter((h) => h.saved)
-      .map((h) => ({ id: `hunt:${h.id}` as AlertScope, label: h.name })),
-  ];
+  const displayListings =
+    feedView === "starred"
+      ? starred
+      : feedView === "dismissed"
+        ? dismissed
+        : newListings;
 
-  const displayListings = feedView === "interested" ? interested : newListings;
+  const emptyMessage =
+    feedView === "starred"
+      ? { title: "No starred listings yet", hint: "Star listings from New to save them here." }
+      : feedView === "dismissed"
+        ? { title: "Nothing dismissed", hint: "Listings you dismiss will appear here." }
+        : { title: "You're all caught up", hint: "Nothing new in this view — try refreshing or widening your scope." };
 
   return (
     <div className="space-y-8">
       <div className="space-y-4">
         <div>
-          <h1 className="font-display text-3xl font-semibold text-ink">
-            Vintage Timex Watches Feed
-          </h1>
-          <p className="mt-1 text-ink-soft">
-            Listings you haven&apos;t dismissed — scan, star, and clear noise.
-          </p>
+          <h1 className="font-display text-3xl font-semibold text-ink">GoodFinds</h1>
           <p className="mt-2 font-mono-data text-xs text-ink-soft">
-            {unseenCount} new · {dismissed.length} dismissed
-            {!ebayEnabled && " · eBay offline (Chrono24 only)"}
+            {unseenCount} new · {starred.length} starred · {dismissed.length} dismissed
+            {!ebayEnabled &&
+              " · eBay offline — save EBAY_CLIENT_ID and EBAY_CLIENT_SECRET in .env.local, then restart npm"}
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
           <div className="inline-flex rounded-sm border border-line-strong p-0.5">
-            {(["new", "interested"] as const).map((view) => (
+            {MAIN_VIEWS.map((view) => (
               <button
-                key={view}
+                key={view.id}
                 type="button"
-                onClick={() => setFeedView(view)}
+                onClick={() => setFeedView(view.id)}
                 className={cn(
-                  "rounded-sm px-3 py-1.5 text-sm capitalize",
-                  feedView === view
+                  "rounded-sm px-3 py-1.5 text-sm",
+                  feedView === view.id
                     ? "bg-ink text-card"
                     : "text-ink-soft hover:text-ink"
                 )}
               >
-                {view}
+                {view.label}
               </button>
             ))}
           </div>
 
-          {feedView === "new" &&
-            scopeChips.map((chip) => (
-              <button
-                key={chip.id}
-                type="button"
-                onClick={() => setAlertScope(chip.id)}
-                className={cn(
-                  "rounded-sm border px-3 py-1.5 text-sm",
-                  alertScope === chip.id
-                    ? "border-brass bg-brass/10 text-ink"
-                    : "border-line-strong text-ink-soft hover:text-ink"
-                )}
-              >
-                {chip.label}
-              </button>
-            ))}
+          {feedView === "new" && (
+            <div className="inline-flex rounded-sm border border-line-strong p-0.5">
+              {NEW_SCOPES.map((scope) => (
+                <button
+                  key={scope.id}
+                  type="button"
+                  onClick={() => setAlertScope(scope.id)}
+                  className={cn(
+                    "rounded-sm px-3 py-1.5 text-sm",
+                    alertScope === scope.id
+                      ? "border-brass bg-brass/10 text-ink"
+                      : "text-ink-soft hover:text-ink"
+                  )}
+                >
+                  {scope.label}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {feedView === "new" && (
@@ -201,22 +208,14 @@ export function FeedView({ listings, ebayEnabled }: FeedViewProps) {
 
       {displayListings.length === 0 ? (
         <div className="rounded-sm border border-dashed border-line-strong bg-card/50 p-12 text-center">
-          <p className="font-display text-lg text-ink">
-            {feedView === "interested"
-              ? "No starred listings yet"
-              : "You're all caught up"}
-          </p>
-          <p className="mt-2 text-sm text-ink-soft">
-            {feedView === "interested"
-              ? "Star listings from New to save them here."
-              : "Nothing new in this view — try refreshing or widening your scope."}
-          </p>
+          <p className="font-display text-lg text-ink">{emptyMessage.title}</p>
+          <p className="mt-2 text-sm text-ink-soft">{emptyMessage.hint}</p>
         </div>
       ) : (
         <section>
           <div className="mb-4 flex items-center gap-2">
-            <h2 className="font-display text-xl font-medium capitalize text-ink">
-              {feedView}
+            <h2 className="font-display text-xl font-medium text-ink">
+              {MAIN_VIEWS.find((v) => v.id === feedView)?.label}
             </h2>
             <Badge variant="outline">{displayListings.length}</Badge>
           </div>
@@ -227,9 +226,16 @@ export function FeedView({ listings, ebayEnabled }: FeedViewProps) {
                 listing={listing}
                 match={matchResults.get(listing.id)}
                 interested={listingStatus[listing.id]?.interested}
+                muted={feedView === "dismissed"}
                 onDismiss={
-                  feedView === "new"
-                    ? () => handleDismiss(listing.id)
+                  feedView === "new" ? () => handleDismiss(listing.id) : undefined
+                }
+                onRestore={
+                  feedView === "dismissed"
+                    ? () => {
+                        restoreListing(listing.id);
+                        toast("Restored to New");
+                      }
                     : undefined
                 }
                 onToggleInterested={() => toggleInterested(listing.id)}
@@ -237,39 +243,6 @@ export function FeedView({ listings, ebayEnabled }: FeedViewProps) {
             ))}
           </div>
         </section>
-      )}
-
-      {feedView === "new" && dismissed.length > 0 && (
-        <Collapsible open={dismissedOpen} onOpenChange={setDismissedOpen}>
-          <CollapsibleTrigger asChild>
-            <button
-              type="button"
-              className="flex w-full items-center justify-between rounded-sm border border-line-strong bg-card/50 px-4 py-3 text-left"
-            >
-              <span className="font-display text-lg text-ink-soft">
-                Dismissed listings
-              </span>
-              <Badge variant="outline">{dismissed.length}</Badge>
-            </button>
-          </CollapsibleTrigger>
-          <CollapsibleContent className="mt-4">
-            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              {dismissed.map((listing) => (
-                <AlertListingCard
-                  key={listing.id}
-                  listing={listing}
-                  match={matchResults.get(listing.id)}
-                  muted
-                  onRestore={() => {
-                    restoreListing(listing.id);
-                    toast("Restored to New");
-                  }}
-                  onToggleInterested={() => toggleInterested(listing.id)}
-                />
-              ))}
-            </div>
-          </CollapsibleContent>
-        </Collapsible>
       )}
     </div>
   );

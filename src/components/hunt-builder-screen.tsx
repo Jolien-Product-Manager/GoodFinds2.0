@@ -10,8 +10,10 @@ import { Badge } from "@/components/ui/badge";
 import {
   ATTR_KEYS,
   ATTR_OPTIONS,
+  HUNT_GENDER_OPTIONS,
   createDraftHunt,
   normalizeCustomValue,
+  normalizeHunt,
   type AttrKey,
   type Hunt,
   type PurchasedWatch,
@@ -54,19 +56,20 @@ export function HuntBuilderScreen() {
     }
     setDraft(null);
     setEditingId(hunt.id);
-    setWorkingCopy(JSON.parse(JSON.stringify(hunt)) as Hunt);
+    setWorkingCopy(normalizeHunt(JSON.parse(JSON.stringify(hunt)) as Hunt));
   };
 
   const updateAttr = (key: AttrKey, picks?: string[], customs?: string[]) => {
     if (!workingCopy) return;
+    const current = workingCopy.attributes[key] ?? { picks: [], customs: [] };
     setWorkingCopy({
       ...workingCopy,
       saved: false,
       attributes: {
         ...workingCopy.attributes,
         [key]: {
-          picks: picks ?? workingCopy.attributes[key].picks,
-          customs: customs ?? workingCopy.attributes[key].customs,
+          picks: picks ?? current.picks,
+          customs: customs ?? current.customs,
         },
       },
       updatedAt: new Date().toISOString(),
@@ -75,7 +78,7 @@ export function HuntBuilderScreen() {
 
   const togglePick = (key: AttrKey, value: string) => {
     if (!workingCopy) return;
-    const current = workingCopy.attributes[key].picks;
+    const current = workingCopy.attributes[key]?.picks ?? [];
     const picks = current.includes(value)
       ? current.filter((v) => v !== value)
       : [...current, value];
@@ -96,7 +99,11 @@ export function HuntBuilderScreen() {
       toast.error("Name your hunt before saving");
       return;
     }
-    const saved: Hunt = { ...workingCopy, saved: true, updatedAt: new Date().toISOString() };
+    const saved: Hunt = normalizeHunt({
+      ...workingCopy,
+      saved: true,
+      updatedAt: new Date().toISOString(),
+    });
     const exists = hunts.some((h) => h.id === saved.id);
     const next = exists
       ? hunts.map((h) => (h.id === saved.id ? saved : h))
@@ -220,12 +227,39 @@ export function HuntBuilderScreen() {
               </Button>
             </div>
 
+            <div className="space-y-2">
+              <Label className="text-brass">Gender</Label>
+              <div className="flex flex-wrap gap-2">
+                {HUNT_GENDER_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() =>
+                      setWorkingCopy({
+                        ...activeHunt,
+                        gender: opt.value,
+                        saved: false,
+                      })
+                    }
+                    className={cn(
+                      "rounded-sm border px-3 py-1.5 text-sm",
+                      (activeHunt.gender ?? "both") === opt.value
+                        ? "border-brass bg-brass/15 text-ink"
+                        : "border-line-strong text-ink-soft"
+                    )}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {ATTR_KEYS.map((key) => (
               <div key={key} className="space-y-2">
                 <Label className="text-brass">{ATTR_OPTIONS[key].label}</Label>
                 <div className="flex flex-wrap gap-2">
                   {ATTR_OPTIONS[key].options.map((opt) => {
-                    const selected = activeHunt.attributes[key].picks.includes(opt);
+                    const selected = (activeHunt.attributes[key]?.picks ?? []).includes(opt);
                     return (
                       <button
                         key={opt}
@@ -245,7 +279,7 @@ export function HuntBuilderScreen() {
                 </div>
                 <Input
                   placeholder="Or type your own (comma-separated)"
-                  defaultValue={activeHunt.attributes[key].customs.join(", ")}
+                  defaultValue={(activeHunt.attributes[key]?.customs ?? []).join(", ")}
                   onBlur={(e) => handleCustomInput(key, e.target.value)}
                   className="text-sm"
                 />
