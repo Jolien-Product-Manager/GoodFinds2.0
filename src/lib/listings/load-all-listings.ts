@@ -5,6 +5,7 @@ import {
   normalizeChrono24Listing,
   normalizeEbayListing,
 } from "./normalize";
+import { enrichAllListings } from "./extract-features";
 import type { AppListing } from "./types";
 
 export interface LoadAllListingsResult {
@@ -30,11 +31,12 @@ export async function loadAllListings(): Promise<LoadAllListingsResult> {
   }
 
   const merged = filterVintageListings([...chronoNormalized, ...ebayNormalized]);
+  const enriched = enrichAllListings(merged);
 
   // Dedupe by URL fallback
   const seen = new Set<string>();
   const deduped: AppListing[] = [];
-  for (const listing of merged) {
+  for (const listing of enriched) {
     const key = listing.url;
     if (seen.has(key)) continue;
     seen.add(key);
