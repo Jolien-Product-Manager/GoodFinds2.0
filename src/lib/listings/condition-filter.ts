@@ -5,7 +5,6 @@ export const CONDITION_FILTER_OPTIONS: {
   label: string;
   hint: string;
 }[] = [
-  { value: "Deadstock", label: "Deadstock", hint: "New old stock, never sold" },
   { value: "NOS / unworn", label: "NOS / unworn", hint: "New old stock or never worn" },
   { value: "Excellent", label: "Excellent", hint: "Light wear, fully functional" },
   { value: "Good / worn", label: "Good / worn", hint: "Normal vintage wear" },
@@ -29,11 +28,19 @@ export const DEFAULT_ALLOWED_CONDITIONS: ConditionGrade[] =
     (o) => o.value
   );
 
+const VALID_CONDITION_VALUES = new Set(
+  CONDITION_FILTER_OPTIONS.map((option) => option.value)
+);
+
 export function normalizeAllowedConditions(
   raw: ConditionGrade[] | undefined,
   legacyExcludeForParts?: boolean
 ): ConditionGrade[] {
-  if (raw && raw.length > 0) return raw;
+  if (raw && raw.length > 0) {
+    return (raw as string[]).filter(
+      (value) => value !== "Deadstock" && VALID_CONDITION_VALUES.has(value as ConditionGrade)
+    ) as ConditionGrade[];
+  }
   if (legacyExcludeForParts === false) {
     return CONDITION_FILTER_OPTIONS.map((o) => o.value);
   }

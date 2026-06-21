@@ -3,7 +3,6 @@ export type ListingSource = "chrono24" | "ebay" | "etsy";
 export type ListingGender = "mens" | "womens" | "unisex" | "unknown";
 
 export type ConditionGrade =
-  | "Deadstock"
   | "NOS / unworn"
   | "Excellent"
   | "Good / worn"

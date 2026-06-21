@@ -2,6 +2,10 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   outputFileTracingRoot: process.cwd(),
+  // Include marketplace snapshots in serverless bundles (Vercel/Lambda). Harmless on Render.
+  outputFileTracingIncludes: {
+    "/api/**": ["./data/**/*"],
+  },
   images: {
     localPatterns: [
       {

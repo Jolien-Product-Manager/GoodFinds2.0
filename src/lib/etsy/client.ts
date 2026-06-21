@@ -211,8 +211,6 @@ function useDiskCache(reason: string): EtsyListing[] {
 }
 
 async function fetchEtsyListingsInternal(): Promise<EtsyListing[]> {
-  if (!getEtsyApiKey()) return [];
-
   const fromMemory = useMemoryCache();
   if (fromMemory) return fromMemory;
 
@@ -223,6 +221,17 @@ async function fetchEtsyListingsInternal(): Promise<EtsyListing[]> {
     if (hasDiskCache) {
       return useDiskCache("snapshot preferred over live fetch");
     }
+  }
+
+  const apiKey = getEtsyApiKey();
+  if (!apiKey) {
+    if (hasDiskCache) {
+      return useDiskCache("no API credentials");
+    }
+    return [];
+  }
+
+  if (!forceRefreshRequested()) {
     return [];
   }
 

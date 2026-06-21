@@ -56,7 +56,7 @@ export function GlobalFiltersSection({
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
               <p className="font-display text-base font-medium leading-tight text-ink">
-                Price ceiling
+                Max cost shipped to you
               </p>
               <p className="mt-0.5 text-xs italic leading-snug text-ink-soft">
                 Max landed cost, all in

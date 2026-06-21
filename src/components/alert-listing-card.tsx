@@ -448,19 +448,19 @@ export function AlertListingCard({
 
           <div className={cn("flex flex-1 flex-col", compact ? "gap-2.5 p-3" : "gap-3 p-4")}>
             <div className="pb-1">
-              <div className="flex items-start justify-between gap-3">
+              <div className="grid grid-cols-[1fr_5.5rem] items-center gap-3">
                 <h3
                   className={cn(
-                    "min-w-0 flex-1 font-display font-semibold leading-snug text-ink",
+                    "min-w-0 font-display font-semibold leading-snug text-ink",
                     compact ? "line-clamp-4 text-[15px]" : "line-clamp-4 text-lg"
                   )}
                 >
                   {listing.title}
                 </h3>
-                <div className="flex w-fit shrink-0 flex-col items-center gap-0.5 text-center">
+                <div className="flex flex-col items-center justify-center gap-0.5 text-center">
                   <span
                     className={cn(
-                      "block w-full font-display font-semibold tabular-nums text-ink",
+                      "font-display font-semibold tabular-nums text-ink",
                       compact ? "text-lg" : "text-xl"
                     )}
                   >
@@ -616,19 +616,19 @@ export function AlertListingCard({
 
             <div className={cn("flex flex-1 flex-col", compact ? "gap-2.5 p-3" : "gap-3 p-4")}>
               <div className="pb-1">
-                <div className="flex items-start justify-between gap-3">
+                <div className="grid grid-cols-[1fr_5.5rem] items-center gap-3">
                   <h3
                     className={cn(
-                      "min-w-0 flex-1 font-display font-semibold leading-snug text-ink",
+                      "min-w-0 font-display font-semibold leading-snug text-ink",
                       compact ? "line-clamp-4 text-[15px]" : "line-clamp-4 text-lg"
                     )}
                   >
                     {listing.title}
                   </h3>
-                  <div className="flex w-fit shrink-0 flex-col items-center gap-0.5 text-center">
+                  <div className="flex flex-col items-center justify-center gap-0.5 text-center">
                     <span
                       className={cn(
-                        "block w-full font-display font-semibold tabular-nums text-ink",
+                        "font-display font-semibold tabular-nums text-ink",
                         compact ? "text-lg" : "text-xl"
                       )}
                     >

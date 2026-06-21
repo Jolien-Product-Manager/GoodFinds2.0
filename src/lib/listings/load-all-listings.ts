@@ -28,25 +28,18 @@ export async function loadAllListings(): Promise<LoadAllListingsResult> {
     console.warn("Chrono24 listings failed normalization — check data/chrono24/vintage_timex.json");
   }
 
-  let ebayNormalized: AppListing[] = [];
+  const ebayRaw = await fetchEbayListings();
+  const ebayNormalized = ebayRaw
+    .map(normalizeEbayListing)
+    .filter((l): l is AppListing => l != null);
+
+  const etsyRaw = await fetchEtsyListings();
+  const etsyNormalized = etsyRaw
+    .map(normalizeEtsyListing)
+    .filter((l): l is AppListing => l != null);
+
   const ebayEnabled = hasEbayCredentials();
-
-  if (ebayEnabled) {
-    const ebayRaw = await fetchEbayListings();
-    ebayNormalized = ebayRaw
-      .map(normalizeEbayListing)
-      .filter((l): l is AppListing => l != null);
-  }
-
-  let etsyNormalized: AppListing[] = [];
   const etsyEnabled = hasEtsyCredentials();
-
-  if (etsyEnabled) {
-    const etsyRaw = await fetchEtsyListings();
-    etsyNormalized = etsyRaw
-      .map(normalizeEtsyListing)
-      .filter((l): l is AppListing => l != null);
-  }
 
   const merged = filterVintageListings([
     ...chronoNormalized,

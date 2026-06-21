@@ -42,9 +42,6 @@ export function resolveListingStoreFind(listing: AppListing): string | undefined
   if (listing.features.storeFind) {
     return listing.features.storeFind;
   }
-  if (listing.condition === "Deadstock") {
-    return "Deadstock";
-  }
   return inferStoreFindFromTitle(listing.title);
 }
 

@@ -323,11 +323,6 @@ function useDiskCache(reason: string): EbayItemSummary[] {
 }
 
 async function fetchEbayListingsInternal(): Promise<EbayItemSummary[]> {
-  const config = getEbayConfig();
-  if (!config) {
-    return [];
-  }
-
   const fromMemory = useMemoryCache();
   if (fromMemory) {
     return fromMemory;
@@ -341,6 +336,17 @@ async function fetchEbayListingsInternal(): Promise<EbayItemSummary[]> {
     if (hasDiskCache) {
       return useDiskCache("snapshot preferred over live fetch");
     }
+  }
+
+  const config = getEbayConfig();
+  if (!config) {
+    if (hasDiskCache) {
+      return useDiskCache("no API credentials");
+    }
+    return [];
+  }
+
+  if (!forceRefreshRequested()) {
     return [];
   }
 
@@ -390,6 +396,12 @@ export function hasEbayCredentials(): boolean {
   const id = process.env.EBAY_CLIENT_ID?.trim();
   const secret = process.env.EBAY_CLIENT_SECRET?.trim();
   return Boolean(id && secret);
+}
+
+/** True when a committed or synced disk snapshot exists (works without API credentials). */
+export function hasEbaySnapshot(): boolean {
+  const cached = readEbaySnapshot();
+  return (cached?.length ?? 0) > 0;
 }
 
 function extractEbayNumericId(url: string): string | null {
