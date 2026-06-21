@@ -61,7 +61,7 @@ listingScore = Σ pointsContributed   // sum across all active hunts
 
 A listing that satisfies two hunts should outrank one that satisfies a single hunt equally well (additive).
 
-**Feed sort:** `listingScore` descending, then `listedAt` descending ([`alertSort()`](../src/lib/listings/selectors.ts)).
+**Feed sort:** perfect matches first → `listingScore` descending → `listedAt` descending ([`alertSort()`](../src/lib/listings/selectors.ts)).
 
 The raw score has **no fixed ceiling** — it is for ranking only.
 
@@ -127,15 +127,15 @@ Within a category: **OR** (any accepted option matches). Across categories: each
 
 ---
 
-## Feed scopes
+## Feed filters
 
-| Scope | Filter |
-|---|---|
-| **all** | All listings passing gates (default) |
-| **watchlist** | `matchedHuntIds.length > 0` (UI label: **Hunt matches**) |
-| **hunt:{id}** | Hunt id in `matchedHuntIds` |
+| Filter | Storage | Effect |
+|---|---|---|
+| `selectedHuntIds[]` | Zustand + `/api/state` | Multi-select; OR within group |
+| `selectedMatchQualities[]` | Zustand + `/api/state` | Perfect / close / loose |
+| `marketplaceFilter` | Zustand + `/api/state` | All / eBay / Chrono24 / Etsy |
 
-Legacy `alertScope: "top"` is migrated to `"all"` on store rehydrate. There is no separate score-threshold scope in shipped UI.
+Legacy `alertScope` migrates on rehydrate. See [listing-match-scoring.md](listing-match-scoring.md) for the full scoring model.
 
 ---
 

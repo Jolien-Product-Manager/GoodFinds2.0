@@ -253,6 +253,7 @@ When eBay returns domestic shipping cost on the summary, it is stored as `shippi
 | Step | What happens |
 |------|----------------|
 | 1 | **Page loads:** read disk snapshot `data/etsy/vintage_timex.json` — **no live Etsy API call** |
+| 1b | **Serverless fallback:** if disk file missing, use bundled snapshot imported at build time (`snapshot.ts`) |
 | 2 | **Manual refresh:** `npm run sync:etsy` fetches live from Open API v3, writes snapshot |
 | 3 | Results normalized and merged with Chrono24 and eBay in `loadAllListings()` |
 | 4 | If creds missing or no snapshot → other sources only, no crash |

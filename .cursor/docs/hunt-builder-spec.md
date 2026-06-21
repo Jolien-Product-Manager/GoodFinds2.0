@@ -233,7 +233,7 @@ Paste URL → simulated parse → feature pills. Optional image upload per row.
 | `attributeHidden` | Removed preset/custom tiles per section |
 | `globalFilters` | Price + shipping gates |
 
-Store key: **`caseback-state-v5`**. Server: Supabase `user_state` when signed in, else `data/store/state.json`.
+Store key: **`caseback-state-v8`**. Server: Supabase `user_state` when signed in, else `data/store/state.json`.
 
 ---
 

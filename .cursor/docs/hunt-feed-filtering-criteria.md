@@ -26,12 +26,12 @@ Target behavior: **rank, don't exclude** on taste alone — except gender, which
 
 ```mermaid
 flowchart LR
-  Fetch["Chrono24 + eBay"] --> Norm["Normalize + infer gender"]
+  Fetch["Chrono24 + eBay + Etsy"] --> Norm["Normalize + infer gender"]
   Norm --> Extract["Extract features per listing"]
   Extract --> Gates["Global gates: passesCriteria + passesListingFilters"]
   Gates --> GenderGate["Per-hunt gender gate"]
   GenderGate --> Match["Match + score vs active hunts"]
-  Match --> Feed["Feed: New / Starred / Dismissed"]
+  Match --> Feed["Feed: All / New / Starred / Dismissed"]
 ```
 
 Gates run **before** matching. Gender runs **inside** `scoreListingAgainstHunt()` before taste scoring.
@@ -98,56 +98,33 @@ Matching quality depends on [`ExtractedFeatures`](../src/lib/listings/types.ts) 
 
 ## Matching one listing against one hunt
 
-Effective value set per attribute = `picks ∪ customs`. **Within** an attribute: OR. **Across** attributes: a score.
+Effective value set per attribute = `picks ∪ customs`. **Within** an attribute: OR. **Across** attributes: each evaluated for pass/fail.
 
-Gender mismatch → `excluded: true`, hunt not added to `matchedHuntIds`.
-
-**Score** — for an eligible hunt (passes gates + gender, no dealbreaker miss):
+Gender mismatch → hunt contributes **0**. Any **required** category miss → hunt contributes **0**.
 
 ```
-score = C × S × H        // range 0 → 8
+pointsContributed = categoriesPassed × HEARTS_SCORE_MULTIPLIER[hearts]
+listingScore = Σ pointsContributed across all matching hunts
 ```
 
-| Factor | Meaning | Value |
-|---|---|---|
-| **C** — completeness | hits ÷ specified attributes | `0–1`; gender-only hunt (`specified === 0`) → `C = 1.0` |
-| **S** — specificity | hunt tightness band (count of attributes with ≥1 value) | Wide open `0.5` · Loose `1.0` · Focused `1.5` · Very specific `2.0` |
-| **H** — desire | hunt hearts | `1–4` |
-
-Misses **and** unverified both count `0` in `C`'s numerator — a low score from unverified means "couldn't
-confirm," shown that way on the card, never "wrong." Specificity is multiplicative so a precise hunt that
-matches outranks a loose one that matches; desire is multiplicative so a 4-heart hunt scores 4× a 1-heart
-hunt at equal completeness and specificity.
+Unverified attributes **do not pass** (shown on cards, not silent misses). Full spec: [listing-match-scoring.md](listing-match-scoring.md).
 
 Dealbreaker promotion is **not shipped**.
-
-**Worked examples**
-
-| Hunt | C | S | H | Score |
-|---|---|---|---|---|
-| 3♥ "Marlin · 1970s · blue · crosshair" — full match | 1.0 | 2.0 | 3 | **6.0** |
-| 4♥ "any Electric" — full match | 1.0 | 1.0 | 4 | **4.0** |
-| 2♥ "Marlin · 1970s" — 1 of 2 hits | 0.5 | 1.5 | 2 | **1.5** |
-| 2♥ Men's-only, no chips — gender-only | 1.0 | 0.5 | 2 | **1.0** |
 
 ---
 
 ## Combining hunts + ranking
 
 ```
-feedScore(listing) = max( score(listing, hunt) for hunt in matchedHunts )
+listingScore = Σ (categoriesPassed × HEARTS_SCORE_MULTIPLIER[hearts])  for each matching hunt
 ```
 
-- A listing's feed score is its **best** matching hunt's score. A hunt the listing does **not** match is
-  simply absent from the set — it never lowers the score. No cross-hunt penalty, no averaging.
-- **All listings** scope (New tab): unseen listings that pass global gates.
-- **Top matches** scope (`top`): unseen listings with `feedScore ≥ 4.0` (shipped in sidebar).
-- **Hunt matches** scope (`watchlist`): same pool, filtered to listings with `matchedHuntIds.length > 0` for ≥1 saved hunt.
-- **Per-hunt** scope (`hunt:{id}`): Hunt matches sub-chips filter to a single saved hunt (shipped in sidebar).
-- **Marketplace** filter (`marketplaceFilter`): `all` | `ebay` | `chrono24` — independent of hunt scope.
-- Tie-break by recency (`listedAt` desc).
+- Points are **additive** across hunts — a listing can score from multiple hunts.
+- **Match quality** (Perfect / Close / Loose) comes from the **top contributing hunt's category pass ratio**, not the raw numeric score.
+- **Filters:** `selectedHuntIds[]` (OR — match any selected hunt), `selectedMatchQualities[]` (OR), `marketplaceFilter` — combined with AND.
+- **Sort** ([`alertSort`](../src/lib/listings/selectors.ts)): perfect matches first → score desc → `listedAt` desc. On New tab, unseen float above seen.
 
-[`alertSort`](../src/lib/listings/selectors.ts): best score desc → `listedAt` desc.
+Legacy `alertScope` (`all` / `top` / `watchlist` / `hunt:{id}`) migrates to `selectedHuntIds` on rehydrate.
 
 ---
 
@@ -177,15 +154,14 @@ Disliked-model exclusion is independent of hearts and stays.
 
 ---
 
-## Feed scope (shipped vs future)
+## Feed filters (shipped)
 
-| Scope / filter | Shipped in UI | Behavior |
+| Filter | Storage | Behavior |
 |---|---|---|
-| `all` | Yes (All listings) | All unseen gated listings |
-| `top` (**Top matches**) | Yes | `feedScore ≥ 4.0` |
-| `watchlist` (**Hunt matches**) | Yes | Unseen + ≥1 hunt match |
-| `hunt:{id}` | Yes | Single hunt filter (sub-chips under Hunt matches) |
-| `marketplaceFilter` | Yes | All / eBay / Chrono24 |
+| `selectedHuntIds[]` | Zustand + `/api/state` | Multi-select; OR within group |
+| `selectedMatchQualities[]` | Zustand + `/api/state` | Perfect / close / loose; OR within group |
+| `marketplaceFilter` | Zustand + `/api/state` | `all` \| `ebay` \| `chrono24` \| `etsy` |
+| Feed attribute filters | Zustand + `/api/state` | Sidebar chips; hard exclude |
 
 ---
 
@@ -215,15 +191,11 @@ then drop the model-hearts field in [`src/store/caseback.ts`](../src/store/caseb
 
 | Shipped | Future |
 |---|---|
-| `C × S × H` scoring (hearts + specificity) | Dealbreaker taste weights |
-| Hunt match scoring + Hunt matches scope | Full dial/case/mvmt from specs |
-| Top matches sidebar filter (`≥ 4.0`) | Explore tab / model triage |
-| Extended gender (8 options) + title inference | Per-attribute nice/want/dealbreaker weights |
-| Per-hunt sub-chips + marketplace filter | — |
-| Feed sidebar (Views / Filters / Marketplace) | — |
-| Model + era + cond + collab + traits extraction (partial) | — |
-| Card match reasons + 0–8 score + image proxy | — |
-| model-hearts retirement + migration | — |
+| Additive hunt scoring (categories × hearts) | Dealbreaker taste weights |
+| Multi-select hunt + match-quality filters | Full dial/case/mvmt from specs |
+| Perfect-match-first sort | Explore tab / model triage |
+| Extended gender + title inference | Per-attribute nice/want/dealbreaker weights |
+| Card match reasons + image proxy | — |
 | Supabase auth + cloud state sync | — |
 
 ---
@@ -237,10 +209,10 @@ then drop the model-hearts field in [`src/store/caseback.ts`](../src/store/caseb
 - **FC5:** Men's hunt excludes ladies/women's title signals and small-case women's heuristics.
 - **FC6:** Custom and preset values normalized identically before compare.
 - **FC7:** Cards show match note and attribute status where available.
-- **FC8:** `alertScope` resolves to `all`, `top`, `watchlist` (Hunt matches), or `hunt:{id}` in sidebar UI.
-- **FC9:** Per-hunt score = `C × S × H`; a 4-heart hunt scores 4× a 1-heart hunt at equal completeness and specificity.
-- **FC10:** At equal completeness and hearts, a "Very specific" hunt outranks a "Loose" hunt.
-- **FC11:** Feed score = max over matched hunts; a hunt a listing does not match never lowers its score.
+- **FC8:** `selectedHuntIds` and `selectedMatchQualities` filter the feed via `HuntQuickFilter` and sidebar.
+- **FC9:** Per-hunt points = `categoriesPassed × HEARTS_SCORE_MULTIPLIER[hearts]`; listing score is additive across hunts.
+- **FC10:** Perfect matches sort before non-perfect at equal listing score.
+- **FC11:** Listing score = sum of points from all matching hunts; perfect matches sort first.
 
 ---
 
@@ -259,4 +231,4 @@ then drop the model-hearts field in [`src/store/caseback.ts`](../src/store/caseb
 - [`src/lib/listings/gender.ts`](../src/lib/listings/gender.ts) — inference + hunt gender gate
 - [`src/lib/listings/selectors.ts`](../src/lib/listings/selectors.ts) — `unseenListings`, `alertListings`, `alertSort`
 - [`src/lib/shipping.ts`](../src/lib/shipping.ts) — `passesCriteria()`
-- [`src/store/caseback.ts`](../src/store/caseback.ts) — `seen`, `listingStatus`, `feedView`, `alertScope`, `hunts`
+- [`src/store/caseback.ts`](../src/store/caseback.ts) — `seen`, `listingStatus`, `feedView`, `selectedHuntIds`, `selectedMatchQualities`, `hunts`
