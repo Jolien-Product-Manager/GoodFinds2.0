@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ChevronDown,
+  Crosshair,
   Pencil,
   Plus,
   Search,
@@ -21,7 +22,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { GlobalFiltersSection } from "@/components/global-filters-section";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -46,7 +46,6 @@ import {
   type PurchasedWatch,
 } from "@/lib/hunts/types";
 import {
-  buildHuntHuntingForLine,
   buildHuntSummary,
   generateHuntTitle,
   huntTightness,
@@ -66,6 +65,7 @@ import { useCasebackStore } from "@/store/caseback";
 import type { AttributeLibrary } from "@/lib/persistence/types";
 import {
   resolveHuntSearchIntent,
+  huntSearchIntentSummary,
   type HuntSearchIntent,
 } from "@/lib/hunts/search-intent";
 import { Masthead } from "@/components/masthead";
@@ -227,7 +227,7 @@ export function HuntBuilderScreen() {
     }
     const saved: Hunt = normalizeHunt({
       ...workingCopy,
-      name: generateHuntTitle(workingCopy),
+      name: generateHuntTitle(workingCopy) || "Untitled hunt",
       saved: true,
       updatedAt: new Date().toISOString(),
     });
@@ -311,8 +311,8 @@ export function HuntBuilderScreen() {
     };
   }, [setPurchasedWatches]);
 
-  const tightness = workingCopy ? huntTightness(workingCopy) : null;
   const editorOpen = workingCopy != null;
+  const tightness = workingCopy ? huntTightness(workingCopy) : null;
   const savedHunts = useMemo(() => sortSavedHunts(hunts), [hunts]);
   const savedHuntCount = savedHunts.length;
 
@@ -565,10 +565,13 @@ function HuntEditorPanel({
 }) {
   const [editingTiles, setEditingTiles] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [mustHave, setMustHave] = useState(false);
   const [searching, setSearching] = useState(false);
+  const [priorityPickerOpen, setPriorityPickerOpen] = useState(false);
+  const [pendingIntent, setPendingIntent] = useState<HuntSearchIntent | null>(null);
+  const [pendingLabel, setPendingLabel] = useState("");
   const [heartsRequiredHint, setHeartsRequiredHint] = useState(false);
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
+  const [featureSelectorOpen, setFeatureSelectorOpen] = useState(false);
 
   const autoTitle = useMemo(() => generateHuntTitle(hunt), [hunt]);
 
@@ -582,9 +585,8 @@ function HuntEditorPanel({
     () => partitionHuntFilterPills(hunt),
     [hunt]
   );
-  const huntingForLine = useMemo(() => buildHuntHuntingForLine(hunt), [hunt]);
 
-  const applySearchIntent = (intent: HuntSearchIntent) => {
+  const applySearchIntent = (intent: HuntSearchIntent, mustHave: boolean) => {
     if (intent.kind === "gender") {
       const next = applyGenderSelection(hunt, intent.value);
       onUpdate({
@@ -612,7 +614,7 @@ function HuntEditorPanel({
     onAddCustom("traits", intent.value, mustHave);
   };
 
-  const addFromSearch = async () => {
+  const beginAddFromSearch = async () => {
     const trimmed = searchQuery.trim();
     if (!trimmed || searching) return;
 
@@ -624,12 +626,27 @@ function HuntEditorPanel({
         attributeLibrary,
         attributeHidden
       );
-      applySearchIntent(intent);
-      setSearchQuery("");
-      setMustHave(false);
+      setPendingIntent(intent);
+      setPendingLabel(huntSearchIntentSummary(intent));
+      setPriorityPickerOpen(true);
     } finally {
       setSearching(false);
     }
+  };
+
+  const confirmSearchPriority = (mustHave: boolean) => {
+    if (!pendingIntent) return;
+    applySearchIntent(pendingIntent, mustHave);
+    setSearchQuery("");
+    setPendingIntent(null);
+    setPendingLabel("");
+    setPriorityPickerOpen(false);
+  };
+
+  const cancelSearchPriority = () => {
+    setPendingIntent(null);
+    setPendingLabel("");
+    setPriorityPickerOpen(false);
   };
 
   const removeFilterPill = (pill: HuntFilterPill) => {
@@ -662,90 +679,65 @@ function HuntEditorPanel({
     return attr?.required === true || (attr?.requiredPicks?.length ?? 0) > 0;
   };
 
-  return (
-    <section className="space-y-5 p-5 pt-8">
-      <div className="space-y-3">
-        <div className="flex items-start justify-between gap-2 pr-8">
-          <h2 className="font-display text-base font-medium leading-snug text-ink">
-            Tell us what to hunt for
-          </h2>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className={cn(
-              "h-8 shrink-0 rounded-sm px-3 text-xs",
-              editingTiles && "border-brass text-brass"
-            )}
-            onClick={() => setEditingTiles((v) => !v)}
-          >
-            <Pencil className="mr-1.5 h-3.5 w-3.5" />
-            {editingTiles ? "Done" : "Edit tiles"}
-          </Button>
-        </div>
-        {editingTiles && (
-          <div className="flex flex-wrap items-center justify-end gap-3 text-xs text-ink-soft">
-            <span>Tap × on a tile to remove it from suggestions</span>
-            {hasHiddenTiles && (
-              <button
-                type="button"
-                className="text-brass underline-offset-2 hover:underline"
-                onClick={() => {
-                  onRestoreAllTiles();
-                  setEditingTiles(false);
-                }}
-              >
-                Restore all removed tiles
-              </button>
-            )}
-          </div>
-        )}
+  const handleSaveClick = () => {
+    if (hunt.hearts == null) {
+      setHeartsRequiredHint(true);
+      toast.error("Choose how badly you want this hunt (1–4 hearts)");
+      return;
+    }
+    onSave();
+  };
 
-        {/* Search + must-have + add */}
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="relative min-w-[12rem] flex-1">
+  return (
+    <section className="space-y-4 p-5">
+      <div className="flex items-start justify-between gap-3">
+        <h2 className="font-display text-xl font-semibold leading-snug text-ink">
+          What Vintage Timex are you Hunting for?
+        </h2>
+        <Crosshair className="mt-0.5 h-5 w-5 shrink-0 text-ink-soft" aria-hidden />
+      </div>
+
+      {/* Search + add */}
+      <div className="relative">
+        <div className="flex items-center gap-2">
+          <div className="relative min-w-0 flex-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-soft" />
             <Input
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="e.g. crosshair dial, Marlin, indiglo"
-              className="h-10 rounded-sm border-line-strong bg-card pl-9 text-sm"
+              placeholder="crosshair dial, Marlin, indiglo…"
+              className="h-11 rounded-lg border-line-strong bg-card pl-9 text-sm"
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
                   e.preventDefault();
-                  addFromSearch();
+                  beginAddFromSearch();
                 }
               }}
             />
           </div>
-          <label className="flex shrink-0 cursor-pointer items-center gap-2 text-sm text-ink-soft">
-            <input
-              type="checkbox"
-              checked={mustHave}
-              onChange={(e) => setMustHave(e.target.checked)}
-              className="h-4 w-4 rounded-sm border-line-strong accent-brass"
-            />
-            Must-have
-          </label>
           <Button
             type="button"
             variant="outline"
-            size="sm"
-            className="h-10 shrink-0 rounded-sm px-4"
-            onClick={addFromSearch}
+            size="icon"
+            className="h-11 w-11 shrink-0 rounded-lg border-line-strong"
+            onClick={beginAddFromSearch}
             disabled={!searchQuery.trim() || searching}
+            aria-label="Add feature"
           >
-            <Plus className="mr-1 h-3.5 w-3.5" />
-            {searching ? "Adding…" : "Add"}
+            <Plus className="h-4 w-4" />
           </Button>
         </div>
+        <FilterPriorityPopover
+          open={priorityPickerOpen}
+          label={pendingLabel}
+          onSelect={confirmSearchPriority}
+          onClose={cancelSearchPriority}
+        />
       </div>
 
-      {/* Summary card */}
       <HuntInterestSummaryCard
         mustHavePills={mustHavePills}
         interestedPills={interestedPills}
-        huntingForLine={huntingForLine}
         tightness={tightness}
         onTogglePillRequired={togglePillRequired}
         onRemovePill={removeFilterPill}
@@ -754,17 +746,15 @@ function HuntEditorPanel({
       {/* Urgency */}
       <div
         className={cn(
-          "flex flex-wrap items-center justify-between gap-3 rounded-sm border bg-card px-4 py-3",
+          "flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-paper px-4 py-3",
           heartsRequiredHint && hunt.hearts == null
             ? "border-steal/50"
-            : "border-line-strong"
+            : "border-line"
         )}
       >
         <div>
-          <Label className="text-xs text-brass">
-            How badly do you want this? <span className="text-steal">*</span>
-          </Label>
-          <p className="text-[11px] text-ink-soft">1♥ keeping an eye out · 4♥ must-find</p>
+          <p className="font-display text-sm font-semibold text-ink">How badly?</p>
+          <p className="text-xs text-ink-soft">eye out → must-find</p>
         </div>
         <HuntHeartsPicker
           value={hunt.hearts}
@@ -776,8 +766,26 @@ function HuntEditorPanel({
         />
       </div>
 
-      {/* Category tiles */}
-      <div className="space-y-2">
+      {/* Feature selector */}
+      <Collapsible open={featureSelectorOpen} onOpenChange={setFeatureSelectorOpen}>
+        <CollapsibleTrigger asChild>
+          <button
+            type="button"
+            className="flex w-full items-center justify-between rounded-lg border border-line-strong bg-card px-4 py-3 text-left transition-colors hover:border-brass/40 hover:bg-brass/5"
+          >
+            <span className="font-display text-sm font-medium text-ink">
+              Feature selector
+            </span>
+            <ChevronDown
+              className={cn(
+                "h-4 w-4 shrink-0 text-ink-soft transition-transform",
+                featureSelectorOpen && "rotate-180"
+              )}
+            />
+          </button>
+        </CollapsibleTrigger>
+        <CollapsibleContent className="overflow-hidden pt-2 data-[state=closed]:animate-out data-[state=open]:animate-in data-[state=open]:overflow-visible">
+          <div className="space-y-2">
         <HuntCategoryTile
           label="Gender"
           summary={
@@ -892,37 +900,50 @@ function HuntEditorPanel({
             />
           </HuntCategoryTile>
         ))}
-      </div>
+            {editingTiles && (
+              <p className="px-1 pt-1 text-xs text-ink-soft">
+                Tap × on a tile to remove it from suggestions
+                {hasHiddenTiles && (
+                  <>
+                    {" · "}
+                    <button
+                      type="button"
+                      className="text-brass underline-offset-2 hover:underline"
+                      onClick={() => {
+                        onRestoreAllTiles();
+                        setEditingTiles(false);
+                      }}
+                    >
+                      Restore all
+                    </button>
+                  </>
+                )}
+              </p>
+            )}
+            <button
+              type="button"
+              className="mt-1 px-1 text-xs text-ink-soft underline-offset-2 hover:text-ink hover:underline"
+              onClick={() => setEditingTiles((v) => !v)}
+            >
+              {editingTiles ? "Done editing tiles" : "Edit tile suggestions"}
+            </button>
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
 
       {/* Actions */}
-      <div className="space-y-3 border-t border-line pt-4">
-        <div className="flex items-center justify-between gap-4">
-          <Button variant="ghost" className="text-steal" onClick={onDelete}>
-            <Trash2 className="mr-1 h-3 w-3" />
-            Delete
-          </Button>
-          <div className="flex items-center gap-2">
-            {!hunt.saved && (
-              <span className="text-xs text-brass">Unsaved changes</span>
-            )}
-            <Button
-              onClick={() => {
-                if (hunt.hearts == null) {
-                  setHeartsRequiredHint(true);
-                  toast.error("Choose how badly you want this hunt (1–4 hearts)");
-                  return;
-                }
-                onSave();
-              }}
-              className="rounded-sm bg-ink text-card"
-            >
-              {savedFlash ? "Saved" : "Save hunt"}
-            </Button>
-          </div>
-        </div>
-        <p className="text-[11px] italic leading-snug text-ink-soft">
-          {buildHuntSummary(hunt)}
-        </p>
+      <div className="flex items-center justify-between gap-4 border-t border-line pt-4">
+        <Button variant="ghost" className="text-steal hover:text-steal" onClick={onDelete}>
+          <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+          Delete
+        </Button>
+        <Button
+          onClick={handleSaveClick}
+          className="h-10 rounded-lg bg-ink px-5 text-card hover:bg-ink/90"
+        >
+          <Crosshair className="mr-2 h-4 w-4" />
+          {savedFlash ? "Saved" : "Hunt"}
+        </Button>
       </div>
     </section>
   );
@@ -994,7 +1015,10 @@ function GenderCategoryPanel({
 }) {
   const [query, setQuery] = useState("");
   const currentGender = hunt.gender ?? "both";
-  const filteredOptions = HUNT_GENDER_OPTIONS.filter((opt) => {
+  const selectableGenderOptions = HUNT_GENDER_OPTIONS.filter(
+    (opt) => opt.value !== "both"
+  );
+  const filteredOptions = selectableGenderOptions.filter((opt) => {
     if (!query.trim()) return true;
     const q = normalizeCustomValue(query);
     return normalizeCustomValue(opt.label).includes(q);
@@ -1006,16 +1030,16 @@ function GenderCategoryPanel({
         value={query}
         onChange={setQuery}
         placeholder="Search gender —"
-        onAdd={() => {
+        onAdd={(_mustHave) => {
           const q = normalizeCustomValue(query);
-          const match = HUNT_GENDER_OPTIONS.find(
+          const match = selectableGenderOptions.find(
             (opt) => normalizeCustomValue(opt.label) === q
           );
           if (match) onUpdate(applyGenderSelection(hunt, match.value));
           setQuery("");
         }}
         canAdd={Boolean(query.trim())}
-        showMustHave={false}
+        showPriorityPicker={false}
       />
       <div className="flex flex-wrap gap-2">
         {filteredOptions.map((opt) => {
@@ -1042,64 +1066,126 @@ function GenderCategoryPanel({
   );
 }
 
+function FilterPriorityPopover({
+  open,
+  label,
+  onSelect,
+  onClose,
+}: {
+  open: boolean;
+  label: string;
+  onSelect: (mustHave: boolean) => void;
+  onClose: () => void;
+}) {
+  if (!open) return null;
+
+  return (
+    <div
+      className="absolute right-0 top-full z-50 mt-1.5 w-[min(100%,18rem)] rounded-sm border border-line-strong bg-card p-3 shadow-lg"
+      role="dialog"
+      aria-label="Choose filter priority"
+    >
+      <p className="text-sm font-medium text-ink">{label}</p>
+      <p className="mt-0.5 text-xs text-ink-soft">Must have or nice to have?</p>
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <Button
+          type="button"
+          size="sm"
+          className="h-9 rounded-sm bg-must text-card hover:bg-must/90"
+          onClick={() => onSelect(true)}
+        >
+          Must have
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-9 rounded-sm"
+          onClick={() => onSelect(false)}
+        >
+          Nice to have
+        </Button>
+      </div>
+      <button
+        type="button"
+        className="mt-2 text-xs text-ink-soft underline-offset-2 hover:text-ink hover:underline"
+        onClick={onClose}
+      >
+        Cancel
+      </button>
+    </div>
+  );
+}
+
 function CategorySearchRow({
   value,
   onChange,
   placeholder,
   onAdd,
   canAdd,
-  mustHave = false,
-  onMustHaveChange,
-  showMustHave = true,
+  showPriorityPicker = true,
 }: {
   value: string;
   onChange: (value: string) => void;
   placeholder: string;
-  onAdd: () => void;
+  onAdd: (mustHave: boolean) => void;
   canAdd: boolean;
-  mustHave?: boolean;
-  onMustHaveChange?: (checked: boolean) => void;
-  showMustHave?: boolean;
+  showPriorityPicker?: boolean;
 }) {
+  const [pickerOpen, setPickerOpen] = useState(false);
+
+  const requestAdd = () => {
+    if (!canAdd) return;
+    if (showPriorityPicker) {
+      setPickerOpen(true);
+    } else {
+      onAdd(false);
+    }
+  };
+
+  const confirmAdd = (mustHave: boolean) => {
+    onAdd(mustHave);
+    setPickerOpen(false);
+  };
+
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      <div className="relative min-w-0 flex-1">
-        <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink-soft" />
-        <Input
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={placeholder}
-          className="h-9 rounded-sm border-line-strong bg-card pl-8 text-sm"
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              onAdd();
-            }
-          }}
-        />
-      </div>
-      {showMustHave && onMustHaveChange && (
-        <label className="flex shrink-0 cursor-pointer items-center gap-1.5 text-xs text-ink-soft">
-          <input
-            type="checkbox"
-            checked={mustHave}
-            onChange={(e) => onMustHaveChange(e.target.checked)}
-            className="h-3.5 w-3.5 rounded-sm border-line-strong accent-brass"
+    <div className="relative">
+      <div className="flex items-center gap-2">
+        <div className="relative min-w-0 flex-1">
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink-soft" />
+          <Input
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            placeholder={placeholder}
+            className="h-9 rounded-sm border-line-strong bg-card pl-8 text-sm"
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                requestAdd();
+              }
+            }}
           />
-          Must-have
-        </label>
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          className="h-9 w-9 shrink-0 rounded-sm"
+          onClick={requestAdd}
+          disabled={!canAdd}
+          aria-label="Add feature"
+        >
+          <Plus className="h-3.5 w-3.5" />
+        </Button>
+      </div>
+      {showPriorityPicker && (
+        <FilterPriorityPopover
+          open={pickerOpen}
+          label={value.trim()}
+          onSelect={confirmAdd}
+          onClose={() => setPickerOpen(false)}
+        />
       )}
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        className="h-9 shrink-0 rounded-sm px-3"
-        onClick={onAdd}
-        disabled={!canAdd}
-      >
-        <Plus className="mr-1 h-3.5 w-3.5" />
-        Add
-      </Button>
     </div>
   );
 }
@@ -1126,7 +1212,6 @@ function AttributeChipGrid({
   onRemoveOption: (key: AttrKey, value: string) => void;
 }) {
   const [query, setQuery] = useState("");
-  const [mustHave, setMustHave] = useState(false);
   let chips = attributeChipOptions(attrKey, savedCustoms, hunt, hiddenOptions);
   if (attrKey === "model") {
     chips = [...chips].sort((a, b) => a.localeCompare(b));
@@ -1142,7 +1227,7 @@ function AttributeChipGrid({
       )
     : chips;
 
-  const addFromCategorySearch = () => {
+  const addFromCategorySearch = (mustHave: boolean) => {
     const trimmed = query.trim();
     if (!trimmed) return;
     const q = normalizeCustomValue(trimmed);
@@ -1157,7 +1242,6 @@ function AttributeChipGrid({
       onAddCustom(attrKey, trimmed, mustHave);
     }
     setQuery("");
-    setMustHave(false);
   };
 
   return (
@@ -1168,14 +1252,7 @@ function AttributeChipGrid({
         placeholder={`Search ${ATTR_OPTIONS[attrKey].label.toLowerCase()} —`}
         onAdd={addFromCategorySearch}
         canAdd={Boolean(query.trim())}
-        mustHave={mustHave}
-        onMustHaveChange={setMustHave}
       />
-      {attrKey === "traits" && filteredChips.length === 0 && !query.trim() && (
-        <p className="text-xs text-ink-soft">
-          Search or add free-form notes and characteristics.
-        </p>
-      )}
       {filteredChips.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {filteredChips.map((opt) => {
@@ -1260,19 +1337,21 @@ function pillKey(pill: HuntFilterPill): string {
 function HuntInterestSummaryCard({
   mustHavePills,
   interestedPills,
-  huntingForLine,
   tightness,
   onTogglePillRequired,
   onRemovePill,
 }: {
   mustHavePills: HuntFilterPill[];
   interestedPills: HuntFilterPill[];
-  huntingForLine: string;
   tightness: ReturnType<typeof huntTightness> | null;
   onTogglePillRequired: (pill: HuntFilterPill) => void;
   onRemovePill: (pill: HuntFilterPill) => void;
 }) {
   const hasPills = mustHavePills.length > 0 || interestedPills.length > 0;
+
+  if (!hasPills) {
+    return null;
+  }
 
   return (
     <div className="rounded-sm border border-line-strong bg-card px-4 py-3">
@@ -1280,27 +1359,21 @@ function HuntInterestSummaryCard({
         You&apos;re hunting for
       </p>
 
-      {hasPills ? (
-        <p className="mt-1 font-display text-base leading-snug">
-          {mustHavePills.length > 0 && (
-            <span className="font-semibold text-must">
-              Must have {mustHavePills.map((p) => p.label).join(", ")}
-            </span>
-          )}
-          {mustHavePills.length > 0 && interestedPills.length > 0 && (
-            <span className="text-ink"> · also interested in </span>
-          )}
-          {interestedPills.length > 0 && (
-            <span className="text-ink">
-              {interestedPills.map((p) => p.label).join(", ")}.
-            </span>
-          )}
-        </p>
-      ) : (
-        <p className="mt-1 font-display text-base leading-snug text-ink">
-          {huntingForLine}
-        </p>
-      )}
+      <p className="mt-1 font-display text-base leading-snug">
+        {mustHavePills.length > 0 && (
+          <span className="font-semibold text-must">
+            Must have {mustHavePills.map((p) => p.label).join(", ")}
+          </span>
+        )}
+        {mustHavePills.length > 0 && interestedPills.length > 0 && (
+          <span className="text-ink"> · also interested in </span>
+        )}
+        {interestedPills.length > 0 && (
+          <span className="text-ink">
+            {interestedPills.map((p) => p.label).join(", ")}.
+          </span>
+        )}
+      </p>
 
       {mustHavePills.length > 0 && (
         <div className="mt-4 space-y-2">
@@ -1344,27 +1417,19 @@ function HuntInterestSummaryCard({
         </div>
       )}
 
-      {hasPills && (
-        <>
-          <div className="mt-4 border-t border-line/60 pt-3">
-            <p className="text-[11px] text-ink-soft">
-              Tap the badge on any chip to move it between must-have and other
-              features.
-            </p>
-          </div>
-        </>
-      )}
-
       {tightness && (
-        <Badge
-          variant="outline"
-          className={cn(
-            "mt-3 h-5 px-1.5 text-[10px] font-normal",
-            tightness.level === "specific" && "border-steal text-steal"
-          )}
-        >
-          {tightness.label}
-        </Badge>
+        <div className="mt-4 flex items-center gap-2 border-t border-line/60 pt-3">
+          <span className="text-xs font-medium text-ink-soft">Specificity</span>
+          <Badge
+            variant="outline"
+            className={cn(
+              "h-5 px-1.5 text-[10px] font-normal",
+              tightness.level === "specific" && "border-steal text-steal"
+            )}
+          >
+            {tightness.label}
+          </Badge>
+        </div>
       )}
     </div>
   );

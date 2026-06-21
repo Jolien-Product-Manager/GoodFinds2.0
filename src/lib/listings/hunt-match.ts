@@ -39,6 +39,8 @@ export interface HuntScoreContribution {
   pointsContributed: number;
   /** Human-readable attributes/signals that passed for this hunt. */
   matchedOn: string[];
+  /** Hit attribute matches for listing card chips. */
+  attributeMatches: AttributeMatch[];
 }
 
 export interface HuntMatchResult {
@@ -502,6 +504,7 @@ export function matchAllHunts(
         hearts,
         pointsContributed,
         matchedOn,
+        attributeMatches: matches.filter((m) => m.status === "hit"),
       });
 
       if (pointsContributed > bestContribution) {

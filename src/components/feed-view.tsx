@@ -342,7 +342,7 @@ export function FeedView({ listings, ebayEnabled }: FeedViewProps) {
         </p>
       )}
 
-      <div className="grid grid-cols-1 items-start gap-6 md:grid-cols-[minmax(0,1fr)_17.5rem] md:gap-8">
+      <div className="grid min-h-0 grid-cols-1 items-start gap-6 md:grid-cols-[minmax(0,1fr)_17.5rem] md:gap-8">
         <FeedSidebar
           feedView={feedView}
           alertScope={alertScope}
@@ -357,7 +357,7 @@ export function FeedView({ listings, ebayEnabled }: FeedViewProps) {
           onToggleFeedAttributeFilter={toggleFeedAttributeFilter}
           onAddFeedAttributeFilter={handleAddFeedAttributeFilter}
           onClearFeedAttributeFilters={clearFeedAttributeFilters}
-          className="md:sticky md:top-4 md:col-start-2 md:row-start-1 md:max-h-[calc(100vh-1rem)] md:overflow-y-auto md:overscroll-y-contain md:pr-0.5"
+          className="md:col-start-2 md:row-start-1"
         />
 
         <div className="min-w-0 space-y-4 md:col-start-1 md:row-start-1">

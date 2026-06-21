@@ -1,13 +1,18 @@
 import type { AppListing } from "./types";
 import type { AttrKey, HuntAttribute } from "@/lib/hunts/types";
-import { FEED_FILTER_ATTR_KEYS, normalizeCustomValue } from "@/lib/hunts/types";
+import {
+  FEED_CUSTOM_ATTR_KEY,
+  FEED_SIDEBAR_ATTR_KEYS,
+  normalizeCustomValue,
+} from "@/lib/hunts/types";
 import { collabPickMatchesListing } from "@/lib/listings/collab";
 import { complicationPickMatchesListing } from "@/lib/listings/complications";
 import { completenessPickMatchesTitle } from "@/lib/listings/infer-buyer-axes";
+import { storeFindPickMatchesListing } from "@/lib/listings/store-find";
 
 function filterValues(attr: HuntAttribute | undefined): string[] {
   if (!attr) return [];
-  return [...attr.picks, ...attr.customs].map(normalizeCustomValue).filter(Boolean);
+  return [...attr.picks, ...attr.customs].filter((value) => value.trim().length > 0);
 }
 
 function listingValueForAttr(listing: AppListing, key: string): string | undefined {
@@ -96,6 +101,14 @@ function listingMatchesAttributePick(
     return haystack.includes(wanted);
   }
 
+  if (key === FEED_CUSTOM_ATTR_KEY) {
+    if (storeFindPickMatchesListing(wantedRaw, listing)) {
+      return true;
+    }
+    const haystack = listingSearchText(listing);
+    return haystack.includes(wanted);
+  }
+
   const listingVal = listingValueForAttr(listing, key);
   if (!listingVal) {
     return listingSearchText(listing).includes(wanted);
@@ -111,7 +124,7 @@ export function hasActiveFeedAttributeFilters(
   filters: Partial<Record<AttrKey, HuntAttribute>> | undefined
 ): boolean {
   if (!filters) return false;
-  return FEED_FILTER_ATTR_KEYS.some((key) => filterValues(filters[key]).length > 0);
+  return FEED_SIDEBAR_ATTR_KEYS.some((key) => filterValues(filters[key]).length > 0);
 }
 
 export function listingPassesFeedAttributeFilters(
@@ -120,7 +133,7 @@ export function listingPassesFeedAttributeFilters(
 ): boolean {
   if (!filters || !hasActiveFeedAttributeFilters(filters)) return true;
 
-  for (const key of FEED_FILTER_ATTR_KEYS) {
+  for (const key of FEED_SIDEBAR_ATTR_KEYS) {
     const wanted = filterValues(filters[key]);
     if (wanted.length === 0) continue;
 

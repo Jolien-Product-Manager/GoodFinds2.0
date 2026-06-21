@@ -89,7 +89,6 @@ export const TASTE_ATTR_KEYS = [
   "dial",
   "color",
   "mvmt",
-  "traits",
 ] as const satisfies readonly AttrKey[];
 
 export const ATTR_OPTIONS: Record<
@@ -248,6 +247,20 @@ export const PRESET_ATTR_KEYS = ATTR_KEYS.filter((k) => k !== "traits") as Exclu
 
 /** Hunt-builder categories exposed as feed sidebar filters (excludes free-form traits). */
 export const FEED_FILTER_ATTR_KEYS = PRESET_ATTR_KEYS;
+
+/** Free-form feed filters (title / keyword search). */
+export const FEED_CUSTOM_ATTR_KEY: AttrKey = "traits";
+
+/** All feed sidebar filter sections, including Custom. */
+export const FEED_SIDEBAR_ATTR_KEYS = [
+  ...PRESET_ATTR_KEYS,
+  FEED_CUSTOM_ATTR_KEY,
+] as const;
+
+export function feedSidebarAttrLabel(key: AttrKey): string {
+  if (key === FEED_CUSTOM_ATTR_KEY) return "Custom";
+  return ATTR_OPTIONS[key].label;
+}
 
 export const HUNT_GENDER_OPTIONS: { value: HuntGender; label: string }[] = [
   { value: "both", label: "Men's & Women's" },

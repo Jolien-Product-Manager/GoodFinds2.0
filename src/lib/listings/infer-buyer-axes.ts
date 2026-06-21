@@ -39,7 +39,7 @@ export const COMPLETENESS_KEYWORDS: { label: string; keywords: string[] }[] = [
   },
   { label: "Box only", keywords: ["with box", "w/ box", "original box", "mint in box", "mib"] },
   { label: "Papers only", keywords: ["with papers", "papers included", "certificate"] },
-  { label: "NOS / unworn", keywords: ["nos", "new old stock", "unworn", "deadstock", "dead stock"] },
+  { label: "NOS / unworn", keywords: ["nos", "new old stock", "unworn"] },
   { label: "Tags attached", keywords: ["tags attached", "with tags", "hang tag"] },
 ];
 
@@ -98,7 +98,6 @@ export function runningFromCondition(condition: ConditionGrade): string | undefi
 export function completenessFromCondition(condition: ConditionGrade): string | undefined {
   switch (condition) {
     case "NOS / unworn":
-    case "Deadstock":
       return "NOS / unworn";
     default:
       return undefined;

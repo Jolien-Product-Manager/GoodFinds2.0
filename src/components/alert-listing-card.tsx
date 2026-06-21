@@ -173,6 +173,41 @@ function ListingPhotoCarousel({
   );
 }
 
+function HuntContributionChips({
+  contribution,
+  listing,
+  chips,
+  fallbackLabels,
+}: {
+  contribution: { huntId: string };
+  listing: AppListing;
+  chips: AttributeMatch[] | null;
+  fallbackLabels: string[] | null;
+}) {
+  if (chips == null && fallbackLabels == null) return null;
+
+  return (
+    <div className="flex flex-wrap justify-end gap-1">
+      {chips?.map((m) => (
+        <AttributeTag
+          key={`${contribution.huntId}-${m.key}`}
+          match={m}
+          listing={listing}
+        />
+      ))}
+      {fallbackLabels?.map((label) => (
+        <span
+          key={`${contribution.huntId}-${label}`}
+          className="inline-flex items-center gap-1 rounded-full bg-brass/12 px-2 py-0.5 text-[10px] font-medium leading-none text-ink"
+        >
+          <Check className="h-2.5 w-2.5 shrink-0 text-brass" strokeWidth={2.5} />
+          {label}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 function AttributeTag({
   match,
   listing,
@@ -234,7 +269,9 @@ export function AlertListingCard({
   const visibleAttributes = attributeMatches.filter(
     (m) => m.status === "hit" || m.status === "miss"
   );
-  const showAttributeRow = visibleAttributes.length > 0;
+  const huntContributions = match?.huntContributions ?? [];
+  const showStandaloneAttributeRow =
+    visibleAttributes.length > 0 && huntContributions.length === 0;
 
   const metaLine = [listing.features.era, listing.year].filter(Boolean).join(" · ");
 
@@ -295,15 +332,20 @@ export function AlertListingCard({
             ${costs.item.toFixed(2)} + ${costs.shipping.toFixed(2)} shipping
             {!costs.shippingConfirmed && " (est.)"}
           </p>
-        </div>
-
-        <div className="flex items-center justify-between gap-2">
-          <div className={cn("flex items-center gap-2", compact ? "text-xs" : "text-sm")}>
+          <div
+            className={cn(
+              "mt-1.5 flex items-center justify-end gap-2",
+              compact ? "text-xs" : "text-sm"
+            )}
+          >
             <span className="text-ink-soft">Condition</span>
             <span className="rounded-full bg-brass/12 px-2 py-0.5 text-[10px] font-medium text-ink">
               {conditionLabel}
             </span>
           </div>
+        </div>
+
+        <div className="flex justify-end">
           <Button
             type="button"
             size="sm"
@@ -320,7 +362,7 @@ export function AlertListingCard({
           </Button>
         </div>
 
-        {showAttributeRow && (
+        {showStandaloneAttributeRow && (
           <div className="flex flex-wrap justify-end gap-1">
             {visibleAttributes.map((m) => (
               <AttributeTag key={m.key} match={m} listing={listing} />
@@ -328,27 +370,45 @@ export function AlertListingCard({
           </div>
         )}
 
-        {((match?.huntContributions.length ?? 0) > 0 ||
+        {(huntContributions.length > 0 ||
           onToggleInterested ||
           onDismiss ||
           onRestore) && (
           <div className="mt-auto space-y-2 border-t border-line pt-2">
-            {(match?.huntContributions.length ?? 0) > 0 && (
+            {huntContributions.length > 0 && (
               <div
                 className={cn(
-                  "space-y-0.5",
+                  "space-y-2",
                   compact ? "text-[11px]" : "text-xs"
                 )}
               >
-                {match!.huntContributions.map((contribution) => (
-                  <p key={contribution.huntId} className="leading-snug text-ink-soft">
-                    <span className="font-medium text-ink">{contribution.huntName}</span>
-                    {" · "}
-                    {contribution.matchedOn.length > 0
-                      ? contribution.matchedOn.join(", ")
-                      : `${contribution.categoriesPassed}/${contribution.totalCategories} categories`}
-                  </p>
-                ))}
+                {huntContributions.map((contribution) => {
+                  const chips =
+                    contribution.attributeMatches.length > 0
+                      ? contribution.attributeMatches
+                      : null;
+                  const fallbackLabels =
+                    chips == null && contribution.matchedOn.length > 0
+                      ? contribution.matchedOn
+                      : null;
+
+                  return (
+                    <div
+                      key={contribution.huntId}
+                      className="flex items-start justify-between gap-2"
+                    >
+                      <p className="min-w-0 shrink-0 font-medium leading-snug text-ink">
+                        {contribution.huntName}
+                      </p>
+                      <HuntContributionChips
+                        contribution={contribution}
+                        listing={listing}
+                        chips={chips}
+                        fallbackLabels={fallbackLabels}
+                      />
+                    </div>
+                  );
+                })}
               </div>
             )}
 

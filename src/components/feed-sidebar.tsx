@@ -88,26 +88,41 @@ function SidebarCollapsibleSection({
   onOpenChange,
   children,
   className,
+  onClear,
+  showClear = false,
 }: {
   label: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   children: React.ReactNode;
   className?: string;
+  onClear?: () => void;
+  showClear?: boolean;
 }) {
   return (
     <Collapsible open={open} onOpenChange={onOpenChange} className={className}>
-      <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 rounded-sm px-1 py-1.5 text-left text-xs font-medium uppercase tracking-wider text-ink-soft transition-colors hover:text-ink">
-        <span>{label}</span>
-        <ChevronDown
-          className={cn(
-            "h-3.5 w-3.5 shrink-0 transition-transform duration-200",
-            open && "rotate-180"
-          )}
-          aria-hidden
-        />
-      </CollapsibleTrigger>
-      <CollapsibleContent className="space-y-1 overflow-hidden pt-1 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0">
+      <div className="flex items-center justify-between gap-2 px-1">
+        <CollapsibleTrigger className="flex min-w-0 flex-1 items-center justify-between gap-2 rounded-sm py-1.5 text-left text-xs font-medium uppercase tracking-wider text-ink-soft transition-colors hover:text-ink">
+          <span>{label}</span>
+          <ChevronDown
+            className={cn(
+              "h-3.5 w-3.5 shrink-0 transition-transform duration-200",
+              open && "rotate-180"
+            )}
+            aria-hidden
+          />
+        </CollapsibleTrigger>
+        {showClear && onClear && (
+          <button
+            type="button"
+            onClick={onClear}
+            className="shrink-0 text-xs text-brass underline-offset-2 hover:underline"
+          >
+            Clear
+          </button>
+        )}
+      </div>
+      <CollapsibleContent className="space-y-1 pt-1 data-[state=closed]:overflow-hidden data-[state=open]:overflow-visible data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0">
         {children}
       </CollapsibleContent>
     </Collapsible>
@@ -202,8 +217,25 @@ export function FeedSidebar({
   };
 
   return (
-    <aside className={cn("w-full shrink-0", className)}>
-      <div className="space-y-6 rounded-sm border border-line-strong bg-card p-4">
+    <aside
+      className={cn(
+        "w-full shrink-0 md:sticky md:top-4 md:self-start md:min-h-0",
+        className
+      )}
+    >
+      <div className="max-h-none overflow-y-visible overscroll-y-contain rounded-sm border border-line-strong bg-card p-4 pb-8 md:max-h-[calc(100dvh-2rem)] md:overflow-y-auto md:pr-0.5 [scrollbar-gutter:stable]">
+        {hasActiveFilter && (
+          <div className="mb-3 flex justify-end px-1">
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="text-xs text-brass underline-offset-2 hover:underline"
+            >
+              Clear all
+            </button>
+          </div>
+        )}
+
         <div className="space-y-1">
           <p className="px-1 text-xs font-medium uppercase tracking-wider text-ink-soft">
             Views
@@ -312,6 +344,8 @@ export function FeedSidebar({
               open={marketplaceOpen}
               onOpenChange={setMarketplaceOpen}
               className="border-t border-line pt-4"
+              showClear={marketplaceFilter !== "all"}
+              onClear={() => onMarketplaceChange("all")}
             >
               <SidebarRow
                 label="All marketplaces"
@@ -344,6 +378,7 @@ export function FeedSidebar({
               attributeLibrary={attributeLibrary}
               onToggle={onToggleFeedAttributeFilter}
               onAddCustom={onAddFeedAttributeFilter}
+              onClear={onClearFeedAttributeFilters}
             />
           </>
         )}

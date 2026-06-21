@@ -10,6 +10,7 @@ import {
   type HuntGender,
 } from "./types";
 import type { AttributeLibrary } from "@/lib/persistence/types";
+import { compactSearchTerm, resolveFeedDomainCustomMatch } from "@/lib/listings/feed-filter-search";
 
 export type HuntSearchIntent =
   | { kind: "gender"; value: HuntGender; source: "rules" | "ai" }
@@ -75,6 +76,11 @@ export function resolveHuntSearchIntentRules(
   const trimmed = query.trim();
   if (!trimmed) return null;
 
+  const domainCustom = resolveFeedDomainCustomMatch(trimmed);
+  if (domainCustom) {
+    return { kind: "custom", value: domainCustom.value, source: "rules" };
+  }
+
   const genderKeyword = inferGenderFromQuery(trimmed);
   if (genderKeyword) {
     return { kind: "gender", value: genderKeyword, source: "rules" };
@@ -86,6 +92,7 @@ export function resolveHuntSearchIntentRules(
   }
 
   const q = normalizeCustomValue(trimmed);
+  const qCompact = compactSearchTerm(trimmed);
   let best: { key: AttrKey; value: string; score: number } | null = null;
 
   for (const key of ATTR_KEYS) {
@@ -97,17 +104,21 @@ export function resolveHuntSearchIntentRules(
     );
     for (const chip of chips) {
       const norm = normalizeCustomValue(chip);
-      if (norm === q) {
+      const normCompact = compactSearchTerm(chip);
+      if (norm === q || normCompact === qCompact) {
         return { kind: "attr", key, value: chip, source: "rules" };
       }
-      if (norm.includes(q) || q.includes(norm)) {
-        const score = norm.length;
+      if (
+        normCompact.includes(qCompact) ||
+        norm.includes(q)
+      ) {
+        const score = normCompact.length;
         if (!best || score > best.score) best = { key, value: chip, score };
       }
     }
   }
 
-  if (best && best.score >= q.length) {
+  if (best && best.score >= qCompact.length) {
     return { kind: "attr", key: best.key, value: best.value, source: "rules" };
   }
 
