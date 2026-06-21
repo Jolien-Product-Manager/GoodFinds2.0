@@ -6,8 +6,8 @@ import {
   ChevronLeft,
   ChevronRight,
   ExternalLink,
+  Heart,
   Info,
-  Sparkles,
   Square,
   X,
 } from "lucide-react";
@@ -54,6 +54,40 @@ function CardFlipButton({
       )}
     >
       <Info className="h-4 w-4" strokeWidth={2} />
+    </button>
+  );
+}
+
+function ListingHeartButton({
+  interested,
+  onToggle,
+  className,
+}: {
+  interested: boolean;
+  onToggle: () => void;
+  className?: string;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={interested ? "Unsave listing" : "Save listing"}
+      aria-pressed={interested}
+      onClick={(e) => {
+        e.stopPropagation();
+        onToggle();
+      }}
+      className={cn(
+        "flex h-8 w-8 items-center justify-center rounded-full shadow-sm transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-steal",
+        interested
+          ? "bg-steal text-card hover:bg-steal/90"
+          : "bg-ink/55 text-card hover:bg-ink/75",
+        className
+      )}
+    >
+      <Heart
+        className={cn("h-4 w-4", interested && "fill-current")}
+        strokeWidth={interested ? 2.25 : 2}
+      />
     </button>
   );
 }
@@ -348,8 +382,6 @@ export function AlertListingCard({
   const showStandaloneAttributeRow =
     visibleAttributes.length > 0 && huntContributions.length === 0;
 
-  const metaLine = [listing.features.era, listing.year].filter(Boolean).join(" · ");
-
   return (
     <article
       role={onSelect ? "button" : undefined}
@@ -366,8 +398,9 @@ export function AlertListingCard({
           : undefined
       }
       className={cn(
-        "overflow-hidden rounded-lg border border-line bg-card shadow-sm",
+        "overflow-hidden rounded-lg border border-line bg-card shadow-sm transition-colors",
         muted && "opacity-60",
+        interested && "border-steal/35 bg-steal/[0.04]",
         onSelect && "cursor-pointer transition-shadow hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-steal",
         selected && "ring-2 ring-steal/70 ring-offset-2 ring-offset-paper"
       )}
@@ -376,6 +409,14 @@ export function AlertListingCard({
         <div className="flex flex-col">
           <div className="relative aspect-[4/3] w-full shrink-0 overflow-hidden bg-[#c9b896]/20">
             <ListingPhotoCarousel listing={listing} />
+
+            {onToggleInterested && (
+              <ListingHeartButton
+                interested={interested}
+                onToggle={onToggleInterested}
+                className="absolute left-3 top-3 z-10"
+              />
+            )}
 
             <span className="absolute bottom-3 left-3 rounded-full bg-ink px-2.5 py-0.5 text-[11px] font-medium lowercase tracking-wide text-card">
               {listing.source}
@@ -390,12 +431,12 @@ export function AlertListingCard({
           </div>
 
           <div className={cn("flex flex-1 flex-col", compact ? "gap-2.5 p-3" : "gap-3 p-4")}>
-            <div className="border-b border-line pb-2.5">
+            <div className="pb-1">
               <div className="flex items-start justify-between gap-3">
                 <h3
                   className={cn(
                     "min-w-0 flex-1 font-display font-semibold leading-snug text-ink",
-                    compact ? "line-clamp-3 text-[15px]" : "line-clamp-4 text-lg"
+                    compact ? "line-clamp-4 text-[15px]" : "line-clamp-4 text-lg"
                   )}
                 >
                   {listing.title}
@@ -409,20 +450,14 @@ export function AlertListingCard({
                   ${costs.total.toFixed(2)}
                 </span>
               </div>
-              {metaLine && (
-                <p className={cn("mt-1.5 text-ink-soft", compact ? "text-xs" : "text-sm")}>
-                  {metaLine}
-                </p>
-              )}
             </div>
 
             {(showStandaloneAttributeRow ||
               huntContributions.length > 0 ||
-              onToggleInterested ||
               onDismiss ||
               onRestore) && (
               <div
-                className="mt-auto space-y-2 border-t border-line pt-2"
+                className="mt-auto space-y-2 border-t border-line pt-2.5"
                 onClick={(event) => event.stopPropagation()}
                 onKeyDown={(event) => event.stopPropagation()}
               >
@@ -441,6 +476,14 @@ export function AlertListingCard({
                       compact ? "text-[11px]" : "text-xs"
                     )}
                   >
+                    <p
+                      className={cn(
+                        "font-mono uppercase tracking-wide text-brass",
+                        compact ? "text-[9px]" : "text-[10px]"
+                      )}
+                    >
+                      Hunt Match
+                    </p>
                     {huntContributions.map((contribution) => {
                       const chips =
                         contribution.attributeMatches.length > 0
@@ -471,39 +514,14 @@ export function AlertListingCard({
                   </div>
                 )}
 
-                {(onToggleInterested || onDismiss || onRestore) && (
+                {(onDismiss || onRestore) && (
                   <div className="flex items-center gap-1.5">
-                    {onToggleInterested && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={onToggleInterested}
-                        aria-label={interested ? "Unsave listing" : "Save listing"}
-                        aria-pressed={interested}
-                        className={cn(
-                          "h-8 flex-1 rounded-md border-line-strong bg-card px-2.5 text-xs hover:bg-paper",
-                          interested
-                            ? "text-steal hover:text-steal"
-                            : "text-brass hover:text-steal/85"
-                        )}
-                      >
-                        <Sparkles
-                          className={cn(
-                            "h-3.5 w-3.5 shrink-0",
-                            interested && "fill-steal/20"
-                          )}
-                          strokeWidth={interested ? 2.25 : 1.75}
-                        />
-                        {interested ? "Unsave" : "Save"}
-                      </Button>
-                    )}
                     {onDismiss && (
                       <Button
                         type="button"
                         variant="outline"
                         size="sm"
-                        className="h-8 flex-1 rounded-md border-line-strong bg-card px-2.5 text-xs text-ink-soft hover:bg-paper hover:text-ink"
+                        className="h-8 w-full rounded-md border-line-strong bg-card px-2.5 text-xs text-ink-soft hover:bg-paper hover:text-ink"
                         onClick={onDismiss}
                         aria-label="Dismiss listing"
                       >
@@ -516,7 +534,7 @@ export function AlertListingCard({
                         type="button"
                         variant="outline"
                         size="sm"
-                        className="h-8 flex-1 rounded-md border-line-strong bg-card px-2.5 text-xs text-ink hover:bg-paper"
+                        className="h-8 w-full rounded-md border-line-strong bg-card px-2.5 text-xs text-ink hover:bg-paper"
                         onClick={onRestore}
                         aria-label="Restore listing"
                       >
@@ -542,6 +560,14 @@ export function AlertListingCard({
             <div className="relative aspect-[4/3] w-full shrink-0 overflow-hidden bg-[#c9b896]/20">
               <ListingPhotoCarousel listing={listing} />
 
+              {onToggleInterested && (
+                <ListingHeartButton
+                  interested={interested}
+                  onToggle={onToggleInterested}
+                  className="absolute left-3 top-3 z-10"
+                />
+              )}
+
               <span className="absolute bottom-3 left-3 rounded-full bg-ink px-2.5 py-0.5 text-[11px] font-medium lowercase tracking-wide text-card">
                 {listing.source}
               </span>
@@ -556,17 +582,17 @@ export function AlertListingCard({
               <CardFlipButton
                 flipped={false}
                 onToggle={() => setFlipped(true)}
-                className="absolute left-3 top-3"
+                className={cn("absolute top-3", onToggleInterested ? "left-12" : "left-3")}
               />
             </div>
 
             <div className={cn("flex flex-1 flex-col", compact ? "gap-2.5 p-3" : "gap-3 p-4")}>
-              <div className="border-b border-line pb-2.5">
+              <div className="pb-1">
                 <div className="flex items-start justify-between gap-3">
                   <h3
                     className={cn(
                       "min-w-0 flex-1 font-display font-semibold leading-snug text-ink",
-                      compact ? "line-clamp-3 text-[15px]" : "line-clamp-4 text-lg"
+                      compact ? "line-clamp-4 text-[15px]" : "line-clamp-4 text-lg"
                     )}
                   >
                     {listing.title}
@@ -580,11 +606,6 @@ export function AlertListingCard({
                     ${costs.total.toFixed(2)}
                   </span>
                 </div>
-                {metaLine && (
-                  <p className={cn("mt-1.5 text-ink-soft", compact ? "text-xs" : "text-sm")}>
-                    {metaLine}
-                  </p>
-                )}
               </div>
 
               {showStandaloneAttributeRow && (
@@ -595,11 +616,8 @@ export function AlertListingCard({
                 </div>
               )}
 
-              {(huntContributions.length > 0 ||
-                onToggleInterested ||
-                onDismiss ||
-                onRestore) && (
-                <div className="mt-auto space-y-2 border-t border-line pt-2">
+              {(huntContributions.length > 0 || onDismiss || onRestore) && (
+                <div className="mt-auto space-y-2 border-t border-line pt-2.5">
                   {huntContributions.length > 0 && (
                     <div
                       className={cn(
@@ -607,6 +625,14 @@ export function AlertListingCard({
                         compact ? "text-[11px]" : "text-xs"
                       )}
                     >
+                      <p
+                        className={cn(
+                          "font-mono uppercase tracking-wide text-brass",
+                          compact ? "text-[9px]" : "text-[10px]"
+                        )}
+                      >
+                        Hunt Match
+                      </p>
                       {huntContributions.map((contribution) => {
                         const chips =
                           contribution.attributeMatches.length > 0
@@ -637,39 +663,14 @@ export function AlertListingCard({
                     </div>
                   )}
 
-                  {(onToggleInterested || onDismiss || onRestore) && (
+                  {(onDismiss || onRestore) && (
                     <div className="flex items-center gap-1.5">
-                      {onToggleInterested && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={onToggleInterested}
-                          aria-label={interested ? "Unsave listing" : "Save listing"}
-                          aria-pressed={interested}
-                          className={cn(
-                            "h-8 flex-1 rounded-md border-line-strong bg-card px-2.5 text-xs hover:bg-paper",
-                            interested
-                              ? "text-steal hover:text-steal"
-                              : "text-brass hover:text-steal/85"
-                          )}
-                        >
-                          <Sparkles
-                            className={cn(
-                              "h-3.5 w-3.5 shrink-0",
-                              interested && "fill-steal/20"
-                            )}
-                            strokeWidth={interested ? 2.25 : 1.75}
-                          />
-                          {interested ? "Unsave" : "Save"}
-                        </Button>
-                      )}
                       {onDismiss && (
                         <Button
                           type="button"
                           variant="outline"
                           size="sm"
-                          className="h-8 flex-1 rounded-md border-line-strong bg-card px-2.5 text-xs text-ink-soft hover:bg-paper hover:text-ink"
+                          className="h-8 w-full rounded-md border-line-strong bg-card px-2.5 text-xs text-ink-soft hover:bg-paper hover:text-ink"
                           onClick={onDismiss}
                           aria-label="Dismiss listing"
                         >
@@ -682,7 +683,7 @@ export function AlertListingCard({
                           type="button"
                           variant="outline"
                           size="sm"
-                          className="h-8 flex-1 rounded-md border-line-strong bg-card px-2.5 text-xs text-ink hover:bg-paper"
+                          className="h-8 w-full rounded-md border-line-strong bg-card px-2.5 text-xs text-ink hover:bg-paper"
                           onClick={onRestore}
                           aria-label="Restore listing"
                         >

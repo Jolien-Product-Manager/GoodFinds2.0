@@ -504,86 +504,93 @@ export function scoreListingAgainstHunt(
   };
 }
 
+export function matchListingForHunts(
+  listing: AppListing,
+  hunts: Hunt[]
+): HuntMatchResult {
+  const activeHunts = hunts.filter((h) => h.saved);
+
+  if (activeHunts.length === 0) {
+    return {
+      score: 0,
+      matchedHuntIds: [],
+      matchedHuntNames: [],
+      attributeMatches: [],
+      whyNote: listing.model
+        ? `${listing.model} — vintage Timex in your scan pool`
+        : "Vintage Timex listing in your scan pool",
+      huntContributions: [],
+    };
+  }
+
+  let listingScore = 0;
+  const huntContributions: HuntScoreContribution[] = [];
+  let bestMatches: AttributeMatch[] = [];
+  let bestContribution = 0;
+
+  for (const hunt of activeHunts) {
+    if (!huntHasActiveCriteria(hunt)) continue;
+
+    const {
+      pointsContributed,
+      matches,
+      categoriesPassed,
+      totalCategories,
+      hearts,
+      matchedOn,
+    } = scoreListingAgainstHunt(listing, hunt);
+
+    if (pointsContributed <= 0) continue;
+
+    listingScore += pointsContributed;
+    huntContributions.push({
+      huntId: hunt.id,
+      huntName: hunt.name,
+      categoriesPassed,
+      totalCategories,
+      hearts,
+      pointsContributed,
+      matchedOn,
+      attributeMatches: matches.filter((m) => m.status === "hit"),
+    });
+
+    if (pointsContributed > bestContribution) {
+      bestContribution = pointsContributed;
+      bestMatches = matches;
+    }
+  }
+
+  huntContributions.sort((a, b) => b.pointsContributed - a.pointsContributed);
+
+  const matchedIds = huntContributions.map((c) => c.huntId);
+  const matchedNames = huntContributions.map((c) => c.huntName);
+
+  const whyNote =
+    matchedNames.length > 0
+      ? `Matches ${matchedNames[0]}${bestMatches.filter((m) => m.status === "hit").length ? " — taste overlap on key attributes" : ""}`
+      : listing.model
+        ? `${listing.model} — no active hunt match yet`
+        : "Unverified model — still worth a look";
+
+  return {
+    score: listingScore,
+    matchedHuntIds: matchedIds,
+    matchedHuntNames: matchedNames,
+    attributeMatches: bestMatches,
+    whyNote,
+    huntContributions,
+  };
+}
+
 export function matchAllHunts(
   listings: AppListing[],
   hunts: Hunt[],
   _globalFilters: GlobalFilters
 ): Map<string, HuntMatchResult> {
-  const activeHunts = hunts.filter((h) => h.saved);
   const results = new Map<string, HuntMatchResult>();
 
   for (const listing of listings) {
-    if (activeHunts.length === 0) {
-      results.set(listing.id, {
-        score: 0,
-        matchedHuntIds: [],
-        matchedHuntNames: [],
-        attributeMatches: [],
-        whyNote: listing.model
-          ? `${listing.model} — vintage Timex in your scan pool`
-          : "Vintage Timex listing in your scan pool",
-        huntContributions: [],
-      });
-      continue;
-    }
-
-    let listingScore = 0;
-    const huntContributions: HuntScoreContribution[] = [];
-    let bestMatches: AttributeMatch[] = [];
-    let bestContribution = 0;
-
-    for (const hunt of activeHunts) {
-      if (!huntHasActiveCriteria(hunt)) continue;
-
-      const {
-        pointsContributed,
-        matches,
-        categoriesPassed,
-        totalCategories,
-        hearts,
-        matchedOn,
-      } = scoreListingAgainstHunt(listing, hunt);
-
-      if (pointsContributed <= 0) continue;
-
-      listingScore += pointsContributed;
-      huntContributions.push({
-        huntId: hunt.id,
-        huntName: hunt.name,
-        categoriesPassed,
-        totalCategories,
-        hearts,
-        pointsContributed,
-        matchedOn,
-        attributeMatches: matches.filter((m) => m.status === "hit"),
-      });
-
-      if (pointsContributed > bestContribution) {
-        bestContribution = pointsContributed;
-        bestMatches = matches;
-      }
-    }
-
-    huntContributions.sort((a, b) => b.pointsContributed - a.pointsContributed);
-
-    const matchedIds = huntContributions.map((c) => c.huntId);
-    const matchedNames = huntContributions.map((c) => c.huntName);
-
-    const whyNote =
-      matchedNames.length > 0
-        ? `Matches ${matchedNames[0]}${bestMatches.filter((m) => m.status === "hit").length ? " — taste overlap on key attributes" : ""}`
-        : listing.model
-          ? `${listing.model} — no active hunt match yet`
-          : "Unverified model — still worth a look";
-
-    results.set(listing.id, {
-      score: listingScore,
-      matchedHuntIds: matchedIds,
-      matchedHuntNames: matchedNames,
-      attributeMatches: bestMatches,
-      whyNote,
-      huntContributions,
-    });
+    results.set(listing.id, matchListingForHunts(listing, hunts));
   }
 
   return results;

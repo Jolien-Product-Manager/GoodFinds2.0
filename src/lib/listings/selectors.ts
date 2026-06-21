@@ -73,10 +73,7 @@ export function unseenListings(
   ctx: FilterContext
 ): AppListing[] {
   return listings.filter(
-    (l) =>
-      !isSeen(l.id, ctx) &&
-      !ctx.listingStatus[l.id]?.interested &&
-      passesListingFilters(l, ctx)
+    (l) => !isSeen(l.id, ctx) && passesListingFilters(l, ctx)
   );
 }
 

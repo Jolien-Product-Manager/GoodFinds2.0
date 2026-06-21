@@ -1,5 +1,9 @@
 import type { AppListing, AlertScope } from "@/lib/listings/types";
-import { huntHasActiveCriteria, matchAllHunts } from "@/lib/listings/hunt-match";
+import {
+  huntHasActiveCriteria,
+  matchAllHunts,
+  matchListingForHunts,
+} from "@/lib/listings/hunt-match";
 import { toFeedCardListing } from "@/lib/listings/feed-card-listing";
 import {
   FEED_DEFAULT_LIMIT,
@@ -21,6 +25,19 @@ import {
 import type { Hunt } from "@/lib/hunts/types";
 import { withInferredHuntCriteria } from "@/lib/hunts/domain-terms";
 import { normalizeHunt } from "@/lib/hunts/types";
+import type { HuntMatchResult } from "@/lib/listings/hunt-match";
+
+const SNAPSHOT_TTL_MS = 60_000;
+
+interface FeedSnapshot {
+  listings: AppListing[];
+  ctx: ReturnType<typeof buildFilterContext>;
+  matchResults: Map<string, HuntMatchResult>;
+  display: AppListing[];
+}
+
+const snapshotCache = new Map<string, { snapshot: FeedSnapshot; fetchedAt: number }>();
+const snapshotInFlight = new Map<string, Promise<FeedSnapshot>>();
 
 function normalizeHunts(hunts: Hunt[]): Hunt[] {
   return hunts.map((hunt) => withInferredHuntCriteria(normalizeHunt(hunt)));
@@ -49,7 +66,7 @@ function displayListingsForView(
   listings: AppListing[],
   body: FeedQueryBody,
   ctx: ReturnType<typeof buildFilterContext>,
-  matchResults: ReturnType<typeof matchAllHunts>
+  matchResults: Map<string, HuntMatchResult>
 ): AppListing[] {
   const ctxWithMatches = { ...ctx, matchResults, hunts: ctx.hunts };
 
@@ -69,9 +86,27 @@ function displayListingsForView(
   );
 }
 
-async function loadMatchedListings(body: FeedQueryBody) {
+function getSnapshotCacheKey(body: FeedQueryBody): string {
+  const { cursor, limit, refresh, listingStatus, feedView, ...rest } = body;
+  const statusPart =
+    feedView === "starred" || feedView === "dismissed" ? listingStatus : null;
+  return JSON.stringify({ ...rest, feedView, listingStatus: statusPart });
+}
+
+function bustSnapshotCache(cacheKey?: string) {
+  if (cacheKey) {
+    snapshotCache.delete(cacheKey);
+    snapshotInFlight.delete(cacheKey);
+    return;
+  }
+  snapshotCache.clear();
+  snapshotInFlight.clear();
+}
+
+async function buildFeedSnapshot(body: FeedQueryBody): Promise<FeedSnapshot> {
   if (body.refresh) {
     invalidateListingsCache();
+    bustSnapshotCache();
   }
 
   const { listings } = await getCachedListings();
@@ -85,32 +120,41 @@ async function loadMatchedListings(body: FeedQueryBody) {
   return { listings, ctx, matchResults, display };
 }
 
-export async function queryFeedPage(body: FeedQueryBody): Promise<FeedPageResponse> {
-  const cursor = Math.max(0, body.cursor ?? 0);
-  const limit = Math.min(
-    FEED_MAX_LIMIT,
-    Math.max(1, body.limit ?? FEED_DEFAULT_LIMIT)
-  );
+async function getFeedSnapshot(body: FeedQueryBody): Promise<FeedSnapshot> {
+  const cacheKey = getSnapshotCacheKey(body);
 
-  const { matchResults, display } = await loadMatchedListings(body);
-  const page = display.slice(cursor, cursor + limit);
-  const nextCursor =
-    cursor + limit < display.length ? cursor + limit : null;
+  if (body.refresh) {
+    bustSnapshotCache(cacheKey);
+  }
 
-  return {
-    items: page.map((listing) => ({
-      listing: toFeedCardListing(listing),
-      match: matchResults.get(listing.id) ?? null,
-    })),
-    nextCursor,
-    total: display.length,
-  };
+  const cached = snapshotCache.get(cacheKey);
+  if (cached && Date.now() - cached.fetchedAt < SNAPSHOT_TTL_MS) {
+    return cached.snapshot;
+  }
+
+  let pending = snapshotInFlight.get(cacheKey);
+  if (!pending) {
+    pending = buildFeedSnapshot(body)
+      .then((snapshot) => {
+        snapshotCache.set(cacheKey, { snapshot, fetchedAt: Date.now() });
+        return snapshot;
+      })
+      .finally(() => {
+        if (snapshotInFlight.get(cacheKey) === pending) {
+          snapshotInFlight.delete(cacheKey);
+        }
+      });
+    snapshotInFlight.set(cacheKey, pending);
+  }
+
+  return pending;
 }
 
-export async function queryFeedCounts(
-  body: FeedQueryBody
-): Promise<FeedCountsResponse> {
-  const { listings, ctx, matchResults } = await loadMatchedListings(body);
+function buildFeedCounts(
+  body: FeedQueryBody,
+  snapshot: FeedSnapshot
+): FeedCountsResponse {
+  const { listings, ctx, matchResults } = snapshot;
   const ctxWithMatches = { ...ctx, matchResults, hunts: ctx.hunts };
   const activeHunts = (ctx.hunts ?? []).filter(
     (hunt) => hunt.saved && huntHasActiveCriteria(hunt)
@@ -148,28 +192,65 @@ export async function queryFeedCounts(
   };
 }
 
-export async function queryListingDetail(
-  id: string,
-  hunts: Hunt[]
-) {
+function sliceFeedPage(
+  snapshot: FeedSnapshot,
+  body: FeedQueryBody
+): FeedPageResponse {
+  const cursor = Math.max(0, body.cursor ?? 0);
+  const limit = Math.min(
+    FEED_MAX_LIMIT,
+    Math.max(1, body.limit ?? FEED_DEFAULT_LIMIT)
+  );
+  const page = snapshot.display.slice(cursor, cursor + limit);
+  const nextCursor =
+    cursor + limit < snapshot.display.length ? cursor + limit : null;
+
+  return {
+    items: page.map((listing) => ({
+      listing: toFeedCardListing(listing),
+      match: snapshot.matchResults.get(listing.id) ?? null,
+    })),
+    nextCursor,
+    total: snapshot.display.length,
+  };
+}
+
+export async function queryFeedPage(body: FeedQueryBody): Promise<FeedPageResponse> {
+  const snapshot = await getFeedSnapshot(body);
+  return sliceFeedPage(snapshot, body);
+}
+
+export async function queryFeedCounts(
+  body: FeedQueryBody
+): Promise<FeedCountsResponse> {
+  const snapshot = await getFeedSnapshot(body);
+  return buildFeedCounts(body, snapshot);
+}
+
+export async function queryFeedBootstrap(body: FeedQueryBody): Promise<{
+  page: FeedPageResponse;
+  counts: FeedCountsResponse;
+}> {
+  const snapshot = await getFeedSnapshot(body);
+  return {
+    page: sliceFeedPage(snapshot, body),
+    counts: buildFeedCounts(body, snapshot),
+  };
+}
+
+export async function queryListingDetail(id: string, hunts: Hunt[]) {
   const { listings } = await getCachedListings();
   const listing = listings.find((item) => item.id === id);
   if (!listing) return null;
 
   const normalizedHunts = normalizeHunts(hunts);
-  const matchResults = matchAllHunts(listings, normalizedHunts, {
-    priceCeiling: 50,
-    shipsToMe: true,
-    postalCode: "M6K1V8",
-  });
-
   return {
     listing,
-    match: matchResults.get(listing.id) ?? null,
+    match: matchListingForHunts(listing, normalizedHunts),
   };
 }
 
 export async function queryFeedIds(body: FeedQueryBody): Promise<string[]> {
-  const { display } = await loadMatchedListings(body);
-  return display.map((listing) => listing.id);
+  const snapshot = await getFeedSnapshot(body);
+  return snapshot.display.map((listing) => listing.id);
 }

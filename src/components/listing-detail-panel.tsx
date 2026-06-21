@@ -7,7 +7,7 @@ import {
   ChevronRight,
   ExternalLink,
   FileText,
-  Sparkles,
+  Heart,
   Square,
   X,
 } from "lucide-react";
@@ -319,9 +319,11 @@ export function ListingDetailPanel({
                 interested && "border-steal/40 text-steal"
               )}
               onClick={onToggleInterested}
+              aria-label={interested ? "Unsave listing" : "Save listing"}
+              aria-pressed={interested}
             >
-              <Sparkles className={cn("mr-1.5 h-4 w-4", interested && "fill-steal/20")} />
-              {interested ? "Unsave" : "Save"}
+              <Heart className={cn("mr-1.5 h-4 w-4", interested && "fill-current")} />
+              {interested ? "Saved" : "Save"}
             </Button>
           )}
           {onDismiss && (

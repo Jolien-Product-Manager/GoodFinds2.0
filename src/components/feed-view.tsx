@@ -88,6 +88,23 @@ async function postFeedPage(body: FeedQueryBody) {
   }>;
 }
 
+async function postFeedBootstrap(body: FeedQueryBody) {
+  const res = await fetch("/api/feed/bootstrap", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error("Failed to load feed");
+  return res.json() as Promise<{
+    page: {
+      items: FeedItem[];
+      nextCursor: number | null;
+      total: number;
+    };
+    counts: FeedCountsResponse;
+  }>;
+}
+
 async function postFeedCounts(body: FeedQueryBody) {
   const res = await fetch("/api/feed/counts", {
     method: "POST",
@@ -179,60 +196,85 @@ export function FeedView({ ebayEnabled }: FeedViewProps) {
     ]
   );
 
+  const feedQueryBodyRef = useRef(feedQueryBody);
+  feedQueryBodyRef.current = feedQueryBody;
+
+  const feedReloadKey = useMemo(
+    () =>
+      JSON.stringify({
+        feedView,
+        alertScope,
+        marketplaceFilter,
+        seen,
+        hiddenListings,
+        dislikedModels,
+        criteria,
+        feedAttributeFilters,
+        hunts,
+        listingStatus:
+          feedView === "starred" || feedView === "dismissed" ? listingStatus : null,
+      }),
+    [
+      feedView,
+      alertScope,
+      marketplaceFilter,
+      seen,
+      hiddenListings,
+      dislikedModels,
+      criteria,
+      feedAttributeFilters,
+      hunts,
+      listingStatus,
+    ]
+  );
+
   const activeHunts = useMemo(
     () => hunts.filter((h) => h.saved && huntHasActiveCriteria(h)),
     [hunts]
   );
 
-  const reloadFeed = useCallback(
-    async (options?: { refresh?: boolean }) => {
-      const generation = ++fetchGeneration.current;
-      setLoading(true);
+  const reloadFeed = useCallback(async (options?: { refresh?: boolean }) => {
+    const generation = ++fetchGeneration.current;
+    setLoading(true);
+    setFeedItems([]);
+    setNextCursor(0);
+    setSelectedListingId(null);
+    setDetailListing(null);
+    setDetailMatch(null);
+
+    try {
+      const { page, counts } = await postFeedBootstrap({
+        ...feedQueryBodyRef.current,
+        cursor: 0,
+        refresh: options?.refresh,
+      });
+
+      if (generation !== fetchGeneration.current) return;
+
+      setFeedItems(page.items);
+      setTotal(page.total);
+      setNextCursor(page.nextCursor);
+      setCounts(counts);
+    } catch {
+      if (generation !== fetchGeneration.current) return;
+      toast.error("Couldn't load listings");
       setFeedItems([]);
-      setNextCursor(0);
-      setSelectedListingId(null);
-      setDetailListing(null);
-      setDetailMatch(null);
-
-      try {
-        const [page, nextCounts] = await Promise.all([
-          postFeedPage({
-            ...feedQueryBody,
-            cursor: 0,
-            refresh: options?.refresh,
-          }),
-          postFeedCounts({
-            ...feedQueryBody,
-            refresh: options?.refresh,
-          }),
-        ]);
-
-        if (generation !== fetchGeneration.current) return;
-
-        setFeedItems(page.items);
-        setTotal(page.total);
-        setNextCursor(page.nextCursor);
-        setCounts(nextCounts);
-      } catch {
-        if (generation !== fetchGeneration.current) return;
-        toast.error("Couldn't load listings");
-        setFeedItems([]);
-        setTotal(0);
-        setNextCursor(null);
-        setCounts(EMPTY_COUNTS);
-      } finally {
-        if (generation === fetchGeneration.current) {
-          setLoading(false);
-        }
+      setTotal(0);
+      setNextCursor(null);
+      setCounts(EMPTY_COUNTS);
+    } finally {
+      if (generation === fetchGeneration.current) {
+        setLoading(false);
       }
-    },
-    [feedQueryBody]
-  );
+    }
+  }, []);
 
   useEffect(() => {
     void reloadFeed({ refresh: pendingRefresh.current });
     pendingRefresh.current = false;
-  }, [feedQueryBody, refreshKey, reloadFeed]);
+    // feedReloadKey is the sole trigger — reloadFeed stays stable via ref
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [feedReloadKey, refreshKey]);
 
   const loadMore = useCallback(async () => {
     if (loading || loadingMore || nextCursor == null) return;
@@ -242,7 +284,7 @@ export function FeedView({ ebayEnabled }: FeedViewProps) {
 
     try {
       const page = await postFeedPage({
-        ...feedQueryBody,
+        ...feedQueryBodyRef.current,
         cursor: nextCursor,
       });
 
@@ -265,7 +307,7 @@ export function FeedView({ ebayEnabled }: FeedViewProps) {
         setLoadingMore(false);
       }
     }
-  }, [feedQueryBody, loading, loadingMore, nextCursor]);
+  }, [loading, loadingMore, nextCursor]);
 
   useEffect(() => {
     const node = loadMoreRef.current;
@@ -393,6 +435,13 @@ export function FeedView({ ebayEnabled }: FeedViewProps) {
             onClick: () => toggleInterested(id),
           },
         });
+      } else {
+        setCounts((current) => ({
+          ...current,
+          starred: wasInterested
+            ? Math.max(0, current.starred - 1)
+            : current.starred + 1,
+        }));
       }
     },
     [feedView, listingStatus, removeFeedItem, toggleInterested]
@@ -446,7 +495,7 @@ export function FeedView({ ebayEnabled }: FeedViewProps) {
           onClick: () => restoreAll(ids),
         },
       });
-      void postFeedCounts(feedQueryBody).then(setCounts).catch(() => {});
+      void postFeedCounts(feedQueryBodyRef.current).then(setCounts).catch(() => {});
     } catch {
       toast.error("Couldn't dismiss all listings");
     }
