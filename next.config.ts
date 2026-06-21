@@ -5,6 +5,9 @@ const nextConfig: NextConfig = {
   images: {
     localPatterns: [
       {
+        pathname: "/goodfinds-logo.png",
+      },
+      {
         pathname: "/api/listing-image",
         search: "url=*",
       },

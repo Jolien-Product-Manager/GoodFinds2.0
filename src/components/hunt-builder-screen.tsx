@@ -68,7 +68,6 @@ import {
   huntSearchIntentSummary,
   type HuntSearchIntent,
 } from "@/lib/hunts/search-intent";
-import { Masthead } from "@/components/masthead";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -242,13 +241,23 @@ export function HuntBuilderScreen() {
 
   const handleDelete = () => {
     if (!workingCopy) return;
-    if (!workingCopy.saved) {
+
+    const existsInStore = hunts.some((h) => h.id === workingCopy.id);
+    if (!existsInStore) {
       setDraft(null);
       setWorkingCopy(null);
       setEditingId(null);
       return;
     }
-    setHunts(hunts.filter((h) => h.id !== workingCopy.id));
+
+    const id = workingCopy.id;
+    setHunts(useCasebackStore.getState().hunts.filter((h) => h.id !== id));
+
+    const alertScope = useCasebackStore.getState().alertScope;
+    if (alertScope === `hunt:${id}`) {
+      useCasebackStore.getState().setAlertScope("all");
+    }
+
     setWorkingCopy(null);
     setEditingId(null);
     toast("Hunt deleted");
@@ -318,7 +327,6 @@ export function HuntBuilderScreen() {
 
   return (
     <>
-      <Masthead />
       <Dialog
         open={editorOpen}
         onOpenChange={(open) => {
@@ -690,12 +698,9 @@ function HuntEditorPanel({
 
   return (
     <section className="space-y-4 p-5">
-      <div className="flex items-start justify-between gap-3">
-        <h2 className="font-display text-xl font-semibold leading-snug text-ink">
-          What Vintage Timex are you Hunting for?
-        </h2>
-        <Crosshair className="mt-0.5 h-5 w-5 shrink-0 text-ink-soft" aria-hidden />
-      </div>
+      <h2 className="pr-8 font-display text-xl font-semibold leading-snug text-ink">
+        What Vintage Timex are you Hunting for?
+      </h2>
 
       {/* Search + add */}
       <div className="relative">

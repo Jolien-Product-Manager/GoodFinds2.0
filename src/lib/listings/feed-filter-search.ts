@@ -7,6 +7,7 @@ import {
   type AttrKey,
   type HuntAttribute,
 } from "@/lib/hunts/types";
+import { resolveNamedDomainCustomTerm } from "@/lib/hunts/domain-terms";
 import type { AttributeLibrary } from "@/lib/persistence/types";
 
 export type FeedFilterMatchSource = "rules" | "ai";
@@ -23,7 +24,7 @@ const FEED_DOMAIN_CUSTOM_TERMS: {
   value: string;
 }[] = [
   {
-    test: (q) => /\b(deadstock|dead[\s-]?stock)\b/i.test(q),
+    test: (q) => resolveNamedDomainCustomTerm(q) === "Deadstock",
     value: "Deadstock",
   },
 ];

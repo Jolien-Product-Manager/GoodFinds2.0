@@ -6,6 +6,7 @@ import type {
   MarketplaceFilter,
 } from "@/lib/listings/types";
 import { migrateAttributeLibrary } from "@/lib/hunts/migrate-attributes";
+import { withInferredHuntCriteria } from "@/lib/hunts/domain-terms";
 import {
   createDraftHunt,
   emptyHuntAttributes,
@@ -162,7 +163,8 @@ export const useCasebackStore = create<CasebackState>()(
       setFeedView: (view) => set({ feedView: view }),
       setCriteria: (criteria) =>
         set((s) => ({ criteria: { ...s.criteria, ...criteria } })),
-      setHunts: (hunts) => set({ hunts: hunts.map((h) => normalizeHunt(h)) }),
+      setHunts: (hunts) =>
+        set({ hunts: hunts.map((h) => withInferredHuntCriteria(normalizeHunt(h))) }),
       setGlobalFilters: (filters) =>
         set((s) => {
           const next = { ...s.globalFilters, ...filters };
@@ -248,7 +250,7 @@ export const useCasebackStore = create<CasebackState>()(
           modelHearts?: Record<string, number>;
         };
         legacy.hunts = migrateModelHeartsToHunts(
-          (legacy.hunts ?? []).map((h) => normalizeHunt(h)),
+          (legacy.hunts ?? []).map((h) => withInferredHuntCriteria(normalizeHunt(h))),
           legacy.modelHearts
         );
         delete legacy.modelHearts;

@@ -5,6 +5,11 @@ import { normalizeCustomValue, HUNT_GENDER_OPTIONS, isGenderRequired } from "@/l
 import { collabPickMatchesListing, resolveListingCollab } from "@/lib/listings/collab";
 import { complicationPickMatchesListing } from "@/lib/listings/complications";
 import { completenessPickMatchesTitle } from "@/lib/listings/infer-buyer-axes";
+import { storeFindPickMatchesListing } from "@/lib/listings/store-find";
+import {
+  huntNameImpliesCriteria,
+  withInferredHuntCriteria,
+} from "@/lib/hunts/domain-terms";
 import {
   genderSearchText,
   hasMensSignals,
@@ -151,7 +156,8 @@ function huntHasAnyTaste(hunt: Hunt): boolean {
 /** Saved hunt with gender and/or attribute criteria — not an empty "both + no attrs" draft. */
 export function huntHasActiveCriteria(hunt: Hunt): boolean {
   if (hunt.gender !== "both") return true;
-  return huntHasAnyTaste(hunt);
+  if (huntHasAnyTaste(hunt)) return true;
+  return huntNameImpliesCriteria(hunt);
 }
 
 function listingValueForAttr(
@@ -312,6 +318,7 @@ function categoryPasses(
   if (key === "traits") {
     const haystack = listingSearchText(listing);
     const matched = wanted.find((w) => {
+      if (storeFindPickMatchesListing(w, listing)) return true;
       const norm = normalizeCustomValue(w);
       return norm.length > 0 && haystack.includes(norm);
     });
@@ -374,6 +381,7 @@ export function scoreListingAgainstHunt(
   hearts: HuntHearts;
   matchedOn: string[];
 } {
+  hunt = withInferredHuntCriteria(hunt);
   const hearts = hunt.hearts ?? 2;
   const gender = hunt.gender ?? "both";
   const genderMatches = listingMatchesHuntGender(

@@ -5,6 +5,7 @@ import { useCasebackStore, migrateModelHeartsToHunts, type FeedView } from "@/st
 import type { PersistedState } from "@/lib/persistence/types";
 import { isPersistedStateEmpty, mergeAttributeLibraries, mergeAttributeHidden } from "@/lib/persistence/state-utils";
 import { normalizeHunt, emptyHuntAttributes, type Hunt, type PurchasedWatch } from "@/lib/hunts/types";
+import { withInferredHuntCriteria } from "@/lib/hunts/domain-terms";
 import { normalizePurchasedWatch } from "@/lib/hunts/purchased-watch";
 
 function migrateFeedView(raw: string | undefined): FeedView {
@@ -38,7 +39,7 @@ function applyPersistedState(
   state: PersistedState & { feedView?: string; modelHearts?: Record<string, number> }
 ) {
   const hunts = migrateModelHeartsToHunts(
-    (state.hunts ?? []).map((h) => normalizeHunt(h as Hunt)),
+    (state.hunts ?? []).map((h) => withInferredHuntCriteria(normalizeHunt(h as Hunt))),
     state.modelHearts
   );
   useCasebackStore.setState({
