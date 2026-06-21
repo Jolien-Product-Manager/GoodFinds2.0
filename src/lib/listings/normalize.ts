@@ -110,7 +110,7 @@ export function normalizeChrono24Listing(raw: Chrono24Listing): AppListing | nul
     shippingConfirmed: false,
     sellerCountry: null,
     listedAt: new Date().toISOString(),
-    gender: inferListingGender(raw.title),
+    gender: inferListingGender(raw.title, raw.gender_label ?? undefined),
     features: buildFeatures(raw.title, year, model, condition),
   };
 }

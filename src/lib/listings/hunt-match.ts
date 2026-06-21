@@ -106,6 +106,10 @@ function genderMatchedLabels(hunt: Hunt, listing: AppListing): string[] {
   if (hasWomensSignals(combined)) labels.push("Ladies/women's");
   if (hasMensSignals(combined)) labels.push("Men's");
   if (labels.length > 0) return labels;
+  if (listing.gender === "mens") labels.push("Men's");
+  else if (listing.gender === "womens") labels.push("Ladies/women's");
+  else if (listing.gender === "unisex") labels.push("Unisex");
+  if (labels.length > 0) return labels;
   if (hunt.gender !== "both") {
     labels.push(huntGenderLabel(hunt.gender));
   }

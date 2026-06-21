@@ -53,6 +53,21 @@ LISTING_LINK_RE = re.compile(r'href="(/[^"]*--id(\d+)\.htm)"')
 TITLE_RE = re.compile(r'class="text-bold[^"]*"[^>]*>([^<]+)</')
 PRICE_RE = re.compile(r'class="text-bold[^"]*"[^>]*>\s*\$?([\d,]+(?:\.\d{2})?)')
 IMAGE_RE = re.compile(r'data-src="(https://[^"]+chrono24[^"]+)"')
+GENDER_LABEL_RE = re.compile(
+    r"Gender\s*</[^>]+>\s*<[^>]+>\s*([^<]+)",
+    re.I,
+)
+
+
+def extract_gender_label(html: str) -> str | None:
+    """Chrono24 detail page: Basic Info table includes Gender (e.g. Men's watch/Unisex)."""
+    match = GENDER_LABEL_RE.search(html)
+    if not match:
+        return None
+    label = match.group(1).strip()
+    return label or None
+
+
 IMAGE_RES = [
     re.compile(
         r"(https://(?:img|cdn2)\.chrono24\.com/images/uhren/[^'\"\s<>]+\.(?:jpg|webp|jpeg))",

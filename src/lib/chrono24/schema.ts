@@ -10,6 +10,8 @@ export const chrono24ListingSchema = z.object({
   image_urls: z.array(z.string()).optional(),
   year: z.number().nullable().optional(),
   is_vintage: z.boolean().optional(),
+  /** Chrono24 detail page gender (e.g. "Men's watch/Unisex"). */
+  gender_label: z.string().nullable().optional(),
   source: z.literal("chrono24").optional(),
 });
 
