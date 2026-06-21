@@ -127,7 +127,8 @@ function ListingDetailsBack({
   onFlipBack: () => void;
 }) {
   const rows = listingDetailRows(listing);
-  const description = listing.description?.trim();
+  const description =
+    listing.description?.trim() || listing.title;
 
   return (
     <div
@@ -136,25 +137,15 @@ function ListingDetailsBack({
         compact ? "gap-2.5 p-3" : "gap-3 p-4"
       )}
     >
-      <div className="flex items-start justify-between gap-2 border-b border-line pb-2">
-        <div className="min-w-0">
-          <p
-            className={cn(
-              "font-mono text-[10px] uppercase tracking-wide text-brass",
-              compact ? "text-[9px]" : "text-[10px]"
-            )}
-          >
-            Listing details
-          </p>
-          <h3
-            className={cn(
-              "mt-1 font-display font-semibold leading-snug text-ink",
-              compact ? "line-clamp-2 text-[15px]" : "line-clamp-2 text-lg"
-            )}
-          >
-            {listing.title}
-          </h3>
-        </div>
+      <div className="flex shrink-0 items-center justify-between gap-2 border-b border-line pb-2">
+        <p
+          className={cn(
+            "font-mono uppercase tracking-wide text-brass",
+            compact ? "text-[9px]" : "text-[10px]"
+          )}
+        >
+          Listing details
+        </p>
         <CardFlipButton flipped onToggle={onFlipBack} className="shrink-0" />
       </div>
 
@@ -188,29 +179,27 @@ function ListingDetailsBack({
           </p>
         )}
 
-        {description && (
-          <div className="mt-3 border-t border-line pt-3">
-            <p
-              className={cn(
-                "font-mono text-[10px] uppercase tracking-wide text-brass",
-                compact ? "text-[9px]" : "text-[10px]"
-              )}
-            >
-              Description
-            </p>
-            <p
-              className={cn(
-                "mt-1.5 line-clamp-6 text-ink-soft",
-                compact ? "text-[11px] leading-relaxed" : "text-xs leading-relaxed"
-              )}
-            >
-              {description}
-            </p>
-          </div>
-        )}
+        <div className="mt-3 border-t border-line pt-3">
+          <p
+            className={cn(
+              "font-mono uppercase tracking-wide text-brass",
+              compact ? "text-[9px]" : "text-[10px]"
+            )}
+          >
+            Description
+          </p>
+          <p
+            className={cn(
+              "mt-1.5 break-words whitespace-pre-wrap text-ink-soft",
+              compact ? "text-[11px] leading-relaxed" : "text-xs leading-relaxed"
+            )}
+          >
+            {description}
+          </p>
+        </div>
       </div>
 
-      <div className="flex justify-end border-t border-line pt-2">
+      <div className="flex shrink-0 justify-end border-t border-line pt-2">
         <Button
           type="button"
           size="sm"

@@ -55,10 +55,15 @@ import {
   type HuntFilterPill,
 } from "@/lib/hunts/summary";
 import {
-  backfillPurchasedWatchImages,
-  findListingImageForPurchaseUrl,
+  applyPurchaseListingMetadata,
+  backfillPurchasedWatchMetadata,
+  findListingMetadataForPurchaseUrl,
   type ListingImageRef,
 } from "@/lib/hunts/purchased-watch";
+import {
+  mergePurchaseListingMetadata,
+  type PurchaseListingMetadata,
+} from "@/lib/hunts/purchase-listing-metadata";
 import { HuntHeartsPicker } from "@/components/hunt-hearts";
 import { PurchasedWatchRow } from "@/components/purchased-watch-row";
 import { useCasebackStore } from "@/store/caseback";
@@ -70,6 +75,22 @@ import {
 } from "@/lib/hunts/search-intent";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+
+async function fetchPurchaseListingMetadata(
+  url: string
+): Promise<PurchaseListingMetadata | null> {
+  try {
+    const res = await fetch(`/api/purchase-image?url=${encodeURIComponent(url)}`);
+    if (!res.ok) return null;
+    return (await res.json()) as PurchaseListingMetadata;
+  } catch {
+    return null;
+  }
+}
+
+function purchaseNeedsMetadataBackfill(watch: PurchasedWatch): boolean {
+  return !watch.imageUrl || !watch.title;
+}
 
 export function HuntBuilderScreen() {
   const hunts = useCasebackStore((s) => s.hunts);
@@ -269,7 +290,7 @@ export function HuntBuilderScreen() {
     setWorkingCopy(null);
   };
 
-  const addPurchase = useCallback(() => {
+  const addPurchase = useCallback(async () => {
     let url = purchaseUrl.trim();
     if (!url) return;
     if (!/^https?:\/\//i.test(url)) url = `https://${url}`;
@@ -280,41 +301,81 @@ export function HuntBuilderScreen() {
       parsing: true,
       features: null,
       imageUrl: null,
+      title: null,
+      description: null,
     };
     setPurchasedWatches([item, ...purchasedWatches]);
     setPurchaseUrl("");
-    setTimeout(() => {
-      const imageUrl = findListingImageForPurchaseUrl(url, listingImages);
-      setPurchasedWatches(
-        useCasebackStore.getState().purchasedWatches.map((p) =>
-          p.id === id
-            ? {
+
+    const fromFeed = findListingMetadataForPurchaseUrl(url, listingImages);
+    const fromApi = await fetchPurchaseListingMetadata(url);
+    const metadata = mergePurchaseListingMetadata(fromFeed, fromApi);
+
+    setPurchasedWatches(
+      useCasebackStore.getState().purchasedWatches.map((p) =>
+        p.id === id
+          ? applyPurchaseListingMetadata(
+              {
                 ...p,
                 parsing: false,
                 features: simulateListingParse(url),
-                imageUrl,
-              }
-            : p
-        )
-      );
-    }, 1200);
+              },
+              metadata
+            )
+          : p
+      )
+    );
   }, [purchaseUrl, purchasedWatches, setPurchasedWatches, listingImages]);
 
   useEffect(() => {
     let cancelled = false;
+
+    async function backfillPurchaseMetadata(images: ListingImageRef[]) {
+      let current = useCasebackStore.getState().purchasedWatches;
+      if (current.length === 0) return;
+
+      const fromFeed = backfillPurchasedWatchMetadata(current, images);
+      if (fromFeed !== current) {
+        if (cancelled) return;
+        setPurchasedWatches(fromFeed);
+        current = fromFeed;
+      }
+
+      for (const watch of current) {
+        if (cancelled || !purchaseNeedsMetadataBackfill(watch)) continue;
+
+        const fromFeedMeta = findListingMetadataForPurchaseUrl(watch.url, images);
+        const fromApi = await fetchPurchaseListingMetadata(watch.url);
+        const metadata = mergePurchaseListingMetadata(fromFeedMeta, fromApi);
+        const updated = applyPurchaseListingMetadata(watch, metadata);
+
+        if (
+          updated.imageUrl === watch.imageUrl &&
+          updated.title === watch.title &&
+          updated.description === watch.description
+        ) {
+          continue;
+        }
+
+        if (cancelled) return;
+
+        setPurchasedWatches(
+          useCasebackStore.getState().purchasedWatches.map((p) =>
+            p.id === watch.id ? updated : p
+          )
+        );
+      }
+    }
+
     fetch("/api/listing-images")
       .then((res) => res.json())
       .then((images: ListingImageRef[]) => {
         if (cancelled || !Array.isArray(images)) return;
         setListingImages(images);
-        const current = useCasebackStore.getState().purchasedWatches;
-        if (current.length === 0) return;
-        const next = backfillPurchasedWatchImages(current, images);
-        if (next !== current) {
-          setPurchasedWatches(next);
-        }
+        void backfillPurchaseMetadata(images);
       })
       .catch(() => {});
+
     return () => {
       cancelled = true;
     };
@@ -400,38 +461,50 @@ export function HuntBuilderScreen() {
         />
 
         {/* Purchased watches */}
-        <section className="space-y-2 rounded-sm border border-line-strong bg-card px-3 py-2.5">
-          <h2 className="font-display text-lg font-medium text-ink">Purchased watches</h2>
+        <section className="space-y-2">
+          <header>
+            <h2 className="font-display text-lg font-medium text-ink">Purchased watches</h2>
+            <p className="mt-0.5 text-sm text-ink-soft">
+              Listings you bought — photos help match future finds
+            </p>
+          </header>
           <div className="flex gap-2">
             <Input
               value={purchaseUrl}
               onChange={(e) => setPurchaseUrl(e.target.value)}
               placeholder="Paste listing URL"
-              className="h-9 text-sm"
-              onKeyDown={(e) => e.key === "Enter" && addPurchase()}
+              className="h-8 text-sm"
+              onKeyDown={(e) => e.key === "Enter" && void addPurchase()}
             />
-            <Button variant="outline" size="sm" className="h-9 shrink-0" onClick={addPurchase}>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 shrink-0"
+              onClick={() => void addPurchase()}
+            >
               Add
             </Button>
           </div>
-          <ul className="space-y-1.5">
-            {purchasedWatches.map((p) => (
-              <PurchasedWatchRow
-                key={p.id}
-                watch={p}
-                onRemove={() =>
-                  setPurchasedWatches(purchasedWatches.filter((x) => x.id !== p.id))
-                }
-                onImageChange={(imageUrl) =>
-                  setPurchasedWatches(
-                    purchasedWatches.map((x) =>
-                      x.id === p.id ? { ...x, imageUrl } : x
+          {purchasedWatches.length > 0 ? (
+            <ul className="space-y-1.5">
+              {purchasedWatches.map((p) => (
+                <PurchasedWatchRow
+                  key={p.id}
+                  watch={p}
+                  onRemove={() =>
+                    setPurchasedWatches(purchasedWatches.filter((x) => x.id !== p.id))
+                  }
+                  onImageChange={(imageUrl) =>
+                    setPurchasedWatches(
+                      purchasedWatches.map((x) =>
+                        x.id === p.id ? { ...x, imageUrl } : x
+                      )
                     )
-                  )
-                }
-              />
-            ))}
-          </ul>
+                  }
+                />
+              ))}
+            </ul>
+          ) : null}
         </section>
       </main>
     </>

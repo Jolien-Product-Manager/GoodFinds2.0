@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { PurchasedWatch } from "@/lib/hunts/types";
 import { getListingImageSrc } from "@/lib/listings/image-url";
+import { cn } from "@/lib/utils";
 
 interface PurchasedWatchRowProps {
   watch: PurchasedWatch;
@@ -24,8 +25,8 @@ export function PurchasedWatchRow({
   const remoteSrc = getListingImageSrc(watch.imageUrl);
   const imageSrc =
     watch.imageUrl?.startsWith("data:") ? watch.imageUrl : remoteSrc;
-  const modelLabel =
-    typeof watch.features?.model === "string" ? watch.features.model : "Timex";
+  const displayTitle = watch.title?.trim();
+  const modelLabel = displayTitle ?? "Purchased watch";
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -42,8 +43,8 @@ export function PurchasedWatchRow({
   };
 
   return (
-    <li className="flex gap-2 rounded-sm border border-line px-2 py-1.5">
-      <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-sm bg-paper">
+    <li className="flex gap-3 rounded-sm border border-line-strong bg-card px-3 py-2">
+      <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-sm bg-paper">
         {imageSrc && !imageFailed ? (
           watch.imageUrl?.startsWith("data:") ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -59,7 +60,7 @@ export function PurchasedWatchRow({
               alt={modelLabel}
               fill
               className="object-cover"
-              sizes="56px"
+              sizes="64px"
               unoptimized
               onError={() => setImageFailed(true)}
             />
@@ -96,17 +97,27 @@ export function PurchasedWatchRow({
         />
       </div>
 
-      <div className="flex min-w-0 flex-1 flex-col justify-center gap-1 text-xs">
+      <div className="flex min-w-0 flex-1 flex-col gap-1.5 text-xs">
         <div className="flex items-start gap-2">
-          <a
-            href={watch.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex min-w-0 flex-1 items-center gap-1 truncate text-ink underline"
-          >
-            <span className="truncate">{watch.url}</span>
-            <ExternalLink className="h-3 w-3 shrink-0" />
-          </a>
+          <div className="min-w-0 flex-1">
+            {displayTitle ? (
+              <p className="font-display text-base font-medium leading-tight text-ink">
+                {displayTitle}
+              </p>
+            ) : null}
+            <a
+              href={watch.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={cn(
+                "flex min-w-0 items-center gap-1 text-ink-soft underline",
+                displayTitle ? "mt-0.5" : "text-ink"
+              )}
+            >
+              <span className="truncate">{watch.url}</span>
+              <ExternalLink className="h-3 w-3 shrink-0" />
+            </a>
+          </div>
           <Button
             type="button"
             variant="ghost"
@@ -123,7 +134,7 @@ export function PurchasedWatchRow({
           <span className="text-ink-soft italic">Reading listing…</span>
         )}
 
-        {watch.features && (
+        {watch.features && Object.keys(watch.features).length > 0 && (
           <div className="flex flex-wrap items-center gap-1">
             {Object.entries(watch.features).map(([key, value]) => (
               <Badge

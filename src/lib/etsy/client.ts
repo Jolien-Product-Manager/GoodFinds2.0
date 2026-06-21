@@ -255,3 +255,90 @@ export async function fetchEtsyListings(): Promise<EtsyListing[]> {
 export function hasEtsyCredentials(): boolean {
   return getEtsyApiKey() != null;
 }
+
+export interface EtsyListingMetadata {
+  imageUrl: string | null;
+  title: string | null;
+  description: string | null;
+}
+
+/** Fetch listing photos for a single Etsy listing id. */
+export async function fetchEtsyListingImage(listingId: string): Promise<string | null> {
+  const metadata = await fetchEtsyListingMetadata(listingId);
+  return metadata.imageUrl;
+}
+
+/** Fetch listing photo + text for a single Etsy listing id. */
+export async function fetchEtsyListingMetadata(
+  listingId: string
+): Promise<EtsyListingMetadata> {
+  const fromPublic = await fetchEtsyPublicListingMetadata(listingId);
+  if (fromPublic.imageUrl || fromPublic.title || fromPublic.description) {
+    return fromPublic;
+  }
+
+  if (!getEtsyApiKey()) {
+    return { imageUrl: null, title: null, description: null };
+  }
+
+  try {
+    const json = await etsyFetch(`/listings/${listingId}`, {
+      includes: "Images",
+    });
+    const parsed = etsyListingSchema.safeParse(json);
+    if (!parsed.success) {
+      return { imageUrl: null, title: null, description: null };
+    }
+
+    const images = parsed.data.images ?? [];
+    const first = images[0];
+
+    return {
+      imageUrl:
+        first?.url_fullxfull ??
+        first?.url_570xN ??
+        first?.url_170x135 ??
+        null,
+      title: parsed.data.title ?? null,
+      description: parsed.data.description ?? parsed.data.title ?? null,
+    };
+  } catch {
+    return { imageUrl: null, title: null, description: null };
+  }
+}
+
+async function fetchEtsyPublicListingMetadata(
+  listingId: string
+): Promise<EtsyListingMetadata> {
+  try {
+    const res = await fetch(
+      `https://www.etsy.com/api/v3/ajax/public/listings/${listingId}`,
+      {
+        headers: {
+          Accept: "application/json",
+          "User-Agent":
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        },
+        cache: "no-store",
+      }
+    );
+
+    if (!res.ok) {
+      return { imageUrl: null, title: null, description: null };
+    }
+
+    const json = (await res.json()) as {
+      title?: string;
+      description?: string;
+      images?: string[];
+    };
+
+    return {
+      imageUrl: json.images?.[0] ?? null,
+      title: json.title ?? null,
+      description: json.description ?? json.title ?? null,
+    };
+  } catch {
+    return { imageUrl: null, title: null, description: null };
+  }
+}

@@ -3,7 +3,7 @@ import { z } from "zod";
 export const EBAY_DEFAULT_QUERY = "timex vintage watch";
 export const EBAY_WRISTWATCH_CATEGORY_ID = "31387";
 /** Max listings for manual sync (`npm run sync:ebay`). Override via EBAY_SEARCH_LIMIT env. */
-export const EBAY_SEARCH_LIMIT = 2000;
+export const EBAY_SEARCH_LIMIT = 10_000;
 /** eBay Browse API max per request (pagination uses offset). */
 export const EBAY_PAGE_SIZE = 200;
 export const EBAY_BRAND = "Timex";

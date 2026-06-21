@@ -6,7 +6,7 @@ import type { PersistedState } from "@/lib/persistence/types";
 import { isPersistedStateEmpty, mergeAttributeLibraries, mergeAttributeHidden } from "@/lib/persistence/state-utils";
 import { normalizeHunt, emptyHuntAttributes, type Hunt, type PurchasedWatch } from "@/lib/hunts/types";
 import { withInferredHuntCriteria } from "@/lib/hunts/domain-terms";
-import { normalizePurchasedWatch } from "@/lib/hunts/purchased-watch";
+import { normalizePurchasedWatch, mergeDefaultPurchasedWatches } from "@/lib/hunts/purchased-watch";
 import type { AlertScope } from "@/lib/listings/types";
 
 function migrateFeedView(raw: string | undefined): FeedView {
@@ -61,8 +61,10 @@ function applyPersistedState(
     criteria: state.criteria ?? useCasebackStore.getState().criteria,
     hunts,
     globalFilters: state.globalFilters ?? useCasebackStore.getState().globalFilters,
-    purchasedWatches: (state.purchasedWatches ?? []).map((p) =>
-      normalizePurchasedWatch(p as PurchasedWatch)
+    purchasedWatches: mergeDefaultPurchasedWatches(
+      (state.purchasedWatches ?? []).map((p) =>
+        normalizePurchasedWatch(p as PurchasedWatch)
+      )
     ),
     attributeLibrary: mergeAttributeLibraries(
       useCasebackStore.getState().attributeLibrary,

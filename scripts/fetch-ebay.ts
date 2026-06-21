@@ -1,5 +1,6 @@
 import { readFileSync, existsSync } from "node:fs";
 import { fetchEbayListings } from "../src/lib/ebay/client";
+import { EBAY_SEARCH_LIMIT } from "../src/lib/ebay/schema";
 
 function loadEnvLocal() {
   const path = ".env.local";
@@ -18,9 +19,11 @@ function loadEnvLocal() {
 loadEnvLocal();
 
 async function main() {
-  // Manual sync: paginate up to EBAY_SEARCH_LIMIT (default 2000 in production).
+  // One-time manual sync: paginate up to EBAY_SEARCH_LIMIT with production rate limits.
   process.env.EBAY_FORCE_REFRESH = "1";
   process.env.EBAY_SYNC = "1";
+  process.env.EBAY_RATE_LIMIT_MODE = "production";
+  process.env.EBAY_SEARCH_LIMIT = String(EBAY_SEARCH_LIMIT);
   const listings = await fetchEbayListings();
   console.log(`Fetched ${listings.length} eBay listings`);
 }

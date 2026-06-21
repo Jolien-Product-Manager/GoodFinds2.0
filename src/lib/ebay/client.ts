@@ -391,3 +391,72 @@ export function hasEbayCredentials(): boolean {
   const secret = process.env.EBAY_CLIENT_SECRET?.trim();
   return Boolean(id && secret);
 }
+
+function extractEbayNumericId(url: string): string | null {
+  const match = url.match(/\/itm\/(\d+)/i);
+  return match?.[1] ?? null;
+}
+
+/** Fetch a single listing photo from the Browse API when the item is not in the feed snapshot. */
+export async function fetchEbayImageForUrl(purchaseUrl: string): Promise<string | null> {
+  const metadata = await fetchEbayListingMetadata(purchaseUrl);
+  return metadata.imageUrl;
+}
+
+export interface EbayListingMetadata {
+  imageUrl: string | null;
+  title: string | null;
+  description: string | null;
+}
+
+/** Fetch listing photo + text from the Browse API when the item is not in the feed snapshot. */
+export async function fetchEbayListingMetadata(
+  purchaseUrl: string
+): Promise<EbayListingMetadata> {
+  const numericId = extractEbayNumericId(purchaseUrl);
+  if (!numericId) {
+    return { imageUrl: null, title: null, description: null };
+  }
+
+  const config = getEbayConfig();
+  if (!config) {
+    return { imageUrl: null, title: null, description: null };
+  }
+
+  try {
+    await throttleEbayApiCall();
+    const token = await getAccessToken(config);
+    const itemId = encodeURIComponent(`v1|${numericId}|0`);
+    const res = await fetch(`${config.baseUrl}/buy/browse/v1/item/${itemId}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "X-EBAY-C-MARKETPLACE-ID": config.marketplaceId,
+        Accept: "application/json",
+      },
+      cache: "no-store",
+    });
+
+    if (!res.ok) {
+      return { imageUrl: null, title: null, description: null };
+    }
+
+    const json = (await res.json()) as {
+      title?: string;
+      description?: string;
+      shortDescription?: string;
+      image?: { imageUrl?: string };
+      additionalImages?: Array<{ imageUrl?: string }>;
+    };
+
+    return {
+      imageUrl:
+        json.image?.imageUrl ??
+        json.additionalImages?.find((img) => img.imageUrl)?.imageUrl ??
+        null,
+      title: json.title ?? null,
+      description: json.description ?? json.shortDescription ?? json.title ?? null,
+    };
+  } catch {
+    return { imageUrl: null, title: null, description: null };
+  }
+}

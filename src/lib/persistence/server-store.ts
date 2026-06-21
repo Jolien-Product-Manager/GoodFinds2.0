@@ -1,6 +1,11 @@
 import fs from "node:fs";
 import path from "node:path";
 import {
+  mergeDefaultPurchasedWatches,
+  normalizePurchasedWatch,
+} from "@/lib/hunts/purchased-watch";
+import type { PurchasedWatch } from "@/lib/hunts/types";
+import {
   DEFAULT_PERSISTED_STATE,
   type PersistedState,
 } from "./types";
@@ -18,7 +23,13 @@ export function readPersistedState(): PersistedState {
       return DEFAULT_PERSISTED_STATE;
     }
     const raw = JSON.parse(fs.readFileSync(STORE_PATH, "utf-8"));
-    return { ...DEFAULT_PERSISTED_STATE, ...raw };
+    const merged = { ...DEFAULT_PERSISTED_STATE, ...raw };
+    merged.purchasedWatches = mergeDefaultPurchasedWatches(
+      (merged.purchasedWatches ?? []).map((watch: PurchasedWatch) =>
+        normalizePurchasedWatch(watch)
+      )
+    );
+    return merged;
   } catch {
     return DEFAULT_PERSISTED_STATE;
   }

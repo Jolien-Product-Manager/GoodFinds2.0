@@ -66,6 +66,8 @@ export interface PurchasedWatch {
   features: Record<string, string | number | undefined> | null;
   /** Marketplace CDN URL or user-uploaded data URL. */
   imageUrl: string | null;
+  title: string | null;
+  description: string | null;
 }
 
 /** Shown near the top of the hunt builder (after gender). */

@@ -4,6 +4,11 @@ import {
   type PersistedState,
 } from "@/lib/persistence/types";
 import { isPersistedStateEmpty } from "@/lib/persistence/state-utils";
+import {
+  mergeDefaultPurchasedWatches,
+  normalizePurchasedWatch,
+} from "@/lib/hunts/purchased-watch";
+import type { PurchasedWatch } from "@/lib/hunts/types";
 
 export { isPersistedStateEmpty };
 
@@ -11,7 +16,13 @@ function mergeWithDefaults(raw: unknown): PersistedState {
   if (!raw || typeof raw !== "object") {
     return DEFAULT_PERSISTED_STATE;
   }
-  return { ...DEFAULT_PERSISTED_STATE, ...(raw as Partial<PersistedState>) };
+  const merged = { ...DEFAULT_PERSISTED_STATE, ...(raw as Partial<PersistedState>) };
+  merged.purchasedWatches = mergeDefaultPurchasedWatches(
+    (merged.purchasedWatches ?? []).map((watch) =>
+      normalizePurchasedWatch(watch as PurchasedWatch)
+    )
+  );
+  return merged;
 }
 
 export async function readUserStateFromDb(
