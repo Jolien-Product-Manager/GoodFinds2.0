@@ -5,6 +5,7 @@ const nextConfig: NextConfig = {
   // Include marketplace snapshots in serverless bundles (Vercel/Lambda). Harmless on Render.
   outputFileTracingIncludes: {
     "/api/**": ["./data/**/*"],
+    "/*": ["./data/etsy/vintage_timex.json", "./data/ebay/vintage_timex.json", "./data/chrono24/vintage_timex.json"],
   },
   images: {
     localPatterns: [

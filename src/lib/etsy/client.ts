@@ -8,6 +8,7 @@ import {
 } from "./schema";
 import {
   etsySnapshotAgeMinutes,
+  hasEtsySnapshot,
   readEtsySnapshot,
   writeEtsySnapshot,
 } from "./snapshot";
@@ -264,6 +265,8 @@ export async function fetchEtsyListings(): Promise<EtsyListing[]> {
 export function hasEtsyCredentials(): boolean {
   return getEtsyApiKey() != null;
 }
+
+export { hasEtsySnapshot };
 
 export interface EtsyListingMetadata {
   imageUrl: string | null;

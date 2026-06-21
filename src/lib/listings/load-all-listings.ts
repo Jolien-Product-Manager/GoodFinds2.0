@@ -1,7 +1,7 @@
 import { loadChrono24Listings } from "@/lib/chrono24/load-listings";
 import { enrichChrono24ListingsIfNeeded } from "@/lib/chrono24/enrich-images";
 import { fetchEbayListings, hasEbayCredentials } from "@/lib/ebay/client";
-import { fetchEtsyListings, hasEtsyCredentials } from "@/lib/etsy/client";
+import { fetchEtsyListings, hasEtsyCredentials, hasEtsySnapshot } from "@/lib/etsy/client";
 import {
   filterVintageListings,
   normalizeChrono24Listing,
@@ -39,7 +39,7 @@ export async function loadAllListings(): Promise<LoadAllListingsResult> {
     .filter((l): l is AppListing => l != null);
 
   const ebayEnabled = hasEbayCredentials();
-  const etsyEnabled = hasEtsyCredentials();
+  const etsyEnabled = hasEtsyCredentials() || hasEtsySnapshot();
 
   const merged = filterVintageListings([
     ...chronoNormalized,
