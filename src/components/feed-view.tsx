@@ -339,7 +339,7 @@ export function FeedView({ listings, ebayEnabled }: FeedViewProps) {
           onMarketplaceChange={setMarketplaceFilter}
           onToggleFeedAttributeFilter={toggleFeedAttributeFilter}
           onClearFeedAttributeFilters={clearFeedAttributeFilters}
-          className="md:sticky md:top-4 md:col-start-2 md:row-start-1"
+          className="md:sticky md:top-4 md:col-start-2 md:row-start-1 md:max-h-[calc(100vh-1rem)] md:overflow-y-auto md:overscroll-y-contain md:pr-0.5"
         />
 
         <div className="min-w-0 space-y-4 md:col-start-1 md:row-start-1">

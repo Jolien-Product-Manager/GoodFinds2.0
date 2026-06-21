@@ -255,7 +255,7 @@ export function AlertListingCard({
         {matchScore != null && (
           <span className="absolute right-3 top-3 inline-flex items-center gap-1.5 rounded-full border border-line bg-card/95 px-2.5 py-1 text-[11px] font-medium tabular-nums text-ink shadow-sm">
             <span className="h-2 w-2 rounded-full bg-brass" />
-            Match Score: {(matchScore * 10).toFixed(1)}
+            Match Score: {Math.round(matchScore * 10)}
           </span>
         )}
       </div>
