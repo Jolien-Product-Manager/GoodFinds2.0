@@ -191,7 +191,8 @@ export function normalizeEtsyListing(raw: EtsyListing): AppListing | null {
     shippingConfirmed: false,
     sellerCountry: null,
     listedAt,
-    gender: inferListingGender(raw.title),
+    gender: inferListingGender(raw.title, raw.description),
+    description: raw.description ?? null,
     features: buildFeatures(raw.title, year, model, condition),
   };
 }

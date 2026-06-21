@@ -21,7 +21,6 @@ import { useCasebackStore, type FeedView } from "@/store/caseback";
 interface FeedViewProps {
   listings: AppListing[];
   ebayEnabled: boolean;
-  etsyEnabled: boolean;
 }
 
 function feedContextSuffix(
@@ -65,7 +64,7 @@ function feedContextSuffix(
   return suffix;
 }
 
-export function FeedView({ listings, ebayEnabled, etsyEnabled }: FeedViewProps) {
+export function FeedView({ listings, ebayEnabled }: FeedViewProps) {
   const router = useRouter();
 
   const seen = useCasebackStore((s) => s.seen);
@@ -327,20 +326,6 @@ export function FeedView({ listings, ebayEnabled, etsyEnabled }: FeedViewProps) 
         <p className="font-mono-data text-xs text-ink-soft">
           eBay offline — add EBAY_CLIENT_ID and EBAY_CLIENT_SECRET to .env.local, run{" "}
           <code className="text-ink">npm run sync:ebay</code>, then restart.
-        </p>
-      )}
-      {!etsyEnabled && (
-        <p className="font-mono-data text-xs text-ink-soft">
-          Etsy offline — add ETSY_API_KEY to .env.local (from{" "}
-          <a
-            href="https://www.etsy.com/developers"
-            className="text-brass underline-offset-2 hover:underline"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            etsy.com/developers
-          </a>
-          ), run <code className="text-ink">npm run sync:etsy</code>, then restart.
         </p>
       )}
 

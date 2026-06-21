@@ -53,6 +53,8 @@ export interface AppListing {
   sellerCountry: string | null;
   listedAt: string;
   gender: ListingGender;
+  /** Marketplace listing body text when available (e.g. Etsy). Used for gender inference. */
+  description?: string | null;
   features: ExtractedFeatures;
 }
 

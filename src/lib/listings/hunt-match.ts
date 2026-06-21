@@ -255,7 +255,12 @@ export function scoreListingAgainstHunt(
 } {
   const hearts = hunt.hearts ?? 2;
 
-  if (!listingMatchesHuntGender(listing.gender, hunt.gender ?? "both", listing.title)) {
+  if (!listingMatchesHuntGender(
+    listing.gender,
+    hunt.gender ?? "both",
+    listing.title,
+    listing.description
+  )) {
     return {
       pointsContributed: 0,
       matches: [],

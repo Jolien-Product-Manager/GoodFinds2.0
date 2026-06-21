@@ -79,9 +79,20 @@ export function isLikelyWomensBySize(title: string): boolean {
   return size != null && size <= 30 && !hasMensSignals(title);
 }
 
-export function inferListingGender(title: string): ListingGender {
-  const womens = hasWomensSignals(title);
-  const mens = hasMensSignals(title);
+export function genderSearchText(
+  title: string,
+  description?: string | null
+): string {
+  return [title, description].filter(Boolean).join(" ");
+}
+
+export function inferListingGender(
+  title: string,
+  description?: string | null
+): ListingGender {
+  const combined = genderSearchText(title, description);
+  const womens = hasWomensSignals(combined);
+  const mens = hasMensSignals(combined);
 
   if (womens && !mens) return "womens";
   if (mens && !womens) return "mens";
@@ -93,18 +104,20 @@ export function inferListingGender(title: string): ListingGender {
 export function listingMatchesHuntGender(
   listingGender: ListingGender,
   huntGender: HuntGender,
-  title: string
+  title: string,
+  description?: string | null
 ): boolean {
   if (huntGender === "both") return true;
 
+  const combined = genderSearchText(title, description);
   const womensHint =
     listingGender === "womens" ||
-    hasWomensSignals(title) ||
+    hasWomensSignals(combined) ||
     isLikelyWomensBySize(title);
-  const mensHint = listingGender === "mens" || hasMensSignals(title);
-  const childrensHint = hasChildrensSignals(title);
-  const boysHint = hasBoysSignals(title);
-  const girlsHint = hasGirlsSignals(title);
+  const mensHint = listingGender === "mens" || hasMensSignals(combined);
+  const childrensHint = hasChildrensSignals(combined);
+  const boysHint = hasBoysSignals(combined);
+  const girlsHint = hasGirlsSignals(combined);
 
   if (huntGender === "boys") {
     return boysHint;

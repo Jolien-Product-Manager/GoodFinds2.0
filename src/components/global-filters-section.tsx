@@ -14,13 +14,7 @@ interface GlobalFiltersSectionProps {
 
 function InfoNote({ children }: { children: ReactNode }) {
   return (
-    <div className="mt-3 flex items-start gap-2.5">
-      <span
-        className="mt-0.5 h-4 w-4 shrink-0 rounded-[3px] border border-line-strong bg-white"
-        aria-hidden
-      />
-      <p className="text-sm leading-snug text-ink-soft">{children}</p>
-    </div>
+    <p className="mt-1.5 text-xs leading-snug text-ink-soft">{children}</p>
   );
 }
 
@@ -35,9 +29,9 @@ function FilterField({
 }) {
   return (
     <div>
-      <p className="font-medium text-ink">{label}</p>
-      <p className="mt-0.5 text-sm text-ink-soft">{description}</p>
-      <div className="mt-3">{children}</div>
+      <p className="text-sm font-medium text-ink">{label}</p>
+      <p className="mt-0.5 text-xs text-ink-soft">{description}</p>
+      <div className="mt-1.5">{children}</div>
     </div>
   );
 }
@@ -50,13 +44,13 @@ export function GlobalFiltersSection({
   return (
     <section
       className={cn(
-        "space-y-6 rounded-lg border border-line bg-card p-6",
+        "space-y-4 rounded-sm border border-line-strong bg-card px-3 py-2.5",
         className
       )}
     >
       <header>
-        <h2 className="font-display text-xl font-medium text-ink">Global filters</h2>
-        <p className="mt-1 text-sm text-ink-soft">
+        <h2 className="font-display text-lg font-medium text-ink">Global filters</h2>
+        <p className="mt-0.5 text-xs text-ink-soft">
           Applied to every hunt — listings that fail these never show up
         </p>
       </header>
@@ -65,7 +59,7 @@ export function GlobalFiltersSection({
         label="Price ceiling"
         description="The most you'll pay to get a watch to your door, all in"
       >
-        <div className="flex h-10 items-center rounded-md border border-line-strong bg-white px-3">
+        <div className="flex h-9 max-w-xs items-center rounded-md border border-line-strong bg-white px-2.5">
           <span className="shrink-0 text-sm text-ink-soft">$</span>
           <input
             id="price-ceiling"
@@ -87,27 +81,24 @@ export function GlobalFiltersSection({
       <hr className="border-line" />
 
       <div>
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <p className="font-medium text-ink">Ships to my address</p>
-          </div>
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-sm font-medium text-ink">Ships to my address</p>
           <Switch
             id="ships-to-me"
             checked={globalFilters.shipsToMe}
             onCheckedChange={(v) => onChange({ shipsToMe: v })}
-            className="mt-0.5"
           />
         </div>
 
         {globalFilters.shipsToMe && (
-          <div className="mt-4 border-l border-line pl-4">
-            <p className="text-sm font-medium text-ink">Postal code</p>
+          <div className="mt-2">
+            <p className="text-xs font-medium text-ink">Postal code</p>
             <Input
               id="postal"
               value={globalFilters.postalCode ?? ""}
               onChange={(e) => onChange({ postalCode: e.target.value })}
               placeholder="M6K 1V8"
-              className="mt-2 border-line-strong bg-white"
+              className="mt-1 h-9 max-w-xs border-line-strong bg-white text-sm"
             />
             <InfoNote>
               Lets us estimate shipping + duties so the ceiling uses true landed

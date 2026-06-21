@@ -305,10 +305,10 @@ export function HuntBuilderScreen() {
         </div>
 
         {/* Saved hunts */}
-        <section className="space-y-3">
+        <section className="space-y-2">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="font-display text-xl font-medium text-ink">Defined hunts</h2>
-            <Button variant="outline" size="sm" onClick={startNewHunt}>
+            <h2 className="font-display text-lg font-medium text-ink">Defined hunts</h2>
+            <Button variant="outline" size="sm" className="h-8" onClick={startNewHunt}>
               <Plus className="mr-1 h-3 w-3" />
               New hunt
               {draft && (
@@ -320,7 +320,7 @@ export function HuntBuilderScreen() {
           {hunts.filter((h) => h.saved).length === 0 ? (
             <p className="text-sm text-ink-soft">No saved hunts yet.</p>
           ) : (
-            <ul className="space-y-3">
+            <ul className="space-y-1.5">
               {hunts
                 .filter((h) => h.saved)
                 .map((hunt) => {
@@ -333,34 +333,35 @@ export function HuntBuilderScreen() {
                         type="button"
                         onClick={() => openEdit(hunt)}
                         className={cn(
-                          "w-full rounded-sm border bg-card p-4 text-left transition-colors hover:border-brass/50 hover:bg-brass/5",
+                          "w-full rounded-sm border bg-card px-3 py-2 text-left transition-colors hover:border-brass/50 hover:bg-brass/5",
                           isActive
                             ? "border-brass bg-brass/10 ring-1 ring-brass/30"
                             : "border-line-strong"
                         )}
                       >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0 space-y-2">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <h3 className="font-display text-lg font-medium text-ink">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                              <h3 className="font-display text-base font-medium leading-tight text-ink">
                                 {hunt.name}
                               </h3>
                               <HuntHeartsPicker value={hunt.hearts ?? 2} size="xs" />
+                              <Badge
+                                variant="outline"
+                                className={cn(
+                                  "h-5 px-1.5 text-[10px] font-normal",
+                                  tightnessForHunt.level === "specific" &&
+                                    "border-steal text-steal"
+                                )}
+                              >
+                                {tightnessForHunt.label}
+                              </Badge>
                             </div>
-                            <p className="font-display text-sm italic text-ink-soft">
+                            <p className="mt-0.5 truncate text-xs italic leading-snug text-ink-soft">
                               {buildHuntSummary(hunt)}
                             </p>
-                            <Badge
-                              variant="outline"
-                              className={cn(
-                                tightnessForHunt.level === "specific" &&
-                                  "border-steal text-steal"
-                              )}
-                            >
-                              {tightnessForHunt.label}
-                            </Badge>
                           </div>
-                          <span className="flex shrink-0 items-center gap-1 text-xs text-ink-soft">
+                          <span className="flex shrink-0 items-center gap-1 text-[11px] text-ink-soft">
                             <Pencil className="h-3 w-3" />
                             Edit
                           </span>
@@ -379,20 +380,21 @@ export function HuntBuilderScreen() {
         />
 
         {/* Purchased watches */}
-        <section className="space-y-4 rounded-sm border border-line-strong bg-card p-6">
-          <h2 className="font-display text-xl font-medium text-ink">Purchased watches</h2>
+        <section className="space-y-2 rounded-sm border border-line-strong bg-card px-3 py-2.5">
+          <h2 className="font-display text-lg font-medium text-ink">Purchased watches</h2>
           <div className="flex gap-2">
             <Input
               value={purchaseUrl}
               onChange={(e) => setPurchaseUrl(e.target.value)}
               placeholder="Paste listing URL"
+              className="h-9 text-sm"
               onKeyDown={(e) => e.key === "Enter" && addPurchase()}
             />
-            <Button variant="outline" onClick={addPurchase}>
+            <Button variant="outline" size="sm" className="h-9 shrink-0" onClick={addPurchase}>
               Add
             </Button>
           </div>
-          <ul className="space-y-3">
+          <ul className="space-y-1.5">
             {purchasedWatches.map((p) => (
               <PurchasedWatchRow
                 key={p.id}
