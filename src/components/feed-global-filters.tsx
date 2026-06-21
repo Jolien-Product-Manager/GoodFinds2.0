@@ -116,11 +116,6 @@ export function FeedGlobalFilters({
           <CollapsibleTrigger className="flex min-w-0 flex-1 items-center justify-between gap-2 py-0.5 text-left transition-colors">
             <span className={filterSectionLabelClassName()}>Condition</span>
             <span className="flex shrink-0 items-center gap-1.5">
-              {hasCustomConditions && (
-                <span className="rounded-sm border border-brass/30 bg-brass/15 px-1.5 py-0.5 font-mono text-[10px] tabular-nums text-ink">
-                  {allowedConditions.length}
-                </span>
-              )}
               <ChevronDown
                 className={cn(
                   "h-3.5 w-3.5 shrink-0 text-ink-soft transition-transform duration-200",
