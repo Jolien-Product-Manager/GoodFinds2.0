@@ -20,6 +20,10 @@ import {
 import type { AppListing } from "@/lib/listings/types";
 import type { HuntMatchResult } from "@/lib/listings/hunt-match";
 import {
+  matchQualityDotClass,
+  matchQualityFromResult,
+} from "@/lib/listings/hunt-match";
+import {
   listingDescriptionText,
   listingDetailRows,
   listingSourceLabel,
@@ -152,7 +156,7 @@ export function ListingDetailPanel({
   const costs = getTotalCost(listing, DEFAULT_CRITERIA.postalCode);
   const rows = listingDetailRows(listing);
   const description = listingDescriptionText(listing);
-  const matchScore = match && match.score > 0 ? match.score : null;
+  const matchQuality = match ? matchQualityFromResult(match) : null;
   const metaLine = [listing.features.era, listing.year].filter(Boolean).join(" · ");
 
   useEffect(() => {
@@ -244,10 +248,15 @@ export function ListingDetailPanel({
               <span className="rounded-full bg-card/10 px-2 py-0.5 text-card/80">
                 {listing.condition}
               </span>
-              {matchScore != null && (
+              {matchQuality != null && (
                 <span className="inline-flex items-center gap-1 rounded-full bg-steal/20 px-2 py-0.5 text-card">
-                  <span className="h-1.5 w-1.5 rounded-full bg-brass" />
-                  Match {Math.round(matchScore * 10)}
+                  <span
+                    className={cn(
+                      "h-1.5 w-1.5 rounded-full",
+                      matchQualityDotClass(matchQuality.level)
+                    )}
+                  />
+                  {matchQuality.label}
                 </span>
               )}
             </div>

@@ -9,6 +9,7 @@ import {
   normalizePurchasedWatch,
 } from "@/lib/hunts/purchased-watch";
 import type { PurchasedWatch } from "@/lib/hunts/types";
+import { DEFAULT_ALLOWED_CONDITIONS, normalizeAllowedConditions } from "@/lib/listings/condition-filter";
 
 export { isPersistedStateEmpty };
 
@@ -22,6 +23,21 @@ function mergeWithDefaults(raw: unknown): PersistedState {
       normalizePurchasedWatch(watch as PurchasedWatch)
     )
   );
+  merged.globalFilters = {
+    ...DEFAULT_PERSISTED_STATE.globalFilters,
+    ...merged.globalFilters,
+    allowedConditions: normalizeAllowedConditions(
+      merged.globalFilters?.allowedConditions,
+      merged.criteria?.excludeForParts
+    ),
+  };
+  merged.criteria = {
+    ...merged.criteria,
+    allowedConditions: merged.globalFilters.allowedConditions,
+    excludeForParts: !merged.globalFilters.allowedConditions.includes(
+      "For parts / project"
+    ),
+  };
   return merged;
 }
 

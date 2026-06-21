@@ -13,6 +13,7 @@ import {
   type FeedQueryBody,
 } from "@/lib/listings/feed-api";
 import { getCachedListings, invalidateListingsCache } from "@/lib/listings/listings-index";
+import { DEFAULT_ALLOWED_CONDITIONS } from "@/lib/listings/condition-filter";
 import {
   alertListings,
   alertSort,
@@ -115,6 +116,7 @@ async function buildFeedSnapshot(body: FeedQueryBody): Promise<FeedSnapshot> {
     priceCeiling: 50,
     shipsToMe: true,
     postalCode: "M6K1V8",
+    allowedConditions: DEFAULT_ALLOWED_CONDITIONS,
   });
   const display = displayListingsForView(listings, body, ctx, matchResults);
   return { listings, ctx, matchResults, display };

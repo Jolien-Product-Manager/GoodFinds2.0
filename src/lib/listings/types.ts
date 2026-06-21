@@ -66,6 +66,7 @@ export interface CriteriaSettings {
   region: string;
   postalCode: string;
   excludeForParts: boolean;
+  allowedConditions?: ConditionGrade[];
 }
 
 export interface ListingStatus {

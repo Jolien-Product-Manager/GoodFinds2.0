@@ -1,4 +1,5 @@
 import type { AppListing, CriteriaSettings } from "@/lib/listings/types";
+import { passesConditionFilter } from "@/lib/listings/condition-filter";
 
 function hashString(input: string): number {
   let hash = 0;
@@ -34,7 +35,14 @@ export function passesCriteria(
   listing: AppListing,
   criteria: CriteriaSettings
 ): boolean {
-  if (criteria.excludeForParts && listing.condition === "For parts / project") {
+  if (criteria.allowedConditions?.length) {
+    if (!passesConditionFilter(listing.condition, criteria.allowedConditions)) {
+      return false;
+    }
+  } else if (
+    criteria.excludeForParts &&
+    listing.condition === "For parts / project"
+  ) {
     return false;
   }
 

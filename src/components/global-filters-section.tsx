@@ -4,6 +4,10 @@ import type { ReactNode } from "react";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import type { GlobalFilters } from "@/lib/hunts/types";
+import {
+  CONDITION_FILTER_OPTIONS,
+  toggleAllowedCondition,
+} from "@/lib/listings/condition-filter";
 import { cn } from "@/lib/utils";
 
 interface GlobalFiltersSectionProps {
@@ -36,6 +40,8 @@ export function GlobalFiltersSection({
   onChange,
   className,
 }: GlobalFiltersSectionProps) {
+  const allowedConditions = globalFilters.allowedConditions ?? [];
+
   return (
     <section className={cn("space-y-2", className)}>
       <header>
@@ -73,6 +79,46 @@ export function GlobalFiltersSection({
               />
               <span className="shrink-0 text-[11px] text-ink-soft">CAD</span>
             </div>
+          </div>
+        </FilterCard>
+
+        <FilterCard>
+          <div>
+            <p className="font-display text-base font-medium leading-tight text-ink">
+              Condition
+            </p>
+            <p className="mt-0.5 text-xs italic leading-snug text-ink-soft">
+              Only show listings in conditions you&apos;re okay with
+            </p>
+          </div>
+          <div className="mt-2 flex flex-wrap gap-1.5 border-t border-line pt-2">
+            {CONDITION_FILTER_OPTIONS.map((option) => {
+              const selected = allowedConditions.includes(option.value);
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  title={option.hint}
+                  aria-pressed={selected}
+                  onClick={() =>
+                    onChange({
+                      allowedConditions: toggleAllowedCondition(
+                        allowedConditions,
+                        option.value
+                      ),
+                    })
+                  }
+                  className={cn(
+                    "rounded-full border px-2.5 py-1 text-xs font-medium transition-colors",
+                    selected
+                      ? "border-brass bg-brass/15 text-ink"
+                      : "border-line-strong bg-white text-ink-soft hover:border-line hover:text-ink"
+                  )}
+                >
+                  {option.label}
+                </button>
+              );
+            })}
           </div>
         </FilterCard>
 

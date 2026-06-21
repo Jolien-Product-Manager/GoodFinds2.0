@@ -14,7 +14,11 @@ import {
 import { Button } from "@/components/ui/button";
 import type { AppListing } from "@/lib/listings/types";
 import type { AttributeMatch, HuntMatchResult } from "@/lib/listings/hunt-match";
-import { characteristicDisplayLabel } from "@/lib/listings/hunt-match";
+import {
+  characteristicDisplayLabel,
+  matchQualityDotClass,
+  matchQualityFromResult,
+} from "@/lib/listings/hunt-match";
 import {
   listingDescriptionText,
   listingDetailRows,
@@ -373,7 +377,7 @@ export function AlertListingCard({
   const [flipped, setFlipped] = useState(false);
   const useDetailPanel = Boolean(onSelect);
   const costs = getTotalCost(listing, DEFAULT_CRITERIA.postalCode);
-  const matchScore = match && match.score > 0 ? match.score : null;
+  const matchQuality = match ? matchQualityFromResult(match) : null;
   const attributeMatches = match?.attributeMatches ?? [];
   const visibleAttributes = attributeMatches.filter(
     (m) => m.status === "hit" || m.status === "miss"
@@ -422,10 +426,15 @@ export function AlertListingCard({
               {listing.source}
             </span>
 
-            {matchScore != null && (
-              <span className="absolute right-3 top-3 inline-flex items-center gap-1.5 rounded-full border border-line bg-card/95 px-2.5 py-1 text-[11px] font-medium tabular-nums text-ink shadow-sm">
-                <span className="h-2 w-2 rounded-full bg-brass" />
-                Match Score: {Math.round(matchScore * 10)}
+            {matchQuality != null && (
+              <span className="absolute right-3 top-3 inline-flex items-center gap-1.5 rounded-full border border-line bg-card/95 px-2.5 py-1 text-[11px] font-medium text-ink shadow-sm">
+                <span
+                  className={cn(
+                    "h-2 w-2 rounded-full",
+                    matchQualityDotClass(matchQuality.level)
+                  )}
+                />
+                {matchQuality.label}
               </span>
             )}
           </div>
@@ -572,10 +581,15 @@ export function AlertListingCard({
                 {listing.source}
               </span>
 
-              {matchScore != null && (
-                <span className="absolute right-3 top-3 inline-flex items-center gap-1.5 rounded-full border border-line bg-card/95 px-2.5 py-1 text-[11px] font-medium tabular-nums text-ink shadow-sm">
-                  <span className="h-2 w-2 rounded-full bg-brass" />
-                  Match Score: {Math.round(matchScore * 10)}
+              {matchQuality != null && (
+                <span className="absolute right-3 top-3 inline-flex items-center gap-1.5 rounded-full border border-line bg-card/95 px-2.5 py-1 text-[11px] font-medium text-ink shadow-sm">
+                  <span
+                    className={cn(
+                      "h-2 w-2 rounded-full",
+                      matchQualityDotClass(matchQuality.level)
+                    )}
+                  />
+                  {matchQuality.label}
                 </span>
               )}
 

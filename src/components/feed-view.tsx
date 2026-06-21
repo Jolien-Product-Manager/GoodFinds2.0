@@ -19,7 +19,6 @@ import {
   isAttributeValueSelected,
   type AttrKey,
 } from "@/lib/hunts/types";
-import { cn } from "@/lib/utils";
 
 interface FeedViewProps {
   ebayEnabled: boolean;
@@ -565,40 +564,26 @@ export function FeedView({ ebayEnabled }: FeedViewProps) {
         </p>
       )}
 
-      <div
-        className={cn(
-          "grid min-h-0 grid-cols-1 items-start gap-6",
-          showDetailPanel
-            ? "xl:grid-cols-[minmax(0,1fr)_22rem_17.5rem]"
-            : "md:grid-cols-[minmax(0,1fr)_17.5rem] md:gap-8"
-        )}
-      >
-        <FeedSidebar
-          feedView={feedView}
-          alertScope={alertScope}
-          marketplaceFilter={marketplaceFilter}
-          feedAttributeFilters={feedAttributeFilters}
-          attributeLibrary={attributeLibrary}
-          counts={counts}
-          activeHunts={activeHunts}
-          onFeedViewChange={setFeedView}
-          onScopeChange={setAlertScope}
-          onMarketplaceChange={setMarketplaceFilter}
-          onToggleFeedAttributeFilter={toggleFeedAttributeFilter}
-          onAddFeedAttributeFilter={handleAddFeedAttributeFilter}
-          onClearFeedAttributeFilters={clearFeedAttributeFilters}
-          className={cn(
-            "md:col-start-2 md:row-start-1",
-            showDetailPanel && "xl:col-start-3"
-          )}
-        />
+      <div className="relative min-h-0">
+        <div className="grid min-h-0 grid-cols-1 items-start gap-6 md:grid-cols-[minmax(0,1fr)_17.5rem] md:gap-8">
+          <FeedSidebar
+            feedView={feedView}
+            alertScope={alertScope}
+            marketplaceFilter={marketplaceFilter}
+            feedAttributeFilters={feedAttributeFilters}
+            attributeLibrary={attributeLibrary}
+            counts={counts}
+            activeHunts={activeHunts}
+            onFeedViewChange={setFeedView}
+            onScopeChange={setAlertScope}
+            onMarketplaceChange={setMarketplaceFilter}
+            onToggleFeedAttributeFilter={toggleFeedAttributeFilter}
+            onAddFeedAttributeFilter={handleAddFeedAttributeFilter}
+            onClearFeedAttributeFilters={clearFeedAttributeFilters}
+            className="md:col-start-2 md:row-start-1"
+          />
 
-        <div
-          className={cn(
-            "relative min-w-0 space-y-4 md:col-start-1 md:row-start-1",
-            showDetailPanel && "xl:pr-0"
-          )}
-        >
+          <div className="relative min-w-0 space-y-4 md:col-start-1 md:row-start-1">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="font-mono-data text-sm text-ink-soft">
               <span className="mr-1.5 inline-block rounded-sm bg-paper px-1.5 py-0.5 font-medium text-ink">
@@ -672,6 +657,7 @@ export function FeedView({ ebayEnabled }: FeedViewProps) {
               )}
             </>
           )}
+          </div>
         </div>
 
         {showDetailPanel && detailListing && (
@@ -679,7 +665,7 @@ export function FeedView({ ebayEnabled }: FeedViewProps) {
             <button
               type="button"
               aria-label="Close listing details"
-              className="fixed inset-0 z-40 bg-ink/40 xl:hidden"
+              className="fixed inset-0 z-40 bg-ink/40 md:absolute md:bg-ink/20"
               onClick={handleCloseDetail}
             />
             <ListingDetailPanel
@@ -717,7 +703,7 @@ export function FeedView({ ebayEnabled }: FeedViewProps) {
                         }
                       : undefined
               }
-              className="fixed inset-y-0 right-0 z-50 w-full max-w-md xl:sticky xl:top-4 xl:col-start-2 xl:row-start-1 xl:z-0 xl:w-auto xl:max-w-none"
+              className="fixed inset-y-0 right-0 z-50 w-full max-w-md md:absolute md:top-0 md:h-full md:max-h-none md:w-[26rem] md:max-w-none md:rounded-none md:border-l md:border-line-strong md:shadow-2xl"
             />
           </>
         )}

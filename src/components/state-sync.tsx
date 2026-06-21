@@ -7,6 +7,7 @@ import { isPersistedStateEmpty, mergeAttributeLibraries, mergeAttributeHidden } 
 import { normalizeHunt, emptyHuntAttributes, type Hunt, type PurchasedWatch } from "@/lib/hunts/types";
 import { withInferredHuntCriteria } from "@/lib/hunts/domain-terms";
 import { normalizePurchasedWatch, mergeDefaultPurchasedWatches } from "@/lib/hunts/purchased-watch";
+import { normalizeAllowedConditions } from "@/lib/listings/condition-filter";
 import type { AlertScope } from "@/lib/listings/types";
 
 function migrateFeedView(raw: string | undefined): FeedView {
@@ -50,6 +51,19 @@ function applyPersistedState(
     (state.hunts ?? []).map((h) => withInferredHuntCriteria(normalizeHunt(h as Hunt))),
     state.modelHearts
   );
+  const globalFilters = {
+    ...useCasebackStore.getState().globalFilters,
+    ...(state.globalFilters ?? {}),
+    allowedConditions: normalizeAllowedConditions(
+      state.globalFilters?.allowedConditions,
+      state.criteria?.excludeForParts
+    ),
+  };
+  const criteria = {
+    ...(state.criteria ?? useCasebackStore.getState().criteria),
+    allowedConditions: globalFilters.allowedConditions,
+    excludeForParts: !globalFilters.allowedConditions.includes("For parts / project"),
+  };
   useCasebackStore.setState({
     seen: state.seen ?? [],
     listingStatus: state.listingStatus ?? {},
@@ -58,9 +72,9 @@ function applyPersistedState(
     feedView: migrateFeedView(state.feedView),
     hiddenListings: state.hiddenListings ?? [],
     dislikedModels: state.dislikedModels ?? [],
-    criteria: state.criteria ?? useCasebackStore.getState().criteria,
+    criteria,
     hunts,
-    globalFilters: state.globalFilters ?? useCasebackStore.getState().globalFilters,
+    globalFilters,
     purchasedWatches: mergeDefaultPurchasedWatches(
       (state.purchasedWatches ?? []).map((p) =>
         normalizePurchasedWatch(p as PurchasedWatch)

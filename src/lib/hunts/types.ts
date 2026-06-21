@@ -1,5 +1,6 @@
 import { TIMEX_MODELS } from "@/lib/models/catalog";
 import { migrateLegacyHuntAttributes } from "@/lib/hunts/migrate-attributes";
+import type { ConditionGrade } from "@/lib/listings/types";
 
 export type AttrKey =
   | "complications"
@@ -57,6 +58,7 @@ export interface GlobalFilters {
   priceCeiling: number | null;
   shipsToMe: boolean;
   postalCode: string | null;
+  allowedConditions: ConditionGrade[];
 }
 
 export interface PurchasedWatch {

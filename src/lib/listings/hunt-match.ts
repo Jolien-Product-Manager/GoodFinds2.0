@@ -412,6 +412,41 @@ function categoryPasses(
   return { passed: false, match: { key, label, status: "miss" } };
 }
 
+function formatOverlapList(labels: string[]): string {
+  if (labels.length === 0) return "";
+  if (labels.length === 1) return labels[0]!;
+  if (labels.length === 2) return `${labels[0]} and ${labels[1]}`;
+  return `${labels.slice(0, -1).join(", ")}, and ${labels.at(-1)}`;
+}
+
+function buildMatchWhyNote(
+  listing: AppListing,
+  matchedNames: string[],
+  huntContributions: HuntScoreContribution[],
+  bestMatches: AttributeMatch[]
+): string {
+  if (matchedNames.length === 0) {
+    return listing.model
+      ? `${listing.model} — no active hunt match yet`
+      : "Unverified model — still worth a look";
+  }
+
+  const topContribution = huntContributions[0];
+  let overlapLabels = topContribution?.matchedOn ?? [];
+
+  if (overlapLabels.length === 0) {
+    overlapLabels = bestMatches
+      .filter((match) => match.status === "hit")
+      .map((match) => characteristicDisplayLabel(match, listing));
+  }
+
+  if (overlapLabels.length === 0) {
+    return `Matches ${matchedNames[0]}`;
+  }
+
+  return `Matches ${matchedNames[0]} on ${formatOverlapList(overlapLabels)}`;
+}
+
 export function scoreListingAgainstHunt(
   listing: AppListing,
   hunt: Hunt
@@ -565,12 +600,12 @@ export function matchListingForHunts(
   const matchedIds = huntContributions.map((c) => c.huntId);
   const matchedNames = huntContributions.map((c) => c.huntName);
 
-  const whyNote =
-    matchedNames.length > 0
-      ? `Matches ${matchedNames[0]}${bestMatches.filter((m) => m.status === "hit").length ? " — taste overlap on key attributes" : ""}`
-      : listing.model
-        ? `${listing.model} — no active hunt match yet`
-        : "Unverified model — still worth a look";
+  const whyNote = buildMatchWhyNote(
+    listing,
+    matchedNames,
+    huntContributions,
+    bestMatches
+  );
 
   return {
     score: listingScore,
@@ -594,6 +629,50 @@ export function matchAllHunts(
   }
 
   return results;
+}
+
+export type MatchQualityLevel = "perfect" | "close" | "loose";
+
+export interface MatchQuality {
+  label: string;
+  level: MatchQualityLevel;
+}
+
+/** User-facing match tier from the top hunt contribution's category pass ratio. */
+export function matchQualityFromContribution(
+  contribution: HuntScoreContribution
+): MatchQuality | null {
+  const { categoriesPassed, totalCategories } = contribution;
+  if (categoriesPassed <= 0 || totalCategories <= 0) return null;
+
+  if (categoriesPassed >= totalCategories) {
+    return { label: "Perfect Match", level: "perfect" };
+  }
+
+  if (categoriesPassed / totalCategories > 0.5) {
+    return { label: "Close Match", level: "close" };
+  }
+
+  return { label: "Loose Match", level: "loose" };
+}
+
+export function matchQualityFromResult(
+  match: HuntMatchResult
+): MatchQuality | null {
+  const top = match.huntContributions[0];
+  if (!top) return null;
+  return matchQualityFromContribution(top);
+}
+
+export function matchQualityDotClass(level: MatchQualityLevel): string {
+  switch (level) {
+    case "perfect":
+      return "bg-ok";
+    case "close":
+      return "bg-brass";
+    case "loose":
+      return "bg-ink-soft";
+  }
 }
 
 export function formatHuntContributionBadge(contribution: HuntScoreContribution): string {

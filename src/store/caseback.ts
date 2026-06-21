@@ -1,4 +1,5 @@
 import { DEFAULT_CRITERIA } from "@/lib/criteria";
+import { DEFAULT_ALLOWED_CONDITIONS, normalizeAllowedConditions } from "@/lib/listings/condition-filter";
 import type {
   AlertScope,
   CriteriaSettings,
@@ -123,6 +124,7 @@ export const useCasebackStore = create<CasebackState>()(
         priceCeiling: 50,
         shipsToMe: true,
         postalCode: "M6K1V8",
+        allowedConditions: DEFAULT_ALLOWED_CONDITIONS,
       },
       purchasedWatches: [],
       attributeLibrary: {},
@@ -168,14 +170,17 @@ export const useCasebackStore = create<CasebackState>()(
       setGlobalFilters: (filters) =>
         set((s) => {
           const next = { ...s.globalFilters, ...filters };
+          const allowedConditions = next.allowedConditions ?? DEFAULT_ALLOWED_CONDITIONS;
           return {
-            globalFilters: next,
+            globalFilters: { ...next, allowedConditions },
             criteria: {
               ...s.criteria,
               maxTotalCost: next.priceCeiling,
               maxTotalCostEnabled: next.priceCeiling != null,
               shipsToMe: next.shipsToMe,
               postalCode: next.postalCode ?? s.criteria.postalCode,
+              allowedConditions,
+              excludeForParts: !allowedConditions.includes("For parts / project"),
             },
           };
         }),
@@ -268,6 +273,19 @@ export const useCasebackStore = create<CasebackState>()(
         if ((legacy.alertScope as string) === "top") {
           legacy.alertScope = "all";
         }
+        const allowedConditions = normalizeAllowedConditions(
+          legacy.globalFilters?.allowedConditions,
+          legacy.criteria?.excludeForParts
+        );
+        legacy.globalFilters = {
+          ...legacy.globalFilters,
+          allowedConditions,
+        };
+        legacy.criteria = {
+          ...legacy.criteria,
+          allowedConditions,
+          excludeForParts: !allowedConditions.includes("For parts / project"),
+        };
       },
     }
   )
