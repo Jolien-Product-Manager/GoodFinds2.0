@@ -16,6 +16,21 @@ import {
 const REVALIDATE_SECONDS = 3600;
 /** In-process cache — avoids duplicate fetches during dev hot reload. */
 const MEMORY_TTL_MS = 6 * 60 * 60 * 1000;
+const STRICT_MEMORY_TTL_MS = 24 * 60 * 60 * 1000;
+/** Pause between paginated Browse API requests during sync (production). */
+const DEFAULT_PAGE_DELAY_MS = 500;
+/** Retries for 429/503 with exponential backoff (respects Retry-After when present). */
+const DEFAULT_MAX_RETRIES = 3;
+const DEFAULT_RETRY_BASE_MS = 2000;
+/** Local dev / non-production: stay well under eBay Browse API quotas. */
+const STRICT_PAGE_DELAY_MS = 10_000;
+const STRICT_MIN_REQUEST_GAP_MS = 8_000;
+const STRICT_MAX_RETRIES = 1;
+const STRICT_RETRY_BASE_MS = 60_000;
+/** Tiny sample on dev page loads (even with EBAY_FORCE_REFRESH=1). */
+const STRICT_LIVE_FETCH_LIMIT = 25;
+/** One small page for manual sync in dev unless EBAY_SEARCH_LIMIT is set. */
+const STRICT_SYNC_LIMIT = 50;
 
 interface TokenCache {
   token: string;
@@ -25,6 +40,7 @@ interface TokenCache {
 let tokenCache: TokenCache | null = null;
 let memoryCache: { listings: EbayItemSummary[]; fetchedAt: number } | null = null;
 let inFlightFetch: Promise<EbayItemSummary[]> | null = null;
+let lastEbayApiRequestAt = 0;
 
 function getEbayConfig() {
   const clientId = process.env.EBAY_CLIENT_ID;
@@ -44,13 +60,69 @@ function getEbayConfig() {
   return { clientId, clientSecret, marketplaceId, baseUrl };
 }
 
+function forceRefreshRequested(): boolean {
+  return process.env.EBAY_FORCE_REFRESH === "1";
+}
+
+function isManualSyncRun(): boolean {
+  return process.env.EBAY_SYNC === "1";
+}
+
+/** True for local dev, sync scripts, and preview — not production deploys. */
+function useStrictEbayRateLimits(): boolean {
+  const mode = process.env.EBAY_RATE_LIMIT_MODE?.trim().toLowerCase();
+  if (mode === "strict") return true;
+  if (mode === "production") return false;
+  return process.env.NODE_ENV !== "production";
+}
+
+function resolvePageDelayMs(): number {
+  const raw = process.env.EBAY_PAGE_DELAY_MS;
+  if (raw) {
+    const n = Number(raw);
+    if (Number.isFinite(n) && n >= 0) return Math.floor(n);
+  }
+  return useStrictEbayRateLimits() ? STRICT_PAGE_DELAY_MS : DEFAULT_PAGE_DELAY_MS;
+}
+
+function resolveMaxRetries(): number {
+  const raw = process.env.EBAY_MAX_RETRIES;
+  if (raw) {
+    const n = Number(raw);
+    if (Number.isFinite(n) && n >= 0) return Math.floor(n);
+  }
+  return useStrictEbayRateLimits() ? STRICT_MAX_RETRIES : DEFAULT_MAX_RETRIES;
+}
+
+function resolveRetryBaseMs(): number {
+  const raw = process.env.EBAY_RETRY_BASE_MS;
+  if (raw) {
+    const n = Number(raw);
+    if (Number.isFinite(n) && n > 0) return Math.floor(n);
+  }
+  return useStrictEbayRateLimits() ? STRICT_RETRY_BASE_MS : DEFAULT_RETRY_BASE_MS;
+}
+
+function resolveMinRequestGapMs(): number {
+  const raw = process.env.EBAY_MIN_REQUEST_GAP_MS;
+  if (raw) {
+    const n = Number(raw);
+    if (Number.isFinite(n) && n >= 0) return Math.floor(n);
+  }
+  return useStrictEbayRateLimits() ? STRICT_MIN_REQUEST_GAP_MS : 0;
+}
+
+function resolveMemoryTtlMs(): number {
+  return useStrictEbayRateLimits() ? STRICT_MEMORY_TTL_MS : MEMORY_TTL_MS;
+}
+
 function resolveSearchLimit(): number {
   const raw = process.env.EBAY_SEARCH_LIMIT;
   if (raw) {
     const n = Number(raw);
     if (Number.isFinite(n) && n > 0) return Math.floor(n);
   }
-  return EBAY_SEARCH_LIMIT;
+  return useStrictEbayRateLimits() ? STRICT_SYNC_LIMIT : EBAY_SEARCH_LIMIT;
 }
 
 /** Live page-load fetch: one page by default. Full pagination is for manual sync only. */
@@ -60,11 +132,45 @@ function resolveLiveFetchLimit(): number {
     const n = Number(raw);
     if (Number.isFinite(n) && n > 0) return Math.min(Math.floor(n), EBAY_PAGE_SIZE);
   }
+  if (useStrictEbayRateLimits()) {
+    return Math.min(STRICT_LIVE_FETCH_LIMIT, EBAY_PAGE_SIZE);
+  }
   return EBAY_PAGE_SIZE;
 }
 
-function forceRefreshRequested(): boolean {
-  return process.env.EBAY_FORCE_REFRESH === "1";
+function resolveFetchLimit(): number {
+  if (!forceRefreshRequested()) return resolveLiveFetchLimit();
+  return isManualSyncRun() ? resolveSearchLimit() : resolveLiveFetchLimit();
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function throttleEbayApiCall(): Promise<void> {
+  const minGapMs = resolveMinRequestGapMs();
+  if (minGapMs <= 0) return;
+
+  const waitMs = lastEbayApiRequestAt + minGapMs - Date.now();
+  if (waitMs > 0) {
+    console.info(`eBay throttle: waiting ${waitMs}ms before next API call`);
+    await sleep(waitMs);
+  }
+  lastEbayApiRequestAt = Date.now();
+}
+
+function retryAfterMs(res: Response): number | null {
+  const header = res.headers.get("Retry-After");
+  if (!header) return null;
+  const seconds = Number(header);
+  if (Number.isFinite(seconds) && seconds > 0) return seconds * 1000;
+  const date = Date.parse(header);
+  if (!Number.isNaN(date)) return Math.max(0, date - Date.now());
+  return null;
+}
+
+function isRetryableEbayStatus(status: number): boolean {
+  return status === 429 || status === 503;
 }
 
 async function getAccessToken(config: NonNullable<ReturnType<typeof getEbayConfig>>): Promise<string> {
@@ -73,6 +179,7 @@ async function getAccessToken(config: NonNullable<ReturnType<typeof getEbayConfi
     return tokenCache.token;
   }
 
+  await throttleEbayApiCall();
   const credentials = Buffer.from(`${config.clientId}:${config.clientSecret}`).toString("base64");
   const res = await fetch(`${config.baseUrl}/identity/v1/oauth2/token`, {
     method: "POST",
@@ -99,12 +206,12 @@ async function getAccessToken(config: NonNullable<ReturnType<typeof getEbayConfi
   return data.access_token;
 }
 
-async function fetchEbaySearchPage(
+async function fetchEbaySearchPageOnce(
   config: NonNullable<ReturnType<typeof getEbayConfig>>,
   token: string,
   offset: number,
   limit: number
-): Promise<{ items: EbayItemSummary[]; rateLimited: boolean }> {
+): Promise<Response> {
   const aspectFilter = `categoryId:${EBAY_WRISTWATCH_CATEGORY_ID},Brand:{${EBAY_BRAND}}`;
   const params = new URLSearchParams({
     q: EBAY_DEFAULT_QUERY,
@@ -115,31 +222,53 @@ async function fetchEbaySearchPage(
     sort: "newlyListed",
   });
 
-  const res = await fetch(
-    `${config.baseUrl}/buy/browse/v1/item_summary/search?${params}`,
-    {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "X-EBAY-C-MARKETPLACE-ID": config.marketplaceId,
-        Accept: "application/json",
-      },
-      cache: "no-store",
-    }
-  );
+  return fetch(`${config.baseUrl}/buy/browse/v1/item_summary/search?${params}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "X-EBAY-C-MARKETPLACE-ID": config.marketplaceId,
+      Accept: "application/json",
+    },
+    cache: "no-store",
+  });
+}
 
-  if (!res.ok) {
+async function fetchEbaySearchPage(
+  config: NonNullable<ReturnType<typeof getEbayConfig>>,
+  token: string,
+  offset: number,
+  limit: number
+): Promise<{ items: EbayItemSummary[]; rateLimited: boolean }> {
+  const maxRetries = resolveMaxRetries();
+  let attempt = 0;
+
+  while (true) {
+    await throttleEbayApiCall();
+    const res = await fetchEbaySearchPageOnce(config, token, offset, limit);
+
+    if (res.ok) {
+      const json = await res.json();
+      const parsed = ebaySearchResponseSchema.safeParse(json);
+      if (!parsed.success) {
+        console.warn("eBay response validation failed:", parsed.error.message);
+        return { items: [], rateLimited: false };
+      }
+      return { items: parsed.data.itemSummaries ?? [], rateLimited: false };
+    }
+
+    if (isRetryableEbayStatus(res.status) && attempt < maxRetries) {
+      const waitMs =
+        retryAfterMs(res) ?? resolveRetryBaseMs() * 2 ** attempt;
+      console.warn(
+        `eBay search ${res.status} at offset ${offset}, retry ${attempt + 1}/${maxRetries} in ${waitMs}ms`
+      );
+      await sleep(waitMs);
+      attempt += 1;
+      continue;
+    }
+
     console.warn("eBay search failed:", res.status, "offset", offset);
     return { items: [], rateLimited: res.status === 429 };
   }
-
-  const json = await res.json();
-  const parsed = ebaySearchResponseSchema.safeParse(json);
-  if (!parsed.success) {
-    console.warn("eBay response validation failed:", parsed.error.message);
-    return { items: [], rateLimited: false };
-  }
-
-  return { items: parsed.data.itemSummaries ?? [], rateLimited: false };
 }
 
 async function fetchEbayListingsFromApi(
@@ -147,6 +276,7 @@ async function fetchEbayListingsFromApi(
   maxResults: number
 ): Promise<EbayItemSummary[]> {
   const token = await getAccessToken(config);
+  const pageDelayMs = resolvePageDelayMs();
   const results: EbayItemSummary[] = [];
   let offset = 0;
 
@@ -160,6 +290,9 @@ async function fetchEbayListingsFromApi(
     results.push(...items);
     offset += items.length;
     if (items.length < pageSize) break;
+    if (results.length < maxResults && pageDelayMs > 0) {
+      await sleep(pageDelayMs);
+    }
   }
 
   return results;
@@ -167,7 +300,7 @@ async function fetchEbayListingsFromApi(
 
 function useMemoryCache(): EbayItemSummary[] | null {
   if (!memoryCache) return null;
-  if (Date.now() - memoryCache.fetchedAt > MEMORY_TTL_MS) return null;
+  if (Date.now() - memoryCache.fetchedAt > resolveMemoryTtlMs()) return null;
   return memoryCache.listings;
 }
 
@@ -211,9 +344,19 @@ async function fetchEbayListingsInternal(): Promise<EbayItemSummary[]> {
     return [];
   }
 
-  const fetchLimit = forceRefreshRequested()
-    ? resolveSearchLimit()
-    : resolveLiveFetchLimit();
+  const fetchLimit = resolveFetchLimit();
+  const pageDelayMs = resolvePageDelayMs();
+  const minGapMs = resolveMinRequestGapMs();
+
+  if (forceRefreshRequested() && useStrictEbayRateLimits()) {
+    console.warn(
+      "eBay strict dev limits active — prefer disk snapshot; live calls are capped heavily."
+    );
+    console.info(
+      `eBay strict rate limits: max ${fetchLimit} listings, ${pageDelayMs}ms between pages, ${minGapMs}ms min gap between API calls` +
+        (isManualSyncRun() ? " (sync)" : " (live fetch)")
+    );
+  }
 
   try {
     const fresh = await fetchEbayListingsFromApi(config, fetchLimit);

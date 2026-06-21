@@ -18,8 +18,9 @@ function loadEnvLocal() {
 loadEnvLocal();
 
 async function main() {
-  // Manual sync: paginate up to EBAY_SEARCH_LIMIT (default 2000).
+  // Manual sync: paginate up to EBAY_SEARCH_LIMIT (default 2000 in production).
   process.env.EBAY_FORCE_REFRESH = "1";
+  process.env.EBAY_SYNC = "1";
   const listings = await fetchEbayListings();
   console.log(`Fetched ${listings.length} eBay listings`);
 }
