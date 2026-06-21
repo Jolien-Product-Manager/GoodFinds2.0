@@ -279,7 +279,7 @@ function FeedFilterCategory({
           />
         </span>
       </CollapsibleTrigger>
-      <CollapsibleContent className="pt-0.5 data-[state=closed]:overflow-hidden data-[state=open]:overflow-visible">
+      <CollapsibleContent className="pt-0.5 data-[state=closed]:overflow-hidden">
         <div className="flex flex-col gap-0.5 pb-1">
           {filteredOptions.length === 0 ? (
             <p className="px-2 py-1 text-xs text-ink-soft">No matches</p>
@@ -494,7 +494,7 @@ export function FeedAttributeFilters({
           </button>
         )}
       </div>
-      <CollapsibleContent className="space-y-1 pt-1.5 data-[state=closed]:overflow-hidden data-[state=open]:overflow-visible data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0">
+      <CollapsibleContent className="space-y-1 pt-1.5 data-[state=closed]:overflow-hidden data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0">
         <FilterSearchBar
           value={sectionQuery}
           onChange={setSectionQuery}

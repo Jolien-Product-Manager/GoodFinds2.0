@@ -675,6 +675,18 @@ export function matchQualityDotClass(level: MatchQualityLevel): string {
   }
 }
 
+/** Subtle listing-card tint — strongest for perfect, fading for close and loose. */
+export function matchQualityCardHighlightClass(level: MatchQualityLevel): string {
+  switch (level) {
+    case "perfect":
+      return "bg-ok/[0.09] border-ok/35";
+    case "close":
+      return "bg-brass/[0.05] border-brass/22";
+    case "loose":
+      return "bg-ink/[0.02] border-line";
+  }
+}
+
 export function formatHuntContributionBadge(contribution: HuntScoreContribution): string {
   return `${contribution.huntName} — ${contribution.categoriesPassed}/${contribution.totalCategories} (${contribution.hearts} hearts)`;
 }

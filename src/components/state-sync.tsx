@@ -38,6 +38,7 @@ function pickPersistedState(): PersistedState {
     criteria: s.criteria,
     hunts: s.hunts,
     globalFilters: s.globalFilters,
+    savedGlobalFilters: s.savedGlobalFilters,
     purchasedWatches: s.purchasedWatches,
     attributeLibrary: s.attributeLibrary ?? {},
     attributeHidden: s.attributeHidden ?? {},
@@ -65,6 +66,14 @@ function applyPersistedState(
     allowedConditions: globalFilters.allowedConditions,
     excludeForParts: !globalFilters.allowedConditions.includes("For parts / project"),
   };
+  const savedGlobalFilters = {
+    ...globalFilters,
+    ...(state.savedGlobalFilters ?? {}),
+    allowedConditions: normalizeAllowedConditions(
+      state.savedGlobalFilters?.allowedConditions ?? globalFilters.allowedConditions,
+      state.criteria?.excludeForParts
+    ),
+  };
   const hasDismissedField = state.dismissed != null;
   useCasebackStore.setState({
     seen: hasDismissedField ? (state.seen ?? []) : [],
@@ -78,6 +87,7 @@ function applyPersistedState(
     criteria,
     hunts,
     globalFilters,
+    savedGlobalFilters,
     purchasedWatches: mergeDefaultPurchasedWatches(
       (state.purchasedWatches ?? []).map((p) =>
         normalizePurchasedWatch(p as PurchasedWatch)

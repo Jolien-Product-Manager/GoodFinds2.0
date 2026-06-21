@@ -1,6 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import {
+  useCallback,
+  useRef,
+  useState,
+  type CSSProperties,
+  type MouseEvent,
+  type PointerEvent,
+  type ReactNode,
+} from "react";
 import {
   Check,
   ChevronLeft,
@@ -13,11 +21,13 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { AppListing } from "@/lib/listings/types";
-import type { AttributeMatch, HuntMatchResult } from "@/lib/listings/hunt-match";
+import type { AttributeMatch, HuntMatchResult, HuntScoreContribution } from "@/lib/listings/hunt-match";
 import {
   characteristicDisplayLabel,
   matchQualityDotClass,
+  matchQualityCardHighlightClass,
   matchQualityFromResult,
+  type MatchQuality,
 } from "@/lib/listings/hunt-match";
 import {
   listingDescriptionText,
@@ -33,6 +43,19 @@ function attributeTagLabel(match: AttributeMatch, listing: AppListing): string {
   const label = characteristicDisplayLabel(match, listing);
   if (match.status === "unverified") return `${label}?`;
   return label;
+}
+
+function NewListingTab() {
+  return (
+    <div
+      className="pointer-events-none absolute left-0 top-0 z-30 -translate-y-1/2"
+      aria-label="New listing"
+    >
+      <span className="inline-flex rounded-t-[6px] border border-ok/40 border-b-0 bg-ok px-3.5 py-1 font-mono text-[9px] font-semibold uppercase tracking-[0.14em] text-card shadow-[0_2px_8px_rgba(47,72,47,0.25)]">
+        New
+      </span>
+    </div>
+  );
 }
 
 function CardFlipButton({
@@ -94,6 +117,228 @@ function ListingHeartButton({
         strokeWidth={interested ? 2.25 : 2}
       />
     </button>
+  );
+}
+
+function ListingDismissButton({
+  onDismiss,
+  className,
+}: {
+  onDismiss: () => void;
+  className?: string;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label="Dismiss listing"
+      onClick={(e) => {
+        e.stopPropagation();
+        onDismiss();
+      }}
+      className={cn(
+        "flex h-8 w-8 items-center justify-center rounded-full bg-ink/55 text-card shadow-sm transition-colors hover:bg-ink/75 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-steal",
+        className
+      )}
+    >
+      <X className="h-4 w-4" strokeWidth={2} />
+    </button>
+  );
+}
+
+function ListingRestoreButton({
+  onRestore,
+  className,
+}: {
+  onRestore: () => void;
+  className?: string;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label="Restore listing"
+      onClick={(e) => {
+        e.stopPropagation();
+        onRestore();
+      }}
+      className={cn(
+        "flex h-8 w-8 items-center justify-center rounded-full bg-ink/55 text-card shadow-sm transition-colors hover:bg-ink/75 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-steal",
+        className
+      )}
+    >
+      <Check className="h-4 w-4" strokeWidth={2} />
+    </button>
+  );
+}
+
+const SWIPE_DISMISS_THRESHOLD = 72;
+
+function useSwipeToDismiss(onDismiss?: () => void) {
+  const [offsetX, setOffsetX] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const startRef = useRef<{ x: number; y: number } | null>(null);
+  const axisLockedRef = useRef<"horizontal" | "vertical" | null>(null);
+  const offsetXRef = useRef(0);
+  const didSwipeRef = useRef(false);
+  const dismissingRef = useRef(false);
+
+  offsetXRef.current = offsetX;
+
+  const reset = useCallback(() => {
+    startRef.current = null;
+    axisLockedRef.current = null;
+    setIsDragging(false);
+    if (!dismissingRef.current) {
+      setOffsetX(0);
+    }
+  }, []);
+
+  const handlePointerDown = useCallback(
+    (event: PointerEvent<HTMLElement>) => {
+      if (!onDismiss || dismissingRef.current) return;
+      if (event.pointerType === "mouse" && event.button !== 0) return;
+      if ((event.target as HTMLElement).closest("button, a")) return;
+
+      startRef.current = { x: event.clientX, y: event.clientY };
+      axisLockedRef.current = null;
+      didSwipeRef.current = false;
+      setIsDragging(true);
+      event.currentTarget.setPointerCapture(event.pointerId);
+    },
+    [onDismiss]
+  );
+
+  const handlePointerMove = useCallback(
+    (event: PointerEvent<HTMLElement>) => {
+      if (!onDismiss || !startRef.current || dismissingRef.current) return;
+
+      const dx = event.clientX - startRef.current.x;
+      const dy = event.clientY - startRef.current.y;
+
+      if (!axisLockedRef.current) {
+        if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+        axisLockedRef.current = Math.abs(dx) > Math.abs(dy) ? "horizontal" : "vertical";
+        if (axisLockedRef.current === "vertical") {
+          startRef.current = null;
+          setIsDragging(false);
+          return;
+        }
+      }
+
+      if (axisLockedRef.current === "horizontal") {
+        event.preventDefault();
+        const next = Math.min(0, dx);
+        offsetXRef.current = next;
+        setOffsetX(next);
+        if (Math.abs(next) > 10) didSwipeRef.current = true;
+      }
+    },
+    [onDismiss]
+  );
+
+  const handlePointerUp = useCallback(
+    (event: PointerEvent<HTMLElement>) => {
+      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+        event.currentTarget.releasePointerCapture(event.pointerId);
+      }
+
+      if (!startRef.current || axisLockedRef.current !== "horizontal") {
+        reset();
+        return;
+      }
+
+      if (offsetXRef.current <= -SWIPE_DISMISS_THRESHOLD && onDismiss) {
+        dismissingRef.current = true;
+        didSwipeRef.current = true;
+        setOffsetX(-120);
+        window.setTimeout(() => onDismiss(), 180);
+        return;
+      }
+
+      reset();
+    },
+    [onDismiss, reset]
+  );
+
+  const handleClickCapture = useCallback((event: MouseEvent) => {
+    if (didSwipeRef.current) {
+      event.preventDefault();
+      event.stopPropagation();
+      didSwipeRef.current = false;
+    }
+  }, []);
+
+  const swipeStyle: CSSProperties | undefined = onDismiss
+    ? {
+        transform: offsetX !== 0 ? `translateX(${offsetX}px)` : undefined,
+        opacity: offsetX < 0 ? Math.max(0.35, 1 + offsetX / 200) : undefined,
+        transition: isDragging ? "none" : "transform 0.18s ease, opacity 0.18s ease",
+      }
+    : undefined;
+
+  const swipeHandlers = onDismiss
+    ? {
+        onPointerDown: handlePointerDown,
+        onPointerMove: handlePointerMove,
+        onPointerUp: handlePointerUp,
+        onPointerCancel: reset,
+        onClickCapture: handleClickCapture,
+      }
+    : {};
+
+  return {
+    swipeHandlers,
+    swipeStyle,
+    touchAction: onDismiss ? ("pan-y" as const) : undefined,
+  };
+}
+
+function ListingPhotoArea({
+  listing,
+  interested,
+  isNew,
+  onToggleInterested,
+  onDismiss,
+  onRestore,
+  extraControls,
+}: {
+  listing: AppListing;
+  interested?: boolean;
+  isNew?: boolean;
+  onToggleInterested?: () => void;
+  onDismiss?: () => void;
+  onRestore?: () => void;
+  extraControls?: ReactNode;
+}) {
+  const overlayTop = isNew ? "top-6" : "top-3";
+
+  return (
+    <div className="relative aspect-[4/3] w-full shrink-0 overflow-hidden bg-[#c9b896]/20">
+      <ListingPhotoCarousel listing={listing} />
+
+      {onToggleInterested && (
+        <ListingHeartButton
+          interested={interested ?? false}
+          onToggle={onToggleInterested}
+          className={cn("absolute left-3 z-10", overlayTop)}
+        />
+      )}
+
+      {onDismiss && (
+        <ListingDismissButton
+          onDismiss={onDismiss}
+          className={cn("absolute right-3 z-10", overlayTop)}
+        />
+      )}
+
+      {onRestore && (
+        <ListingRestoreButton
+          onRestore={onRestore}
+          className={cn("absolute right-3 z-10", overlayTop)}
+        />
+      )}
+
+      {extraControls}
+    </div>
   );
 }
 
@@ -350,6 +595,79 @@ function AttributeTag({
   );
 }
 
+function MatchQualityBadge({
+  matchQuality,
+  compact,
+}: {
+  matchQuality: MatchQuality;
+  compact?: boolean;
+}) {
+  return (
+    <span
+      className={cn(
+        "inline-flex shrink-0 items-center gap-1.5 rounded-full border border-line bg-card/95 px-2 py-0.5 font-medium text-ink shadow-sm",
+        compact ? "text-[10px]" : "text-[11px]"
+      )}
+    >
+      <span
+        className={cn("h-1.5 w-1.5 rounded-full", matchQualityDotClass(matchQuality.level))}
+      />
+      {matchQuality.label}
+    </span>
+  );
+}
+
+function HuntMatchBlock({
+  contributions,
+  listing,
+  matchQuality,
+  compact,
+}: {
+  contributions: HuntScoreContribution[];
+  listing: AppListing;
+  matchQuality: MatchQuality | null;
+  compact?: boolean;
+}) {
+  return (
+    <div className={cn("space-y-2", compact ? "text-[11px]" : "text-xs")}>
+      <div className="flex items-center justify-between gap-2">
+        <p
+          className={cn(
+            "font-mono uppercase tracking-wide text-brass",
+            compact ? "text-[9px]" : "text-[10px]"
+          )}
+        >
+          Hunt Match
+        </p>
+        {matchQuality != null && (
+          <MatchQualityBadge matchQuality={matchQuality} compact={compact} />
+        )}
+      </div>
+
+      {contributions.map((contribution) => {
+        const chips =
+          contribution.attributeMatches.length > 0 ? contribution.attributeMatches : null;
+        const fallbackLabels =
+          chips == null && contribution.matchedOn.length > 0 ? contribution.matchedOn : null;
+
+        return (
+          <div key={contribution.huntId} className="flex items-start justify-between gap-2">
+            <p className="min-w-0 shrink-0 font-medium leading-snug text-ink">
+              {contribution.huntName}
+            </p>
+            <HuntContributionChips
+              contribution={contribution}
+              listing={listing}
+              chips={chips}
+              fallbackLabels={fallbackLabels}
+            />
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 interface AlertListingCardProps {
   listing: AppListing;
   match?: HuntMatchResult;
@@ -388,6 +706,9 @@ export function AlertListingCard({
   const huntContributions = match?.huntContributions ?? [];
   const showStandaloneAttributeRow =
     visibleAttributes.length > 0 && huntContributions.length === 0;
+  const showMatchSection =
+    showStandaloneAttributeRow || huntContributions.length > 0;
+  const { swipeHandlers, swipeStyle, touchAction } = useSwipeToDismiss(onDismiss);
 
   return (
     <article
@@ -404,47 +725,29 @@ export function AlertListingCard({
             }
           : undefined
       }
+      style={{ ...swipeStyle, touchAction }}
+      {...swipeHandlers}
       className={cn(
-        "overflow-hidden rounded-lg border border-line bg-card shadow-sm transition-colors",
+        "relative rounded-lg border border-line bg-card shadow-sm transition-colors",
         muted && "opacity-60",
+        !interested && matchQuality && matchQualityCardHighlightClass(matchQuality.level),
         interested && "border-steal/35 bg-steal/[0.04]",
         onSelect && "cursor-pointer transition-shadow hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-steal",
         selected && "ring-2 ring-steal/70 ring-offset-2 ring-offset-paper"
       )}
     >
+      {isNew && <NewListingTab />}
+      <div className="overflow-hidden rounded-lg">
       {useDetailPanel ? (
         <div className="flex flex-col">
-          {isNew && (
-            <div className="border-b border-line px-3 py-0.5">
-              <span className="font-mono text-[9px] font-medium uppercase tracking-wide text-ok">
-                New
-              </span>
-            </div>
-          )}
-
-          <div className="relative aspect-[4/3] w-full shrink-0 overflow-hidden bg-[#c9b896]/20">
-            <ListingPhotoCarousel listing={listing} />
-
-            {onToggleInterested && (
-              <ListingHeartButton
-                interested={interested}
-                onToggle={onToggleInterested}
-                className="absolute left-3 top-3 z-10"
-              />
-            )}
-
-            {matchQuality != null && (
-              <span className="absolute right-3 top-3 inline-flex items-center gap-1.5 rounded-full border border-line bg-card/95 px-2.5 py-1 text-[11px] font-medium text-ink shadow-sm">
-                <span
-                  className={cn(
-                    "h-2 w-2 rounded-full",
-                    matchQualityDotClass(matchQuality.level)
-                  )}
-                />
-                {matchQuality.label}
-              </span>
-            )}
-          </div>
+          <ListingPhotoArea
+            listing={listing}
+            interested={interested}
+            isNew={isNew}
+            onToggleInterested={onToggleInterested}
+            onDismiss={onDismiss}
+            onRestore={onRestore}
+          />
 
           <div className={cn("flex flex-1 flex-col", compact ? "gap-2.5 p-3" : "gap-3 p-4")}>
             <div className="pb-1">
@@ -471,10 +774,7 @@ export function AlertListingCard({
               </div>
             </div>
 
-            {(showStandaloneAttributeRow ||
-              huntContributions.length > 0 ||
-              onDismiss ||
-              onRestore) && (
+            {showMatchSection && (
               <div
                 className="mt-auto space-y-2 border-t border-line pt-2.5"
                 onClick={(event) => event.stopPropagation()}
@@ -489,79 +789,12 @@ export function AlertListingCard({
                 )}
 
                 {huntContributions.length > 0 && (
-                  <div
-                    className={cn(
-                      "space-y-2",
-                      compact ? "text-[11px]" : "text-xs"
-                    )}
-                  >
-                    <p
-                      className={cn(
-                        "font-mono uppercase tracking-wide text-brass",
-                        compact ? "text-[9px]" : "text-[10px]"
-                      )}
-                    >
-                      Hunt Match
-                    </p>
-                    {huntContributions.map((contribution) => {
-                      const chips =
-                        contribution.attributeMatches.length > 0
-                          ? contribution.attributeMatches
-                          : null;
-                      const fallbackLabels =
-                        chips == null && contribution.matchedOn.length > 0
-                          ? contribution.matchedOn
-                          : null;
-
-                      return (
-                        <div
-                          key={contribution.huntId}
-                          className="flex items-start justify-between gap-2"
-                        >
-                          <p className="min-w-0 shrink-0 font-medium leading-snug text-ink">
-                            {contribution.huntName}
-                          </p>
-                          <HuntContributionChips
-                            contribution={contribution}
-                            listing={listing}
-                            chips={chips}
-                            fallbackLabels={fallbackLabels}
-                          />
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {(onDismiss || onRestore) && (
-                  <div className="flex items-center gap-1.5">
-                    {onDismiss && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="h-8 w-full rounded-md border-line-strong bg-card px-2.5 text-xs text-ink-soft hover:bg-paper hover:text-ink"
-                        onClick={onDismiss}
-                        aria-label="Dismiss listing"
-                      >
-                        <X className="h-3.5 w-3.5" />
-                        Dismiss
-                      </Button>
-                    )}
-                    {onRestore && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="h-8 w-full rounded-md border-line-strong bg-card px-2.5 text-xs text-ink hover:bg-paper"
-                        onClick={onRestore}
-                        aria-label="Restore listing"
-                      >
-                        <Check className="h-3.5 w-3.5" />
-                        Restore
-                      </Button>
-                    )}
-                  </div>
+                  <HuntMatchBlock
+                    contributions={huntContributions}
+                    listing={listing}
+                    matchQuality={matchQuality}
+                    compact={compact}
+                  />
                 )}
               </div>
             )}
@@ -576,43 +809,25 @@ export function AlertListingCard({
           )}
         >
           <div className="flex flex-col [backface-visibility:hidden]">
-            {isNew && (
-              <div className="border-b border-line px-3 py-0.5">
-                <span className="font-mono text-[9px] font-medium uppercase tracking-wide text-ok">
-                  New
-                </span>
-              </div>
-            )}
-
-            <div className="relative aspect-[4/3] w-full shrink-0 overflow-hidden bg-[#c9b896]/20">
-              <ListingPhotoCarousel listing={listing} />
-
-              {onToggleInterested && (
-                <ListingHeartButton
-                  interested={interested}
-                  onToggle={onToggleInterested}
-                  className="absolute left-3 top-3 z-10"
+            <ListingPhotoArea
+              listing={listing}
+              interested={interested}
+              isNew={isNew}
+              onToggleInterested={onToggleInterested}
+              onDismiss={onDismiss}
+              onRestore={onRestore}
+              extraControls={
+                <CardFlipButton
+                  flipped={false}
+                  onToggle={() => setFlipped(true)}
+                  className={cn(
+                    "absolute",
+                    isNew ? "top-6" : "top-3",
+                    onToggleInterested ? "left-12" : "left-3"
+                  )}
                 />
-              )}
-
-              {matchQuality != null && (
-                <span className="absolute right-3 top-3 inline-flex items-center gap-1.5 rounded-full border border-line bg-card/95 px-2.5 py-1 text-[11px] font-medium text-ink shadow-sm">
-                  <span
-                    className={cn(
-                      "h-2 w-2 rounded-full",
-                      matchQualityDotClass(matchQuality.level)
-                    )}
-                  />
-                  {matchQuality.label}
-                </span>
-              )}
-
-              <CardFlipButton
-                flipped={false}
-                onToggle={() => setFlipped(true)}
-                className={cn("absolute top-3", onToggleInterested ? "left-12" : "left-3")}
-              />
-            </div>
+              }
+            />
 
             <div className={cn("flex flex-1 flex-col", compact ? "gap-2.5 p-3" : "gap-3 p-4")}>
               <div className="pb-1">
@@ -647,83 +862,14 @@ export function AlertListingCard({
                 </div>
               )}
 
-              {(huntContributions.length > 0 || onDismiss || onRestore) && (
-                <div className="mt-auto space-y-2 border-t border-line pt-2.5">
-                  {huntContributions.length > 0 && (
-                    <div
-                      className={cn(
-                        "space-y-2",
-                        compact ? "text-[11px]" : "text-xs"
-                      )}
-                    >
-                      <p
-                        className={cn(
-                          "font-mono uppercase tracking-wide text-brass",
-                          compact ? "text-[9px]" : "text-[10px]"
-                        )}
-                      >
-                        Hunt Match
-                      </p>
-                      {huntContributions.map((contribution) => {
-                        const chips =
-                          contribution.attributeMatches.length > 0
-                            ? contribution.attributeMatches
-                            : null;
-                        const fallbackLabels =
-                          chips == null && contribution.matchedOn.length > 0
-                            ? contribution.matchedOn
-                            : null;
-
-                        return (
-                          <div
-                            key={contribution.huntId}
-                            className="flex items-start justify-between gap-2"
-                          >
-                            <p className="min-w-0 shrink-0 font-medium leading-snug text-ink">
-                              {contribution.huntName}
-                            </p>
-                            <HuntContributionChips
-                              contribution={contribution}
-                              listing={listing}
-                              chips={chips}
-                              fallbackLabels={fallbackLabels}
-                            />
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  {(onDismiss || onRestore) && (
-                    <div className="flex items-center gap-1.5">
-                      {onDismiss && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="h-8 w-full rounded-md border-line-strong bg-card px-2.5 text-xs text-ink-soft hover:bg-paper hover:text-ink"
-                          onClick={onDismiss}
-                          aria-label="Dismiss listing"
-                        >
-                          <X className="h-3.5 w-3.5" />
-                          Dismiss
-                        </Button>
-                      )}
-                      {onRestore && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="h-8 w-full rounded-md border-line-strong bg-card px-2.5 text-xs text-ink hover:bg-paper"
-                          onClick={onRestore}
-                          aria-label="Restore listing"
-                        >
-                          <Check className="h-3.5 w-3.5" />
-                          Restore
-                        </Button>
-                      )}
-                    </div>
-                  )}
+              {huntContributions.length > 0 && (
+                <div className="mt-auto border-t border-line pt-2.5">
+                  <HuntMatchBlock
+                    contributions={huntContributions}
+                    listing={listing}
+                    matchQuality={matchQuality}
+                    compact={compact}
+                  />
                 </div>
               )}
             </div>
@@ -739,6 +885,7 @@ export function AlertListingCard({
         </div>
       </div>
       )}
+      </div>
     </article>
   );
 }

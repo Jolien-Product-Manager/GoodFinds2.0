@@ -29,6 +29,36 @@ import { persist } from "zustand/middleware";
 
 export type FeedView = "new" | "all" | "starred" | "dismissed";
 
+const INITIAL_GLOBAL_FILTERS: GlobalFilters = {
+  priceCeiling: 50,
+  shipsToMe: true,
+  postalCode: "M6K1V8",
+  allowedConditions: DEFAULT_ALLOWED_CONDITIONS,
+};
+
+function syncCriteriaWithGlobalFilters(
+  criteria: CriteriaSettings,
+  globalFilters: GlobalFilters
+): { globalFilters: GlobalFilters; criteria: CriteriaSettings } {
+  const allowedConditions = normalizeAllowedConditions(
+    globalFilters.allowedConditions,
+    criteria.excludeForParts
+  );
+  const nextFilters = { ...globalFilters, allowedConditions };
+  return {
+    globalFilters: nextFilters,
+    criteria: {
+      ...criteria,
+      maxTotalCost: nextFilters.priceCeiling,
+      maxTotalCostEnabled: nextFilters.priceCeiling != null,
+      shipsToMe: nextFilters.shipsToMe,
+      postalCode: nextFilters.postalCode ?? criteria.postalCode,
+      allowedConditions,
+      excludeForParts: !allowedConditions.includes("For parts / project"),
+    },
+  };
+}
+
 interface CasebackState {
   seen: string[];
   dismissed: string[];
@@ -41,6 +71,7 @@ interface CasebackState {
   criteria: CriteriaSettings;
   hunts: Hunt[];
   globalFilters: GlobalFilters;
+  savedGlobalFilters: GlobalFilters;
   purchasedWatches: PurchasedWatch[];
   attributeLibrary: AttributeLibrary;
   attributeHidden: AttributeLibrary;
@@ -59,6 +90,8 @@ interface CasebackState {
   archiveHunt: (id: string) => void;
   unarchiveHunt: (id: string) => void;
   setGlobalFilters: (filters: Partial<GlobalFilters>) => void;
+  saveGlobalFilters: (filters: GlobalFilters) => void;
+  resetGlobalFiltersToSaved: () => void;
   setPurchasedWatches: (watches: PurchasedWatch[]) => void;
   addAttributeLibraryOption: (key: AttrKey, value: string) => void;
   removeAttributeOption: (key: AttrKey, value: string) => void;
@@ -125,12 +158,8 @@ export const useCasebackStore = create<CasebackState>()(
       dislikedModels: [],
       criteria: DEFAULT_CRITERIA,
       hunts: [],
-      globalFilters: {
-        priceCeiling: 50,
-        shipsToMe: true,
-        postalCode: "M6K1V8",
-        allowedConditions: DEFAULT_ALLOWED_CONDITIONS,
-      },
+      globalFilters: INITIAL_GLOBAL_FILTERS,
+      savedGlobalFilters: INITIAL_GLOBAL_FILTERS,
       purchasedWatches: [],
       attributeLibrary: {},
       attributeHidden: {},
@@ -216,22 +245,22 @@ export const useCasebackStore = create<CasebackState>()(
           ),
         })),
       setGlobalFilters: (filters) =>
+        set((s) =>
+          syncCriteriaWithGlobalFilters(s.criteria, {
+            ...s.globalFilters,
+            ...filters,
+          })
+        ),
+      saveGlobalFilters: (filters) =>
         set((s) => {
-          const next = { ...s.globalFilters, ...filters };
-          const allowedConditions = next.allowedConditions ?? DEFAULT_ALLOWED_CONDITIONS;
+          const synced = syncCriteriaWithGlobalFilters(s.criteria, filters);
           return {
-            globalFilters: { ...next, allowedConditions },
-            criteria: {
-              ...s.criteria,
-              maxTotalCost: next.priceCeiling,
-              maxTotalCostEnabled: next.priceCeiling != null,
-              shipsToMe: next.shipsToMe,
-              postalCode: next.postalCode ?? s.criteria.postalCode,
-              allowedConditions,
-              excludeForParts: !allowedConditions.includes("For parts / project"),
-            },
+            ...synced,
+            savedGlobalFilters: synced.globalFilters,
           };
         }),
+      resetGlobalFiltersToSaved: () =>
+        set((s) => syncCriteriaWithGlobalFilters(s.criteria, s.savedGlobalFilters)),
       setPurchasedWatches: (purchasedWatches) => set({ purchasedWatches }),
       addAttributeLibraryOption: (key, value) =>
         set((s) => {
@@ -339,6 +368,9 @@ export const useCasebackStore = create<CasebackState>()(
           allowedConditions,
           excludeForParts: !allowedConditions.includes("For parts / project"),
         };
+        if (!legacy.savedGlobalFilters) {
+          legacy.savedGlobalFilters = { ...legacy.globalFilters };
+        }
       },
     }
   )

@@ -28,6 +28,15 @@ export function normalizePersistedState(raw: unknown): PersistedState {
       merged.criteria?.excludeForParts
     ),
   };
+  merged.savedGlobalFilters = {
+    ...merged.globalFilters,
+    ...merged.savedGlobalFilters,
+    allowedConditions: normalizeAllowedConditions(
+      merged.savedGlobalFilters?.allowedConditions ??
+        merged.globalFilters.allowedConditions,
+      merged.criteria?.excludeForParts
+    ),
+  };
   merged.criteria = {
     ...merged.criteria,
     allowedConditions: merged.globalFilters.allowedConditions,

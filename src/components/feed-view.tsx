@@ -154,6 +154,8 @@ export function FeedView({ ebayEnabled }: FeedViewProps) {
   const hiddenListings = useCasebackStore((s) => s.hiddenListings);
   const dislikedModels = useCasebackStore((s) => s.dislikedModels);
   const feedAttributeFilters = useCasebackStore((s) => s.feedAttributeFilters);
+  const globalFilters = useCasebackStore((s) => s.globalFilters);
+  const savedGlobalFilters = useCasebackStore((s) => s.savedGlobalFilters);
   const attributeLibrary = useCasebackStore((s) => s.attributeLibrary ?? {});
 
   const dismissListing = useCasebackStore((s) => s.dismissListing);
@@ -167,6 +169,8 @@ export function FeedView({ ebayEnabled }: FeedViewProps) {
   const setFeedView = useCasebackStore((s) => s.setFeedView);
   const toggleFeedAttributeFilter = useCasebackStore((s) => s.toggleFeedAttributeFilter);
   const clearFeedAttributeFilters = useCasebackStore((s) => s.clearFeedAttributeFilters);
+  const setGlobalFilters = useCasebackStore((s) => s.setGlobalFilters);
+  const resetGlobalFiltersToSaved = useCasebackStore((s) => s.resetGlobalFiltersToSaved);
   const addAttributeLibraryOption = useCasebackStore((s) => s.addAttributeLibraryOption);
 
   const seenSet = useMemo(() => new Set(seen), [seen]);
@@ -754,6 +758,8 @@ export function FeedView({ ebayEnabled }: FeedViewProps) {
               alertScope={alertScope}
               marketplaceFilter={marketplaceFilter}
               feedAttributeFilters={feedAttributeFilters}
+              globalFilters={globalFilters}
+              savedGlobalFilters={savedGlobalFilters}
               attributeLibrary={attributeLibrary}
               counts={counts}
               onFeedViewChange={setFeedView}
@@ -762,6 +768,8 @@ export function FeedView({ ebayEnabled }: FeedViewProps) {
               onToggleFeedAttributeFilter={toggleFeedAttributeFilter}
               onAddFeedAttributeFilter={handleAddFeedAttributeFilter}
               onClearFeedAttributeFilters={clearFeedAttributeFilters}
+              onGlobalFiltersChange={setGlobalFilters}
+              onResetGlobalFilters={resetGlobalFiltersToSaved}
               className="md:col-start-2 md:row-start-1"
             />
           )}

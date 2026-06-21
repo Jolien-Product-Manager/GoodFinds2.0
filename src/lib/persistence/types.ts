@@ -23,6 +23,7 @@ export interface PersistedState {
   criteria: CriteriaSettings;
   hunts: Hunt[];
   globalFilters: GlobalFilters;
+  savedGlobalFilters: GlobalFilters;
   purchasedWatches: PurchasedWatch[];
   attributeLibrary: AttributeLibrary;
   attributeHidden: AttributeLibrary;
@@ -49,6 +50,12 @@ export const DEFAULT_PERSISTED_STATE: PersistedState = {
   },
   hunts: [],
   globalFilters: {
+    priceCeiling: 50,
+    shipsToMe: true,
+    postalCode: "M6K1V8",
+    allowedConditions: DEFAULT_ALLOWED_CONDITIONS,
+  },
+  savedGlobalFilters: {
     priceCeiling: 50,
     shipsToMe: true,
     postalCode: "M6K1V8",

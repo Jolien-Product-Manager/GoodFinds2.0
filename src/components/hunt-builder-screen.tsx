@@ -113,7 +113,7 @@ export function HuntBuilderScreen() {
   const setHunts = useCasebackStore((s) => s.setHunts);
   const archiveHunt = useCasebackStore((s) => s.archiveHunt);
   const unarchiveHunt = useCasebackStore((s) => s.unarchiveHunt);
-  const setGlobalFilters = useCasebackStore((s) => s.setGlobalFilters);
+  const saveGlobalFilters = useCasebackStore((s) => s.saveGlobalFilters);
   const setPurchasedWatches = useCasebackStore((s) => s.setPurchasedWatches);
   const attributeLibrary = useCasebackStore((s) => s.attributeLibrary ?? {});
   const attributeHidden = useCasebackStore((s) => s.attributeHidden ?? {});
@@ -539,7 +539,7 @@ export function HuntBuilderScreen() {
 
         <GlobalFiltersSection
           globalFilters={globalFilters}
-          onSave={setGlobalFilters}
+          onSave={saveGlobalFilters}
         />
 
         {/* Purchased watches */}
