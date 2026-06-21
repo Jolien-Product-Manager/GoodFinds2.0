@@ -30,7 +30,8 @@ import { withInferredHuntCriteria } from "@/lib/hunts/domain-terms";
 import { normalizeHunt } from "@/lib/hunts/types";
 import type { HuntMatchResult } from "@/lib/listings/hunt-match";
 
-const SNAPSHOT_TTL_MS = 60_000;
+const SNAPSHOT_TTL_MS =
+  process.env.NODE_ENV === "production" ? 5 * 60 * 1000 : 60_000;
 
 interface FeedSnapshot {
   listings: AppListing[];
@@ -147,12 +148,20 @@ async function buildFeedSnapshot(body: FeedQueryBody): Promise<FeedSnapshot> {
 
   const { listings } = await getCachedListings();
   const ctx = buildFilterContext(body);
-  const matchResults = matchAllHunts(listings, ctx.hunts ?? [], {
-    priceCeiling: 50,
-    shipsToMe: true,
-    postalCode: "M6K1V8",
-    allowedConditions: DEFAULT_ALLOWED_CONDITIONS,
-  });
+  const activeHunts = (ctx.hunts ?? []).filter(
+    (hunt) => hunt.saved && !hunt.archived && huntHasActiveCriteria(hunt)
+  );
+  const matchPool = poolListings(listings, ctx);
+  const matchResults =
+    activeHunts.length === 0
+      ? new Map<string, HuntMatchResult>()
+      : matchAllHunts(matchPool, activeHunts, {
+          priceCeiling: ctx.criteria?.maxTotalCost ?? 50,
+          shipsToMe: ctx.criteria?.shipsToMe ?? true,
+          postalCode: ctx.criteria?.postalCode ?? "M6K1V8",
+          allowedConditions:
+            ctx.criteria?.allowedConditions ?? DEFAULT_ALLOWED_CONDITIONS,
+        });
   const display = displayListingsForView(listings, body, ctx, matchResults);
   return { listings, ctx, matchResults, display };
 }

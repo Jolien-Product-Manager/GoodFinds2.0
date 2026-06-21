@@ -1,7 +1,8 @@
 import type { AppListing } from "./types";
 import { loadAllListings, type LoadAllListingsResult } from "./load-all-listings";
 
-const CACHE_TTL_MS = 10 * 60 * 1000;
+const CACHE_TTL_MS =
+  process.env.NODE_ENV === "production" ? 30 * 60 * 1000 : 10 * 60 * 1000;
 
 let cached: { result: LoadAllListingsResult; fetchedAt: number } | null = null;
 let inFlight: Promise<LoadAllListingsResult> | null = null;
@@ -11,12 +12,7 @@ export function invalidateListingsCache(): void {
   inFlight = null;
 }
 
-export async function getCachedListings(): Promise<LoadAllListingsResult> {
-  const now = Date.now();
-  if (cached && now - cached.fetchedAt < CACHE_TTL_MS) {
-    return cached.result;
-  }
-
+async function loadAndCache(): Promise<LoadAllListingsResult> {
   if (!inFlight) {
     inFlight = loadAllListings()
       .then((result) => {
@@ -27,8 +23,21 @@ export async function getCachedListings(): Promise<LoadAllListingsResult> {
         inFlight = null;
       });
   }
-
   return inFlight;
+}
+
+/** Preload snapshots after deploy — avoids cold-start penalty on first page view. */
+export function warmListingsCache(): Promise<LoadAllListingsResult> {
+  return loadAndCache();
+}
+
+export async function getCachedListings(): Promise<LoadAllListingsResult> {
+  const now = Date.now();
+  if (cached && now - cached.fetchedAt < CACHE_TTL_MS) {
+    return cached.result;
+  }
+
+  return loadAndCache();
 }
 
 export function findListingById(
