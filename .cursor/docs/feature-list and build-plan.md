@@ -24,7 +24,8 @@
 ### Marketplace ingestion
 
 - **F1. Chrono24 scraper** — Offline Python scraper (~10 vintage query terms), per-article HTML parsing, dedupes by listing ID, URL canonicalization, writes JSON snapshot. Images proxied via `/api/listing-image` (CDN blocks hotlinking).
-- **F2. eBay Browse API** — Live fetch via `npm run sync:ebay` (`timex vintage watch`, newlyListed), up to **2000** listings (paginated at 200/request). **Page loads serve disk snapshot only** (`data/ebay/vintage_timex.json`) to avoid rate limits; set `EBAY_FORCE_REFRESH=1` to force live fetch.
+- **F2. eBay Browse API** — Live fetch via `npm run sync:ebay` (`timex vintage watch`, newlyListed), up to **10,000** listings by default (paginated at 200/request; override via `EBAY_SEARCH_LIMIT`). **Page loads serve disk snapshot only** (`data/ebay/vintage_timex.json`) to avoid rate limits; set `EBAY_FORCE_REFRESH=1` to force live fetch.
+- **F2b. Etsy Open API** — Live fetch via `npm run sync:etsy` (`vintage timex watch`), up to **500** listings (paginated at 100/request). Same snapshot pattern as eBay.
 - **F3. Normalize & merge** — Combines sources, drops missing price/ID, namespaces eBay IDs, infers listing gender from titles.
 - **F4. Vintage filter** — Keeps listings where title says "vintage" or parsed year ≤ 2000.
 
@@ -32,7 +33,7 @@
 
 - **F5. New section** — Single pool of unseen, gated listings ranked by best hunt score (no 24h/Older split).
 - **F6. View toggle (New | Starred | Dismissed)** — Three views in sidebar; Starred = `listingStatus.interested` (UI label: **Interesting**).
-- **F7. Scope under New** — Sidebar filters: **All listings** | **Top matches** (`feedScore ≥ 4.0`) | **Hunt matches** (saved hunt matches) with per-hunt sub-chips. **Marketplace** filter: All / eBay / Chrono24.
+- **F7. Scope under New** — Sidebar filters: **All listings** | **New listings** | **Hunt matches** (`alertScope: watchlist` or `hunt:{id}`) with per-hunt sub-chips. **Marketplace** filter: All / eBay / Chrono24 / Etsy.
 - **F8. Dismiss / Restore** — Dismissed is a top-level view; undo toast on dismiss.
 - **F9. Bulk + refresh actions** — "Check for new listings" (`router.refresh`).
 
@@ -64,7 +65,7 @@
 
 ### Persistence & auth
 
-- Zustand (`caseback-state-v5`) + [`/api/state`](../src/app/api/state/route.ts):
+- Zustand (`caseback-state-v8`) + [`/api/state`](../src/app/api/state/route.ts):
   - **Signed in:** Supabase `user_state` table (magic-link email auth)
   - **Local fallback:** `data/store/state.json` when Supabase is not configured
 - Persisted fields include hunts, dismissals, stars, feed scope, `marketplaceFilter`, `attributeLibrary`, `attributeHidden`.
@@ -78,10 +79,10 @@
 New hunt → inline editor opens → set gender → toggle attribute chips / type customs → **Edit tiles** to hide unwanted suggestions → set hearts → watch summary + tightness → name → Save → card in Defined hunts list.
 
 ### Daily triage
-Land on Feed (**New**, sorted by hunt score) → use sidebar **Top matches** or **Hunt matches** → scan match reasons → Dismiss noise / mark **Interesting** → **Starred** view to revisit saved listings.
+Land on Feed (**New**, sorted by hunt score) → use sidebar **Hunt matches** or per-hunt sub-filters → scan match reasons → Dismiss noise / mark **Interesting** → **Starred** view to revisit saved listings.
 
 ### Narrow what you see
-Under **New**, tap **Hunt matches** → expand per-hunt sub-chips → or filter by **eBay** / **Chrono24** in Marketplace section.
+Under **New**, tap **Hunt matches** → expand per-hunt sub-chips → or filter by **eBay** / **Chrono24** / **Etsy** in Marketplace section.
 
 ### Tune buy-ability
 On **Hunts** → Global filters → price ceiling and ships-to-me + postal code → gates exclude before feed.
@@ -99,4 +100,4 @@ Magic-link email via masthead auth button → state syncs to Supabase across dev
 - [vintage-timex-watches-feed.md](vintage-timex-watches-feed.md) — shipped feed UI
 - [hunt-builder-spec.md](hunt-builder-spec.md) — hunts page
 - [hunt-feed-filtering-criteria.md](hunt-feed-filtering-criteria.md) — matching pipeline
-- [marketplace-queries.md](marketplace-queries.md) — Chrono24 + eBay fetch
+- [marketplace-queries.md](marketplace-queries.md) — Chrono24 + eBay + Etsy fetch

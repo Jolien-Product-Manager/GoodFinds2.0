@@ -1,6 +1,7 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import type { GlobalFilters } from "@/lib/hunts/types";
@@ -12,8 +13,22 @@ import { cn } from "@/lib/utils";
 
 interface GlobalFiltersSectionProps {
   globalFilters: GlobalFilters;
-  onChange: (filters: Partial<GlobalFilters>) => void;
+  onSave: (filters: GlobalFilters) => void;
   className?: string;
+}
+
+function globalFiltersEqual(a: GlobalFilters, b: GlobalFilters): boolean {
+  if (
+    a.priceCeiling !== b.priceCeiling ||
+    a.shipsToMe !== b.shipsToMe ||
+    a.postalCode !== b.postalCode
+  ) {
+    return false;
+  }
+  const aConds = a.allowedConditions ?? [];
+  const bConds = b.allowedConditions ?? [];
+  if (aConds.length !== bConds.length) return false;
+  return aConds.every((c) => bConds.includes(c));
 }
 
 function FilterCard({
@@ -37,10 +52,35 @@ function FilterCard({
 
 export function GlobalFiltersSection({
   globalFilters,
-  onChange,
+  onSave,
   className,
 }: GlobalFiltersSectionProps) {
-  const allowedConditions = globalFilters.allowedConditions ?? [];
+  const [draft, setDraft] = useState(globalFilters);
+  const [savedFlash, setSavedFlash] = useState(false);
+  const savedFlashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const allowedConditions = draft.allowedConditions ?? [];
+  const isDirty = !globalFiltersEqual(draft, globalFilters);
+
+  useEffect(() => {
+    setDraft(globalFilters);
+  }, [globalFilters]);
+
+  useEffect(() => {
+    return () => {
+      if (savedFlashTimer.current) clearTimeout(savedFlashTimer.current);
+    };
+  }, []);
+
+  const updateDraft = (filters: Partial<GlobalFilters>) => {
+    setDraft((prev) => ({ ...prev, ...filters }));
+  };
+
+  const handleSave = () => {
+    onSave(draft);
+    setSavedFlash(true);
+    if (savedFlashTimer.current) clearTimeout(savedFlashTimer.current);
+    savedFlashTimer.current = setTimeout(() => setSavedFlash(false), 1600);
+  };
 
   return (
     <section className={cn("space-y-2", className)}>
@@ -68,9 +108,9 @@ export function GlobalFiltersSection({
                 id="price-ceiling"
                 type="number"
                 min={0}
-                value={globalFilters.priceCeiling ?? ""}
+                value={draft.priceCeiling ?? ""}
                 onChange={(e) =>
-                  onChange({
+                  updateDraft({
                     priceCeiling: e.target.value ? Number(e.target.value) : null,
                   })
                 }
@@ -80,6 +120,44 @@ export function GlobalFiltersSection({
               <span className="shrink-0 text-[11px] text-ink-soft">CAD</span>
             </div>
           </div>
+        </FilterCard>
+
+        <FilterCard>
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="font-display text-base font-medium leading-tight text-ink">
+                Ships to my address
+              </p>
+              {draft.shipsToMe ? (
+                <p className="mt-0.5 text-xs italic leading-snug text-ink-soft">
+                  Estimates shipping + duties for ceiling
+                </p>
+              ) : null}
+            </div>
+            <Switch
+              id="ships-to-me"
+              checked={draft.shipsToMe}
+              onCheckedChange={(v) => updateDraft({ shipsToMe: v })}
+            />
+          </div>
+
+          {draft.shipsToMe && (
+            <div className="mt-2 flex items-center gap-2 border-t border-line pt-2">
+              <label
+                htmlFor="postal"
+                className="shrink-0 text-xs text-ink-soft"
+              >
+                Postal
+              </label>
+              <Input
+                id="postal"
+                value={draft.postalCode ?? ""}
+                onChange={(e) => updateDraft({ postalCode: e.target.value })}
+                placeholder="M6K 1V8"
+                className="h-8 flex-1 border-line-strong bg-white text-sm"
+              />
+            </div>
+          )}
         </FilterCard>
 
         <FilterCard>
@@ -101,7 +179,7 @@ export function GlobalFiltersSection({
                   title={option.hint}
                   aria-pressed={selected}
                   onClick={() =>
-                    onChange({
+                    updateDraft({
                       allowedConditions: toggleAllowedCondition(
                         allowedConditions,
                         option.value
@@ -121,45 +199,18 @@ export function GlobalFiltersSection({
             })}
           </div>
         </FilterCard>
-
-        <FilterCard>
-          <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <p className="font-display text-base font-medium leading-tight text-ink">
-                Ships to my address
-              </p>
-              {globalFilters.shipsToMe ? (
-                <p className="mt-0.5 text-xs italic leading-snug text-ink-soft">
-                  Estimates shipping + duties for ceiling
-                </p>
-              ) : null}
-            </div>
-            <Switch
-              id="ships-to-me"
-              checked={globalFilters.shipsToMe}
-              onCheckedChange={(v) => onChange({ shipsToMe: v })}
-            />
-          </div>
-
-          {globalFilters.shipsToMe && (
-            <div className="mt-2 flex items-center gap-2 border-t border-line pt-2">
-              <label
-                htmlFor="postal"
-                className="shrink-0 text-xs text-ink-soft"
-              >
-                Postal
-              </label>
-              <Input
-                id="postal"
-                value={globalFilters.postalCode ?? ""}
-                onChange={(e) => onChange({ postalCode: e.target.value })}
-                placeholder="M6K 1V8"
-                className="h-8 flex-1 border-line-strong bg-white text-sm"
-              />
-            </div>
-          )}
-        </FilterCard>
       </ul>
+
+      <div className="flex justify-end pt-1">
+        <Button
+          type="button"
+          onClick={handleSave}
+          disabled={!isDirty && !savedFlash}
+          className="h-9 rounded-lg bg-ink px-4 text-card hover:bg-ink/90 disabled:opacity-50"
+        >
+          {savedFlash ? "Saved" : "Save filters"}
+        </Button>
+      </div>
     </section>
   );
 }

@@ -1,6 +1,6 @@
 # Marketplace queries
 
-Reference for **fetch-time queries** (what we ask Chrono24 and eBay for) and **in-app filters** (what the UI applies after listings are merged). Use the **Target (draft — edit me)** sections at the bottom of each marketplace to refine strategy without hunting through code.
+Reference for **fetch-time queries** (what we ask Chrono24, eBay, and Etsy for) and **in-app filters** (what the UI applies after listings are merged). Use the **Target (draft — edit me)** sections at the bottom of each marketplace to refine strategy without hunting through code.
 
 ---
 
@@ -13,14 +13,16 @@ flowchart LR
   subgraph fetch [Fetch queries]
     Chrono24["Chrono24 scraper\n10 search terms"]
     Ebay["eBay Browse API\nwatch category + brand"]
+    Etsy["Etsy Open API v3\nkeyword search"]
   end
   subgraph app [In-app filters]
     Norm["Normalize + gender infer"]
     Crit["Global gates from Hunts page"]
-    FeedScope["Feed scope: All / Top matches / Hunt matches + marketplace"]
+    FeedScope["Feed scope: All / Hunt matches + marketplace"]
   end
   Chrono24 --> Norm
   Ebay --> Norm
+  Etsy --> Norm
   Norm --> Crit --> FeedScope
 ```
 
@@ -148,7 +150,7 @@ Merge: [`src/lib/listings/load-all-listings.ts`](../src/lib/listings/load-all-li
 | `aspect_filter` | `categoryId:31387,Brand:{Timex}` | Built in client from category + brand |
 | `limit` | `200` per page (max API page size) | Hard-coded: `EBAY_PAGE_SIZE` |
 | `offset` | `0`, then `200`, … | Paginated until `EBAY_SEARCH_LIMIT` reached |
-| Total fetched (sync) | `2000` (default) | `EBAY_SEARCH_LIMIT` env or [`schema.ts`](../src/lib/ebay/schema.ts) |
+| Total fetched (sync) | `10,000` (default in code) | `EBAY_SEARCH_LIMIT` env or [`schema.ts`](../src/lib/ebay/schema.ts) |
 | Page load fetch | **0** (snapshot only) | Reads `data/ebay/vintage_timex.json` |
 | `sort` | `newlyListed` | Hard-coded in client |
 | Marketplace | `EBAY_CA` | `.env.local` → `EBAY_MARKETPLACE_ID` |
@@ -163,7 +165,7 @@ EBAY_CLIENT_ID=
 EBAY_CLIENT_SECRET=
 EBAY_MARKETPLACE_ID=EBAY_CA
 EBAY_ENV=production
-# EBAY_SEARCH_LIMIT=2000          # max for npm run sync:ebay
+# EBAY_SEARCH_LIMIT=10000         # max for npm run sync:ebay
 # EBAY_FORCE_REFRESH=1            # force live API on page load (dev only)
 ```
 
@@ -193,7 +195,7 @@ Second page (when more results needed):
   &sort=newlyListed
 ```
 
-Up to **2000** items total (`EBAY_SEARCH_LIMIT` default); stops early if fewer are available.
+Up to **10,000** items total (`EBAY_SEARCH_LIMIT` default in `schema.ts`); stops early if fewer are available.
 
 Headers:
 
@@ -226,7 +228,7 @@ When eBay returns domestic shipping cost on the summary, it is stored as `shippi
 
 | What | Where |
 |------|--------|
-| Query + limit constants | `src/lib/ebay/schema.ts` — `EBAY_DEFAULT_QUERY`, `EBAY_SEARCH_LIMIT` (2000), `EBAY_PAGE_SIZE` (200), `EBAY_WRISTWATCH_CATEGORY_ID` |
+| Query + limit constants | `src/lib/ebay/schema.ts` — `EBAY_DEFAULT_QUERY`, `EBAY_SEARCH_LIMIT` (10,000), `EBAY_PAGE_SIZE` (200), `EBAY_WRISTWATCH_CATEGORY_ID` |
 | Snapshot read/write | `src/lib/ebay/snapshot.ts` |
 | Title blocklist | `src/lib/ebay/title-filter.ts` — `shouldExcludeEbayTitle()` |
 | OAuth + search | `src/lib/ebay/client.ts` — `fetchEbayListings()` |
@@ -235,7 +237,7 @@ When eBay returns domestic shipping cost on the summary, it is stored as `shippi
 ### Target (draft — edit me)
 
 - **Primary query:** `timex vintage watch` + wristwatch category + Timex brand aspect *(current)*
-- **Result limit:** 2000 total for `npm run sync:ebay` / page loads use disk snapshot
+- **Result limit:** 10,000 total for `npm run sync:ebay` / page loads use disk snapshot
 - **Sort:** newlyListed / price / other
 - **Marketplace:** EBAY_CA *(current)* / EBAY_US
 - **Title blocklist:** extend if apparel or parts-only listings still leak through
@@ -244,9 +246,105 @@ When eBay returns domestic shipping cost on the summary, it is stored as `shippi
 
 ---
 
-## In-app filters (both sources)
+## Etsy
 
-Applied **after** Chrono24 and eBay listings are merged. Same rules for every listing regardless of source.
+### How data reaches the app
+
+| Step | What happens |
+|------|----------------|
+| 1 | **Page loads:** read disk snapshot `data/etsy/vintage_timex.json` — **no live Etsy API call** |
+| 2 | **Manual refresh:** `npm run sync:etsy` fetches live from Open API v3, writes snapshot |
+| 3 | Results normalized and merged with Chrono24 and eBay in `loadAllListings()` |
+| 4 | If creds missing or no snapshot → other sources only, no crash |
+| 5 | Force live fetch on page load: set `ETSY_FORCE_REFRESH=1` in env |
+
+Client: [`src/lib/etsy/client.ts`](../src/lib/etsy/client.ts)  
+Snapshot: [`src/lib/etsy/snapshot.ts`](../src/lib/etsy/snapshot.ts)  
+Merge: [`src/lib/listings/load-all-listings.ts`](../src/lib/listings/load-all-listings.ts)
+
+### Current search parameters
+
+| Parameter | Current value | Configurable? |
+|-----------|---------------|---------------|
+| `keywords` | `vintage timex watch` | Hard-coded default: `ETSY_DEFAULT_QUERY` in `src/lib/etsy/schema.ts` |
+| Multi-query | Single query | `ETSY_SEARCH_QUERIES` env (pipe-separated) |
+| `limit` | `100` per page (max API page size) | Hard-coded: `ETSY_PAGE_SIZE` |
+| `offset` | `0`, then `100`, … | Paginated until `ETSY_SEARCH_LIMIT` reached |
+| Total fetched (sync) | `500` (default) | `ETSY_SEARCH_LIMIT` env or [`schema.ts`](../src/lib/etsy/schema.ts) |
+| Page load fetch | **0** (snapshot only) | Reads `data/etsy/vintage_timex.json` |
+| `sort_on` / `sort_order` | `created` / `desc` | Hard-coded in client |
+
+**Env vars** (see [`.env.local.example`](../.env.local.example)):
+
+```
+ETSY_API_KEY=keystring:shared_secret
+# ETSY_SEARCH_LIMIT=500
+# ETSY_SEARCH_QUERIES=vintage timex watch|timex marlin
+# ETSY_FORCE_REFRESH=1
+```
+
+**Refresh Etsy data:**
+
+```bash
+npm run sync:etsy
+```
+
+### API call
+
+```
+GET /v3/application/listings/active
+  ?keywords=vintage+timex+watch
+  &limit=100
+  &offset=0
+  &sort_on=created
+  &sort_order=desc
+```
+
+Headers:
+
+- `x-api-key: {keystring:shared_secret}`
+- `Accept: application/json`
+
+Listings missing images are batch-enriched via `/listings/batch` after search. Live API results are written to `data/etsy/vintage_timex.json`. Page loads read the snapshot; in-process memory cache TTL is 6 hours.
+
+### Post-fetch filters (app)
+
+In [`src/lib/listings/normalize.ts`](../src/lib/listings/normalize.ts), `normalizeEtsyListing()` skips items with:
+
+- Missing `listing_id`, or
+- Missing parseable `price_value`, or
+- Title matches non-watch blocklist (`shouldExcludeEtsyTitle()` in `src/lib/etsy/title-filter.ts`)
+
+Listing IDs are namespaced as `etsy-{listing_id}`. `listedAt` uses Etsy's `creation_timestamp` when available.
+
+### Not applied at fetch time (gaps)
+
+- No explicit vintage year filter at API level (search text only)
+- No price-range or condition filters on the API call
+- Shipping cost not always available on listing summary
+
+### Code references
+
+| What | Where |
+|------|--------|
+| Query + limit constants | `src/lib/etsy/schema.ts` — `ETSY_DEFAULT_QUERY`, `ETSY_SEARCH_LIMIT` (500), `ETSY_PAGE_SIZE` (100) |
+| Snapshot read/write | `src/lib/etsy/snapshot.ts` |
+| Title blocklist | `src/lib/etsy/title-filter.ts` — `shouldExcludeEtsyTitle()` |
+| OAuth + search | `src/lib/etsy/client.ts` — `fetchEtsyListings()` |
+| Response schema | `src/lib/etsy/schema.ts` — `etsySearchResponseSchema` |
+
+### Target (draft — edit me)
+
+- **Primary query:** `vintage timex watch` *(current)* / multi-query sweep
+- **Result limit:** 500 total for `npm run sync:etsy` / page loads use disk snapshot
+- **Sort:** created desc / other
+- **Open questions:** expand query set to mirror Chrono24 model terms
+
+---
+
+## In-app filters (all sources)
+
+Applied **after** Chrono24, eBay, and Etsy listings are merged. Same rules for every listing regardless of source.
 
 Defaults from global filters on `/hunts` (synced to [`src/lib/criteria.ts`](../src/lib/criteria.ts)):
 
@@ -257,10 +355,10 @@ Defaults from global filters on `/hunts` (synced to [`src/lib/criteria.ts`](../s
 | Conditions | All except **For parts** | `passesCriteria()` |
 | Hidden listings | Excluded | `passesListingFilters()` in `src/lib/listings/selectors.ts` |
 | Disliked models | Excluded | `passesListingFilters()` |
-| Seen / starred | Excluded from **New**; starred in own tab | `unseenListings()`, `interestedListings()` |
-| Feed scope (New tab) | **All listings** / **Top matches** / **Hunt matches** + per-hunt (`hunt:{id}`) | `alertListings()` |
-| Marketplace filter | All / eBay / Chrono24 | `marketplaceFilter` in selectors |
-| Hunt scoring | `C × S × H` (0–8); hearts in `H` | `scoreListingAgainstHunt()` |
+| Seen / starred | Excluded from **New** counts; starred in own tab | `unseenListings()`, `interestedListings()` |
+| Feed scope (New tab) | **All listings** / **Hunt matches** (`watchlist` or `hunt:{id}`) | `alertListings()` |
+| Marketplace filter | All / eBay / Chrono24 / Etsy | `marketplaceFilter` in selectors |
+| Hunt scoring | Additive: `categoriesPassed × heartsMultiplier`, summed across hunts | `scoreListingAgainstHunt()` in `hunt-match.ts` |
 | Hunt gender | Per-hunt gate (8 gender options) | `listingMatchesHuntGender()` in `gender.ts` |
 
 **Shipping estimates:** Total cost uses seeded deterministic shipping unless eBay provides a domestic `shipping_cost` on the listing. Chrono24 listings always use the estimate model today.
@@ -278,16 +376,17 @@ Defaults from global filters on `/hunts` (synced to [`src/lib/criteria.ts`](../s
 
 ## Comparison summary
 
-| | Chrono24 | eBay |
-|--|----------|------|
-| Fetch mode | Static JSON (scraper) | Disk snapshot; live via `npm run sync:ebay` |
-| Query count | 10 (with `--vintage`) | 1 |
-| Result cap | ~120 per query, deduped across queries | 2000 total (sync); page load reads snapshot |
-| Vintage filter at fetch | Yes (`--vintage-only`) | Search text only; category + brand at API |
-| Non-watch exclusion | Scraper site context | Wristwatch category + title blocklist |
-| Refresh | Manual scraper + `sync:listings` | `npm run sync:ebay` (or `EBAY_FORCE_REFRESH=1`) |
-| Credentials | FlareSolverr URL in scraper `.env` | `EBAY_CLIENT_ID` / `EBAY_CLIENT_SECRET` in `.env.local` |
-| Images | Proxied via `/api/listing-image` | Direct CDN URLs |
+| | Chrono24 | eBay | Etsy |
+|--|----------|------|------|
+| Fetch mode | Static JSON (scraper) | Disk snapshot; live via `npm run sync:ebay` | Disk snapshot; live via `npm run sync:etsy` |
+| Query count | 10 (with `--vintage`) | 1 | 1 (multi via env) |
+| Result cap | ~120 per query, deduped across queries | 10,000 total (sync default); page load reads snapshot | 500 total (sync default); page load reads snapshot |
+| Vintage filter at fetch | Yes (`--vintage-only`) | Search text only; category + brand at API | Search text only |
+| Non-watch exclusion | Scraper site context | Wristwatch category + title blocklist | Title blocklist |
+| Refresh | Manual scraper + `sync:listings` | `npm run sync:ebay` (or `EBAY_FORCE_REFRESH=1`) | `npm run sync:etsy` (or `ETSY_FORCE_REFRESH=1`) |
+| Credentials | FlareSolverr URL in scraper `.env` | `EBAY_CLIENT_ID` / `EBAY_CLIENT_SECRET` in `.env.local` | `ETSY_API_KEY` in `.env.local` |
+| Images | Proxied via `/api/listing-image` | Direct CDN URLs | Direct CDN URLs (batch-enriched when missing) |
+| Listing date | Not available (uses fetch time) | Not available (uses fetch time) | `creation_timestamp` when available |
 
 ---
 
@@ -309,11 +408,18 @@ Defaults from global filters on `/hunts` (synced to [`src/lib/criteria.ts`](../s
 
 - `src/lib/ebay/schema.ts` — constants, Zod types
 - `src/lib/ebay/client.ts` — OAuth + search
+- `src/lib/ebay/snapshot.ts` — disk snapshot read/write
 - `.env.local.example` — credential template
+
+**Etsy**
+
+- `src/lib/etsy/schema.ts` — constants, Zod types
+- `src/lib/etsy/client.ts` — search + batch image enrichment
+- `src/lib/etsy/snapshot.ts` — disk snapshot read/write
 
 **Shared**
 
-- `src/lib/listings/load-all-listings.ts` — merge both sources
+- `src/lib/listings/load-all-listings.ts` — merge all sources
 - `src/lib/listings/normalize.ts` — map to `AppListing`
 - `src/lib/criteria.ts` — Criteria defaults
 - `src/lib/shipping.ts` — `passesCriteria()`, cost estimates

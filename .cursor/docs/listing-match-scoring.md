@@ -99,7 +99,15 @@ Grail Marlin — 5/5 (4 hearts)
 
 Helper: `formatHuntContributionBadge()`.
 
-Card quality pill ("Good match" / "Match") uses the top contribution: full category match with ≥3 hearts → "Good match"; any positive `listingScore` → "Match".
+**Match quality pill** (`matchQualityFromContribution()` on the top hunt contribution):
+
+| Label | Condition |
+|---|---|
+| **Perfect Match** | `categoriesPassed >= totalCategories` |
+| **Close Match** | pass ratio > 50% |
+| **Loose Match** | pass ratio ≤ 50% but > 0 |
+
+The raw `listingScore` is for sort order only — not shown as a user-facing tier.
 
 ---
 
@@ -123,9 +131,11 @@ Within a category: **OR** (any accepted option matches). Across categories: each
 
 | Scope | Filter |
 |---|---|
-| **watchlist** | `matchedHuntIds.length > 0` |
-| **top** | `score >= TOP_MATCH_SCORE_THRESHOLD` (default **3.0** on additive scale) |
+| **all** | All listings passing gates (default) |
+| **watchlist** | `matchedHuntIds.length > 0` (UI label: **Hunt matches**) |
 | **hunt:{id}** | Hunt id in `matchedHuntIds` |
+
+Legacy `alertScope: "top"` is migrated to `"all"` on store rehydrate. There is no separate score-threshold scope in shipped UI.
 
 ---
 
@@ -145,7 +155,7 @@ Assume `HEARTS_SCORE_MULTIPLIER[4] = 1.0`, `HEARTS_SCORE_MULTIPLIER[2] = 0.5`.
 ## Related files
 
 - [`src/lib/listings/hunt-match.ts`](../src/lib/listings/hunt-match.ts) — `scoreListingAgainstHunt()`, `matchAllHunts()`, `HEARTS_SCORE_MULTIPLIER`
-- [`src/lib/listings/selectors.ts`](../src/lib/listings/selectors.ts) — `alertSort()`, `TOP_MATCH_SCORE_THRESHOLD`
+- [`src/lib/listings/selectors.ts`](../src/lib/listings/selectors.ts) — `alertSort()`, feed scope selectors
 - [`src/components/alert-listing-card.tsx`](../src/components/alert-listing-card.tsx) — hunt badges and match quality pill
 - [`src/lib/hunts/types.ts`](../src/lib/hunts/types.ts) — `HuntAttribute.required`
 

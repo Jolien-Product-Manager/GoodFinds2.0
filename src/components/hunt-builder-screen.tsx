@@ -539,7 +539,7 @@ export function HuntBuilderScreen() {
 
         <GlobalFiltersSection
           globalFilters={globalFilters}
-          onChange={setGlobalFilters}
+          onSave={setGlobalFilters}
         />
 
         {/* Purchased watches */}
