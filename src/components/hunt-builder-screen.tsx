@@ -1,19 +1,27 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { ChevronDown, Pencil, Plus, Trash2 } from "lucide-react";
+import { Pencil, Plus, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
+import { GlobalFiltersSection } from "@/components/global-filters-section";
 import { Badge } from "@/components/ui/badge";
 import {
   ATTR_KEYS,
   ATTR_OPTIONS,
   HUNT_GENDER_OPTIONS,
+  attributeChipOptions,
   createDraftHunt,
+  isAttributeValueSelected,
   normalizeCustomValue,
   normalizeHunt,
+  toggleAttributePick,
   type AttrKey,
   type Hunt,
   type HuntHearts,
@@ -28,6 +36,7 @@ import {
 import { HuntHeartsPicker } from "@/components/hunt-hearts";
 import { PurchasedWatchRow } from "@/components/purchased-watch-row";
 import { useCasebackStore } from "@/store/caseback";
+import type { AttributeLibrary } from "@/lib/persistence/types";
 import { Masthead } from "@/components/masthead";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -39,6 +48,15 @@ export function HuntBuilderScreen() {
   const setHunts = useCasebackStore((s) => s.setHunts);
   const setGlobalFilters = useCasebackStore((s) => s.setGlobalFilters);
   const setPurchasedWatches = useCasebackStore((s) => s.setPurchasedWatches);
+  const attributeLibrary = useCasebackStore((s) => s.attributeLibrary ?? {});
+  const attributeHidden = useCasebackStore((s) => s.attributeHidden ?? {});
+  const addAttributeLibraryOption = useCasebackStore((s) => s.addAttributeLibraryOption);
+  const removeAttributeOption = useCasebackStore((s) => s.removeAttributeOption);
+  const restoreAllAttributeTiles = useCasebackStore((s) => s.restoreAllAttributeTiles);
+
+  const hasHiddenTiles = Object.values(attributeHidden).some(
+    (values) => (values?.length ?? 0) > 0
+  );
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<Hunt | null>(null);
@@ -46,9 +64,6 @@ export function HuntBuilderScreen() {
   const [savedFlash, setSavedFlash] = useState(false);
   const [purchaseUrl, setPurchaseUrl] = useState("");
   const [listingImages, setListingImages] = useState<ListingImageRef[]>([]);
-
-  const expanded = editingId != null || draft != null;
-  const activeHunt = workingCopy ?? draft;
 
   const startNewHunt = () => {
     const d = createDraftHunt();
@@ -64,37 +79,86 @@ export function HuntBuilderScreen() {
   };
 
   const updateAttr = (key: AttrKey, picks?: string[], customs?: string[]) => {
-    if (!workingCopy) return;
-    const current = workingCopy.attributes[key] ?? { picks: [], customs: [] };
-    setWorkingCopy({
-      ...workingCopy,
-      saved: false,
-      attributes: {
-        ...workingCopy.attributes,
-        [key]: {
-          picks: picks ?? current.picks,
-          customs: customs ?? current.customs,
+    setWorkingCopy((prev) => {
+      if (!prev) return prev;
+      const current = prev.attributes[key] ?? { picks: [], customs: [] };
+      return {
+        ...prev,
+        saved: false,
+        attributes: {
+          ...prev.attributes,
+          [key]: {
+            picks: picks ?? current.picks,
+            customs: customs ?? current.customs,
+          },
         },
-      },
-      updatedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
     });
   };
 
   const togglePick = (key: AttrKey, value: string) => {
-    if (!workingCopy) return;
-    const current = workingCopy.attributes[key]?.picks ?? [];
-    const picks = current.includes(value)
-      ? current.filter((v) => v !== value)
-      : [...current, value];
-    updateAttr(key, picks);
+    setWorkingCopy((prev) => {
+      if (!prev) return prev;
+      const current = prev.attributes[key] ?? { picks: [], customs: [] };
+      const next = toggleAttributePick(current, value);
+      return {
+        ...prev,
+        saved: false,
+        attributes: {
+          ...prev.attributes,
+          [key]: next,
+        },
+        updatedAt: new Date().toISOString(),
+      };
+    });
   };
 
-  const handleCustomInput = (key: AttrKey, raw: string) => {
-    const customs = raw
-      .split(",")
-      .map((s) => normalizeCustomValue(s))
-      .filter(Boolean);
-    updateAttr(key, undefined, customs);
+  const handleAddCustomFilter = (key: AttrKey, raw: string) => {
+    const trimmed = raw.trim();
+    if (!trimmed) return;
+    addAttributeLibraryOption(key, trimmed);
+    const norm = normalizeCustomValue(trimmed);
+    const libraryLabel =
+      (useCasebackStore.getState().attributeLibrary?.[key] ?? []).find(
+        (v) => normalizeCustomValue(v) === norm
+      ) ?? trimmed;
+    setWorkingCopy((prev) => {
+      if (!prev) return prev;
+      const current = prev.attributes[key] ?? { picks: [], customs: [] };
+      if (isAttributeValueSelected(current, libraryLabel)) {
+        return { ...prev, saved: false, updatedAt: new Date().toISOString() };
+      }
+      const next = toggleAttributePick(current, libraryLabel);
+      return {
+        ...prev,
+        saved: false,
+        attributes: {
+          ...prev.attributes,
+          [key]: next,
+        },
+        updatedAt: new Date().toISOString(),
+      };
+    });
+  };
+
+  const handleRemoveOption = (key: AttrKey, value: string) => {
+    removeAttributeOption(key, value);
+    setWorkingCopy((prev) => {
+      if (!prev) return prev;
+      const current = prev.attributes[key] ?? { picks: [], customs: [] };
+      const norm = normalizeCustomValue(value);
+      const next = {
+        picks: current.picks.filter((v) => normalizeCustomValue(v) !== norm),
+        customs: current.customs.filter((v) => normalizeCustomValue(v) !== norm),
+      };
+      return {
+        ...prev,
+        saved: false,
+        attributes: { ...prev.attributes, [key]: next },
+        updatedAt: new Date().toISOString(),
+      };
+    });
   };
 
   const handleSave = () => {
@@ -192,11 +256,45 @@ export function HuntBuilderScreen() {
     };
   }, [setPurchasedWatches]);
 
-  const tightness = activeHunt ? huntTightness(activeHunt) : null;
+  const tightness = workingCopy ? huntTightness(workingCopy) : null;
+  const editorOpen = workingCopy != null;
 
   return (
     <>
       <Masthead />
+      <Dialog
+        open={editorOpen}
+        onOpenChange={(open) => {
+          if (!open) handleCollapse();
+        }}
+      >
+        <DialogContent
+          showCloseButton
+          className="max-h-[min(90vh,900px)] overflow-y-auto border-line-strong bg-card p-0 sm:max-w-2xl"
+        >
+          <DialogTitle className="sr-only">
+            {workingCopy?.saved ? `Edit ${workingCopy.name}` : "New hunt"}
+          </DialogTitle>
+          {workingCopy && (
+            <HuntEditorPanel
+              hunt={workingCopy}
+              tightness={tightness}
+              savedFlash={savedFlash}
+              attributeLibrary={attributeLibrary}
+              attributeHidden={attributeHidden}
+              onUpdate={(next) => setWorkingCopy({ ...next, saved: false })}
+              onTogglePick={togglePick}
+              onAddCustom={handleAddCustomFilter}
+              onRemoveOption={handleRemoveOption}
+              hasHiddenTiles={hasHiddenTiles}
+              onRestoreAllTiles={restoreAllAttributeTiles}
+              onSave={handleSave}
+              onDelete={handleDelete}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+
       <main className="mx-auto max-w-3xl space-y-8 px-4 py-8">
         <div>
           <h1 className="font-display text-3xl font-semibold text-ink">Hunts</h1>
@@ -226,51 +324,47 @@ export function HuntBuilderScreen() {
                 .filter((h) => h.saved)
                 .map((hunt) => {
                   const tightnessForHunt = huntTightness(hunt);
-                  const isEditing = editingId === hunt.id && !draft;
+                  const isActive = editingId === hunt.id && editorOpen;
 
                   return (
-                    <li
-                      key={hunt.id}
-                      className={cn(
-                        "rounded-sm border bg-card p-4",
-                        isEditing
-                          ? "border-brass bg-brass/5"
-                          : "border-line-strong"
-                      )}
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0 space-y-2">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <h3 className="font-display text-lg font-medium text-ink">
-                              {hunt.name}
-                            </h3>
-                            <HuntHeartsPicker value={hunt.hearts ?? 2} size="xs" />
-                          </div>
-                          <p className="font-display text-sm italic text-ink-soft">
-                            {buildHuntSummary(hunt)}
-                          </p>
-                          <Badge
-                            variant="outline"
-                            className={cn(
-                              tightnessForHunt.level === "specific" &&
-                                "border-steal text-steal"
-                            )}
-                          >
-                            {tightnessForHunt.label}
-                          </Badge>
-                        </div>
-                        {!isEditing && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="shrink-0"
-                            onClick={() => openEdit(hunt)}
-                          >
-                            <Pencil className="mr-1 h-3 w-3" />
-                            Edit
-                          </Button>
+                    <li key={hunt.id}>
+                      <button
+                        type="button"
+                        onClick={() => openEdit(hunt)}
+                        className={cn(
+                          "w-full rounded-sm border bg-card p-4 text-left transition-colors hover:border-brass/50 hover:bg-brass/5",
+                          isActive
+                            ? "border-brass bg-brass/10 ring-1 ring-brass/30"
+                            : "border-line-strong"
                         )}
-                      </div>
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0 space-y-2">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <h3 className="font-display text-lg font-medium text-ink">
+                                {hunt.name}
+                              </h3>
+                              <HuntHeartsPicker value={hunt.hearts ?? 2} size="xs" />
+                            </div>
+                            <p className="font-display text-sm italic text-ink-soft">
+                              {buildHuntSummary(hunt)}
+                            </p>
+                            <Badge
+                              variant="outline"
+                              className={cn(
+                                tightnessForHunt.level === "specific" &&
+                                  "border-steal text-steal"
+                              )}
+                            >
+                              {tightnessForHunt.label}
+                            </Badge>
+                          </div>
+                          <span className="flex shrink-0 items-center gap-1 text-xs text-ink-soft">
+                            <Pencil className="h-3 w-3" />
+                            Edit
+                          </span>
+                        </div>
+                      </button>
                     </li>
                   );
                 })}
@@ -278,178 +372,10 @@ export function HuntBuilderScreen() {
           )}
         </section>
 
-        {/* Hunt editor */}
-        {expanded && activeHunt && (
-          <section className="space-y-6 rounded-sm border border-line-strong bg-card p-6">
-            <div className="flex items-center gap-2">
-              <Input
-                value={activeHunt.name}
-                onChange={(e) =>
-                  setWorkingCopy({
-                    ...activeHunt,
-                    name: e.target.value,
-                    saved: false,
-                  })
-                }
-                className="font-display text-lg"
-                placeholder="Hunt name"
-              />
-              <Button variant="ghost" size="icon" onClick={handleCollapse}>
-                <ChevronDown className="h-4 w-4" />
-              </Button>
-            </div>
-
-            <div className="space-y-2">
-              <Label className="text-brass">Gender</Label>
-              <div className="flex flex-wrap gap-2">
-                {HUNT_GENDER_OPTIONS.map((opt) => (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    onClick={() =>
-                      setWorkingCopy({
-                        ...activeHunt,
-                        gender: opt.value,
-                        saved: false,
-                      })
-                    }
-                    className={cn(
-                      "rounded-sm border px-3 py-1.5 text-sm",
-                      (activeHunt.gender ?? "both") === opt.value
-                        ? "border-brass bg-brass/15 text-ink"
-                        : "border-line-strong text-ink-soft"
-                    )}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label className="text-brass">How badly do you want this hunt?</Label>
-              <p className="text-xs text-ink-soft">
-                1 heart = keeping an eye out · 4 hearts = must-find
-              </p>
-              <HuntHeartsPicker
-                value={activeHunt.hearts ?? 2}
-                onChange={(hearts: HuntHearts) =>
-                  setWorkingCopy({
-                    ...activeHunt,
-                    hearts,
-                    saved: false,
-                  })
-                }
-              />
-            </div>
-
-            {ATTR_KEYS.map((key) => (
-              <div key={key} className="space-y-2">
-                <Label className="text-brass">{ATTR_OPTIONS[key].label}</Label>
-                <div className="flex flex-wrap gap-2">
-                  {ATTR_OPTIONS[key].options.map((opt) => {
-                    const selected = (activeHunt.attributes[key]?.picks ?? []).includes(opt);
-                    return (
-                      <button
-                        key={opt}
-                        type="button"
-                        onClick={() => togglePick(key, opt)}
-                        className={cn(
-                          "rounded-sm border px-2 py-1 text-xs",
-                          selected
-                            ? "border-brass bg-brass/15 text-ink"
-                            : "border-line-strong text-ink-soft"
-                        )}
-                      >
-                        {opt}
-                      </button>
-                    );
-                  })}
-                </div>
-                <Input
-                  placeholder="Or type your own (comma-separated)"
-                  defaultValue={(activeHunt.attributes[key]?.customs ?? []).join(", ")}
-                  onBlur={(e) => handleCustomInput(key, e.target.value)}
-                  className="text-sm"
-                />
-              </div>
-            ))}
-
-            <div className="rounded-sm border border-line bg-paper/50 p-4">
-              <p className="font-display text-sm italic text-ink">
-                {buildHuntSummary(activeHunt)}
-              </p>
-              {tightness && (
-                <Badge
-                  variant="outline"
-                  className={cn(
-                    "mt-2",
-                    tightness.level === "specific" && "border-steal text-steal"
-                  )}
-                >
-                  {tightness.label}
-                </Badge>
-              )}
-            </div>
-
-            <div className="flex items-center justify-between gap-4">
-              <Button
-                variant="ghost"
-                className="text-steal"
-                onClick={handleDelete}
-              >
-                <Trash2 className="mr-1 h-3 w-3" />
-                Delete
-              </Button>
-              <div className="flex items-center gap-2">
-                {!activeHunt.saved && (
-                  <span className="text-xs text-brass">Unsaved changes</span>
-                )}
-                <Button onClick={handleSave} className="bg-ink text-card">
-                  {savedFlash ? "Saved" : "Save hunt"}
-                </Button>
-              </div>
-            </div>
-          </section>
-        )}
-
-        {/* Global filters */}
-        <section className="space-y-4 rounded-sm border border-line-strong bg-card p-6">
-          <h2 className="font-display text-xl font-medium text-ink">Global filters</h2>
-          <div className="space-y-2">
-            <Label htmlFor="price-ceiling">Price ceiling (landed cost)</Label>
-            <Input
-              id="price-ceiling"
-              type="number"
-              value={globalFilters.priceCeiling ?? ""}
-              onChange={(e) =>
-                setGlobalFilters({
-                  priceCeiling: e.target.value ? Number(e.target.value) : null,
-                })
-              }
-              placeholder="No limit"
-            />
-          </div>
-          <div className="flex items-center justify-between">
-            <Label htmlFor="ships-to-me">Ships to my address</Label>
-            <Switch
-              id="ships-to-me"
-              checked={globalFilters.shipsToMe}
-              onCheckedChange={(v) => setGlobalFilters({ shipsToMe: v })}
-            />
-          </div>
-          {globalFilters.shipsToMe && (
-            <div className="space-y-2">
-              <Label htmlFor="postal">Postal code</Label>
-              <Input
-                id="postal"
-                value={globalFilters.postalCode ?? ""}
-                onChange={(e) => setGlobalFilters({ postalCode: e.target.value })}
-                placeholder="M6K1V8"
-              />
-            </div>
-          )}
-        </section>
+        <GlobalFiltersSection
+          globalFilters={globalFilters}
+          onChange={setGlobalFilters}
+        />
 
         {/* Purchased watches */}
         <section className="space-y-4 rounded-sm border border-line-strong bg-card p-6">
@@ -486,5 +412,273 @@ export function HuntBuilderScreen() {
         </section>
       </main>
     </>
+  );
+}
+
+function HuntEditorPanel({
+  hunt,
+  tightness,
+  savedFlash,
+  attributeLibrary,
+  attributeHidden,
+  onUpdate,
+  onTogglePick,
+  onAddCustom,
+  onRemoveOption,
+  hasHiddenTiles,
+  onRestoreAllTiles,
+  onSave,
+  onDelete,
+}: {
+  hunt: Hunt;
+  tightness: ReturnType<typeof huntTightness> | null;
+  savedFlash: boolean;
+  attributeLibrary: AttributeLibrary;
+  attributeHidden: AttributeLibrary;
+  onUpdate: (hunt: Hunt) => void;
+  onTogglePick: (key: AttrKey, value: string) => void;
+  onAddCustom: (key: AttrKey, value: string) => void;
+  onRemoveOption: (key: AttrKey, value: string) => void;
+  hasHiddenTiles: boolean;
+  onRestoreAllTiles: () => void;
+  onSave: () => void;
+  onDelete: () => void;
+}) {
+  const [editingTiles, setEditingTiles] = useState(false);
+
+  return (
+    <section className="space-y-6 p-6 pt-8">
+      <div className="space-y-1">
+        <div className="flex items-center gap-2 pr-8">
+          <Input
+            value={hunt.name}
+            onChange={(e) => onUpdate({ ...hunt, name: e.target.value })}
+            className="min-w-0 flex-1 font-display text-lg"
+            placeholder="Hunt name"
+          />
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className={cn(
+              "h-9 shrink-0 px-2 text-xs",
+              editingTiles ? "text-brass" : "text-ink-soft"
+            )}
+            onClick={() => setEditingTiles((v) => !v)}
+          >
+            <Pencil className="mr-1 h-3 w-3" />
+            {editingTiles ? "Done" : "Edit tiles"}
+          </Button>
+        </div>
+        {editingTiles && (
+          <div className="flex flex-wrap items-center justify-end gap-3 text-xs text-ink-soft">
+            <span>Tap × on a tile to remove it from suggestions</span>
+            {hasHiddenTiles && (
+              <button
+                type="button"
+                className="text-brass underline-offset-2 hover:underline"
+                onClick={() => {
+                  onRestoreAllTiles();
+                  setEditingTiles(false);
+                }}
+              >
+                Restore all removed tiles
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
+      <div className="space-y-2">
+        <Label className="text-brass">Gender</Label>
+        <div className="flex flex-wrap gap-2">
+          {HUNT_GENDER_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => onUpdate({ ...hunt, gender: opt.value })}
+              className={cn(
+                "rounded-sm border px-3 py-1.5 text-sm",
+                (hunt.gender ?? "both") === opt.value
+                  ? "border-brass bg-brass/15 text-ink"
+                  : "border-line-strong text-ink-soft"
+              )}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {ATTR_KEYS.map((key) => (
+        <AttributeFilterSection
+          key={key}
+          attrKey={key}
+          hunt={hunt}
+          savedCustoms={attributeLibrary[key] ?? []}
+          hiddenOptions={attributeHidden[key] ?? []}
+          editingTiles={editingTiles}
+          onTogglePick={onTogglePick}
+          onAddCustom={onAddCustom}
+          onRemoveOption={onRemoveOption}
+        />
+      ))}
+
+      <div className="space-y-2">
+        <Label className="text-brass">How badly do you want this hunt?</Label>
+        <p className="text-xs text-ink-soft">
+          1 heart = keeping an eye out · 4 hearts = must-find
+        </p>
+        <HuntHeartsPicker
+          value={hunt.hearts ?? 2}
+          onChange={(hearts: HuntHearts) => onUpdate({ ...hunt, hearts })}
+        />
+      </div>
+
+      <div className="rounded-sm border border-line bg-paper/50 p-4">
+        <p className="font-display text-sm italic text-ink">{buildHuntSummary(hunt)}</p>
+        {tightness && (
+          <Badge
+            variant="outline"
+            className={cn(
+              "mt-2",
+              tightness.level === "specific" && "border-steal text-steal"
+            )}
+          >
+            {tightness.label}
+          </Badge>
+        )}
+      </div>
+
+      <div className="flex items-center justify-between gap-4">
+        <Button variant="ghost" className="text-steal" onClick={onDelete}>
+          <Trash2 className="mr-1 h-3 w-3" />
+          Delete
+        </Button>
+        <div className="flex items-center gap-2">
+          {!hunt.saved && (
+            <span className="text-xs text-brass">Unsaved changes</span>
+          )}
+          <Button onClick={onSave} className="bg-ink text-card">
+            {savedFlash ? "Saved" : "Save hunt"}
+          </Button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function AttributeFilterSection({
+  attrKey,
+  hunt,
+  savedCustoms,
+  hiddenOptions,
+  editingTiles,
+  onTogglePick,
+  onAddCustom,
+  onRemoveOption,
+}: {
+  attrKey: AttrKey;
+  hunt: Hunt;
+  savedCustoms: string[];
+  hiddenOptions: string[];
+  editingTiles: boolean;
+  onTogglePick: (key: AttrKey, value: string) => void;
+  onAddCustom: (key: AttrKey, value: string) => void;
+  onRemoveOption: (key: AttrKey, value: string) => void;
+}) {
+  const [input, setInput] = useState("");
+  let chips = attributeChipOptions(attrKey, savedCustoms, hunt, hiddenOptions);
+  if (attrKey === "model") {
+    chips = [...chips].sort((a, b) => a.localeCompare(b));
+  }
+  const attr = hunt.attributes[attrKey] ?? { picks: [], customs: [] };
+  const presetSet = new Set(
+    ATTR_OPTIONS[attrKey].options.map((o) => normalizeCustomValue(o))
+  );
+
+  const submitCustom = () => {
+    if (!input.trim()) return;
+    onAddCustom(attrKey, input);
+    setInput("");
+  };
+
+  return (
+    <div className={cn("space-y-2", attrKey === "traits" && "border-t border-line pt-4")}>
+      <Label className="text-brass">{ATTR_OPTIONS[attrKey].label}</Label>
+      {attrKey === "traits" && (
+        <p className="text-xs text-ink-soft">
+          Anything else you care about — add a filter and tap to select
+        </p>
+      )}
+      {chips.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {chips.map((opt) => {
+            const selected = isAttributeValueSelected(attr, opt);
+            const isCustom = !presetSet.has(normalizeCustomValue(opt));
+            return (
+              <span
+                key={opt}
+                className={cn(
+                  "inline-flex items-center gap-0.5 rounded-sm border text-xs",
+                  editingTiles
+                    ? "border-steal/40 bg-steal/5 pr-0.5"
+                    : selected
+                      ? "border-brass bg-brass/15 text-ink"
+                      : "border-line-strong text-ink-soft",
+                  isCustom && !selected && !editingTiles && "border-dashed"
+                )}
+              >
+                <button
+                  type="button"
+                  disabled={editingTiles}
+                  onClick={() => !editingTiles && onTogglePick(attrKey, opt)}
+                  className={cn(
+                    "px-2 py-1",
+                    editingTiles && "cursor-default opacity-70"
+                  )}
+                >
+                  {opt}
+                </button>
+                {editingTiles && (
+                  <button
+                    type="button"
+                    aria-label={`Remove ${opt}`}
+                    onClick={() => onRemoveOption(attrKey, opt)}
+                    className="rounded-sm p-1 text-steal hover:bg-steal/10"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                )}
+              </span>
+            );
+          })}
+        </div>
+      )}
+      <div className="flex gap-2">
+        <Input
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          placeholder={`Add ${ATTR_OPTIONS[attrKey].label.toLowerCase()} filter`}
+          className="text-sm"
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              submitCustom();
+            }
+          }}
+        />
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="shrink-0"
+          onClick={submitCustom}
+          disabled={!input.trim()}
+        >
+          Add
+        </Button>
+      </div>
+    </div>
   );
 }

@@ -1,4 +1,5 @@
 import { loadChrono24Listings } from "@/lib/chrono24/load-listings";
+import { enrichChrono24ListingsIfNeeded } from "@/lib/chrono24/enrich-images";
 import { fetchEbayListings, hasEbayCredentials } from "@/lib/ebay/client";
 import {
   filterVintageListings,
@@ -15,7 +16,7 @@ export interface LoadAllListingsResult {
 }
 
 export async function loadAllListings(): Promise<LoadAllListingsResult> {
-  const chronoRaw = loadChrono24Listings();
+  const chronoRaw = await enrichChrono24ListingsIfNeeded(loadChrono24Listings());
   const chronoNormalized = chronoRaw
     .map(normalizeChrono24Listing)
     .filter((l): l is AppListing => l != null);

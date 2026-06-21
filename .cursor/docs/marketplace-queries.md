@@ -17,7 +17,7 @@ flowchart LR
   subgraph app [In-app filters]
     Norm["Normalize + gender infer"]
     Crit["Global gates from Hunts page"]
-    FeedScope["Feed scope All / Hunt Finds + per-hunt"]
+    FeedScope["Feed scope: All / Top matches / Hunt matches + marketplace"]
   end
   Chrono24 --> Norm
   Ebay --> Norm
@@ -128,12 +128,15 @@ Chrono24 CDN blocks browser hotlinking. Cards use [`getListingImageSrc()`](../sr
 
 | Step | What happens |
 |------|----------------|
-| 1 | Server calls eBay Browse API on each page load |
-| 2 | OAuth client-credentials token cached in memory (~2h, refresh 5 min early) |
-| 3 | Results normalized and merged with Chrono24 in `loadAllListings()` |
-| 4 | If creds missing or API fails → Chrono24-only, no crash |
+| 1 | **Page loads:** read disk snapshot `data/ebay/vintage_timex.json` — **no live Browse API call** (avoids 429 rate limits) |
+| 2 | **Manual refresh:** `npm run sync:ebay` fetches live from Browse API, writes snapshot |
+| 3 | OAuth client-credentials token cached in memory (~2h, refresh 5 min early) |
+| 4 | Results normalized and merged with Chrono24 in `loadAllListings()` |
+| 5 | If creds missing or no snapshot → Chrono24-only, no crash |
+| 6 | Force live fetch on page load: set `EBAY_FORCE_REFRESH=1` in env |
 
 Client: [`src/lib/ebay/client.ts`](../src/lib/ebay/client.ts)  
+Snapshot: [`src/lib/ebay/snapshot.ts`](../src/lib/ebay/snapshot.ts)  
 Merge: [`src/lib/listings/load-all-listings.ts`](../src/lib/listings/load-all-listings.ts)
 
 ### Current search parameters
@@ -144,8 +147,9 @@ Merge: [`src/lib/listings/load-all-listings.ts`](../src/lib/listings/load-all-li
 | `category_ids` | `31387` (Wristwatches) | Hard-coded: `EBAY_WRISTWATCH_CATEGORY_ID` |
 | `aspect_filter` | `categoryId:31387,Brand:{Timex}` | Built in client from category + brand |
 | `limit` | `200` per page (max API page size) | Hard-coded: `EBAY_PAGE_SIZE` |
-| `offset` | `0`, then `200` | Paginated until `EBAY_SEARCH_LIMIT` (400) reached |
-| Total fetched | `400` | Hard-coded: `EBAY_SEARCH_LIMIT` in `src/lib/ebay/schema.ts` |
+| `offset` | `0`, then `200`, … | Paginated until `EBAY_SEARCH_LIMIT` reached |
+| Total fetched (sync) | `2000` (default) | `EBAY_SEARCH_LIMIT` env or [`schema.ts`](../src/lib/ebay/schema.ts) |
+| Page load fetch | **0** (snapshot only) | Reads `data/ebay/vintage_timex.json` |
 | `sort` | `newlyListed` | Hard-coded in client |
 | Marketplace | `EBAY_CA` | `.env.local` → `EBAY_MARKETPLACE_ID` |
 | Environment | `production` | `.env.local` → `EBAY_ENV` (`production` \| `sandbox`) |
@@ -159,6 +163,14 @@ EBAY_CLIENT_ID=
 EBAY_CLIENT_SECRET=
 EBAY_MARKETPLACE_ID=EBAY_CA
 EBAY_ENV=production
+# EBAY_SEARCH_LIMIT=2000          # max for npm run sync:ebay
+# EBAY_FORCE_REFRESH=1            # force live API on page load (dev only)
+```
+
+**Refresh eBay data:**
+
+```bash
+npm run sync:ebay
 ```
 
 ### API call
@@ -181,7 +193,7 @@ Second page (when more results needed):
   &sort=newlyListed
 ```
 
-Up to **400** items total (`EBAY_SEARCH_LIMIT`); stops early if fewer are available.
+Up to **2000** items total (`EBAY_SEARCH_LIMIT` default); stops early if fewer are available.
 
 Headers:
 
@@ -189,7 +201,7 @@ Headers:
 - `X-EBAY-C-MARKETPLACE-ID: EBAY_CA` (or env override)
 - `Accept: application/json`
 
-Response cached with Next.js `revalidate: 300` (5 minutes).
+Live API results are written to `data/ebay/vintage_timex.json`. Page loads read the snapshot; in-process memory cache TTL is 6 hours.
 
 ### Post-fetch filters (app)
 
@@ -214,7 +226,8 @@ When eBay returns domestic shipping cost on the summary, it is stored as `shippi
 
 | What | Where |
 |------|--------|
-| Query + limit constants | `src/lib/ebay/schema.ts` — `EBAY_DEFAULT_QUERY`, `EBAY_SEARCH_LIMIT` (400), `EBAY_PAGE_SIZE` (200), `EBAY_WRISTWATCH_CATEGORY_ID` |
+| Query + limit constants | `src/lib/ebay/schema.ts` — `EBAY_DEFAULT_QUERY`, `EBAY_SEARCH_LIMIT` (2000), `EBAY_PAGE_SIZE` (200), `EBAY_WRISTWATCH_CATEGORY_ID` |
+| Snapshot read/write | `src/lib/ebay/snapshot.ts` |
 | Title blocklist | `src/lib/ebay/title-filter.ts` — `shouldExcludeEbayTitle()` |
 | OAuth + search | `src/lib/ebay/client.ts` — `fetchEbayListings()` |
 | Response schema | `src/lib/ebay/schema.ts` — `ebaySearchResponseSchema` |
@@ -222,7 +235,7 @@ When eBay returns domestic shipping cost on the summary, it is stored as `shippi
 ### Target (draft — edit me)
 
 - **Primary query:** `timex vintage watch` + wristwatch category + Timex brand aspect *(current)*
-- **Result limit:** 400 total (2 × 200-page Browse API calls) / split across queries
+- **Result limit:** 2000 total for `npm run sync:ebay` / page loads use disk snapshot
 - **Sort:** newlyListed / price / other
 - **Marketplace:** EBAY_CA *(current)* / EBAY_US
 - **Title blocklist:** extend if apparel or parts-only listings still leak through
@@ -245,9 +258,10 @@ Defaults from global filters on `/hunts` (synced to [`src/lib/criteria.ts`](../s
 | Hidden listings | Excluded | `passesListingFilters()` in `src/lib/listings/selectors.ts` |
 | Disliked models | Excluded | `passesListingFilters()` |
 | Seen / starred | Excluded from **New**; starred in own tab | `unseenListings()`, `interestedListings()` |
-| Feed scope (New tab) | **All** / **Hunt Finds** + per-hunt (`hunt:{id}`) | `alertListings()` |
+| Feed scope (New tab) | **All listings** / **Top matches** / **Hunt matches** + per-hunt (`hunt:{id}`) | `alertListings()` |
+| Marketplace filter | All / eBay / Chrono24 | `marketplaceFilter` in selectors |
 | Hunt scoring | `C × S × H` (0–8); hearts in `H` | `scoreListingAgainstHunt()` |
-| Hunt gender | Per-hunt gate (Men's / Women's / Both) | `scoreListingAgainstHunt()` in `hunt-match.ts` |
+| Hunt gender | Per-hunt gate (8 gender options) | `listingMatchesHuntGender()` in `gender.ts` |
 
 **Shipping estimates:** Total cost uses seeded deterministic shipping unless eBay provides a domestic `shipping_cost` on the listing. Chrono24 listings always use the estimate model today.
 
@@ -266,13 +280,14 @@ Defaults from global filters on `/hunts` (synced to [`src/lib/criteria.ts`](../s
 
 | | Chrono24 | eBay |
 |--|----------|------|
-| Fetch mode | Static JSON (scraper) | Live Browse API |
+| Fetch mode | Static JSON (scraper) | Disk snapshot; live via `npm run sync:ebay` |
 | Query count | 10 (with `--vintage`) | 1 |
-| Result cap | ~120 per query, deduped across queries | 400 total (paginated) |
+| Result cap | ~120 per query, deduped across queries | 2000 total (sync); page load reads snapshot |
 | Vintage filter at fetch | Yes (`--vintage-only`) | Search text only; category + brand at API |
 | Non-watch exclusion | Scraper site context | Wristwatch category + title blocklist |
-| Refresh | Manual scraper + `sync:listings` | Every page load (~5 min cache) |
+| Refresh | Manual scraper + `sync:listings` | `npm run sync:ebay` (or `EBAY_FORCE_REFRESH=1`) |
 | Credentials | FlareSolverr URL in scraper `.env` | `EBAY_CLIENT_ID` / `EBAY_CLIENT_SECRET` in `.env.local` |
+| Images | Proxied via `/api/listing-image` | Direct CDN URLs |
 
 ---
 

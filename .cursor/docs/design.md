@@ -90,7 +90,9 @@ Every candidate card presents information in this sequence:
    shown** (never just a single price). Flag when shipping is unconfirmed.
 7. **Condition flag** — likely-working (`ok`) / uncertain (`brass`), with the
    evidence behind it. A confidence read, never a guarantee.
-8. **Actions** — Star · Dismiss · View on source.
+8. **Actions** — Interesting · Dismiss · View on source.
+
+> Shipped UI label is **Interesting** (not "Star"); starred state uses the `steal` accent when active.
 
 ## Principles
 
@@ -113,7 +115,7 @@ Every candidate card presents information in this sequence:
 - Borders + faint grain do the work; avoid heavy drop shadows. One soft elevation
   shadow max, only on the hero card.
 - Buttons: outline default (ink border), one solid dark primary ("View on source").
-  Starred state switches to `steal`.
+  Interesting/starred state switches to `steal`.
 - Visible keyboard focus everywhere: `2px solid steal`, offset 2px.
 - Responsive to mobile (single column ≤680px). Respect `prefers-reduced-motion`.
 - Motion is restrained: hover lift (~2px) + subtle entrance fade-up. Nothing more.

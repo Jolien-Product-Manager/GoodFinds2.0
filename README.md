@@ -8,13 +8,13 @@ Vintage Timex hunting assistant — aggregate listings from Chrono24 and eBay, t
 
 ```bash
 npm install
-cp .env.local.example .env.local   # add eBay API keys (optional)
+cp .env.local.example .env.local   # eBay + Supabase keys (optional)
 npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) for the feed. Hunts live at `/hunts`.
 
-**Feed tabs:** New · Starred · Dismissed. Under **New**, **Watch-list** shows listings that match your saved hunts (gender + taste criteria on `/hunts`).
+**Feed views (sidebar):** New · Starred · Dismissed. Under **New**: **All listings** · **Top matches** · **Hunt matches** (with per-hunt sub-filters) · **Marketplace** (eBay / Chrono24).
 
 ## Chrono24 data
 
@@ -30,6 +30,8 @@ npm run sync:listings
 
 Sample data ships in `data/chrono24/vintage_timex.json` for local dev. `sync:listings` **does not overwrite** existing data if the scraper returns 0 listings (e.g. without FlareSolverr).
 
+Chrono24 images are proxied via `/api/listing-image` (CDN blocks browser hotlinking).
+
 ## eBay (optional)
 
 Set in `.env.local`:
@@ -41,7 +43,23 @@ EBAY_MARKETPLACE_ID=EBAY_CA
 EBAY_ENV=production
 ```
 
-Without credentials the app runs Chrono24-only. With credentials, the feed pulls up to **10,000** eBay Timex wristwatch listings (paginated at 200 per Browse API request, sorted by newly listed).
+**Page loads use the disk snapshot** (`data/ebay/vintage_timex.json`) — not live API — to avoid rate limits. Refresh with:
+
+```bash
+npm run sync:ebay
+```
+
+Without credentials or snapshot the app runs Chrono24-only. Sync fetches up to **2000** listings (override via `EBAY_SEARCH_LIMIT`).
+
+## Supabase auth (optional)
+
+Sign in with magic-link email to sync hunts, dismissals, and stars across devices.
+
+1. Create a Supabase project and run `supabase/schema.sql`
+2. Add `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` to `.env.local`
+3. Configure auth redirect: `http://localhost:3000/auth/callback`
+
+Without Supabase, state persists to `data/store/state.json` locally.
 
 ## Commit with change details
 
@@ -52,10 +70,10 @@ Without credentials the app runs Chrono24-only. With credentials, the feed pulls
 ## Deploy (Vercel)
 
 1. Push to GitHub and import the repo in [Vercel](https://vercel.com).
-2. Set environment variables: `EBAY_CLIENT_ID`, `EBAY_CLIENT_SECRET`, `EBAY_MARKETPLACE_ID`, `EBAY_ENV`.
+2. Set environment variables: eBay keys, Supabase keys (recommended for persistence).
 3. Deploy — `vercel.json` is included.
 
-**Note:** User state (dismissed, starred, hunts, purchases) persists to `data/store/state.json` on the server. On Vercel's ephemeral filesystem this resets between cold starts unless you mount persistent storage. For production persistence, use Vercel Postgres/KV or deploy to a platform with a persistent disk.
+**Note:** Without Supabase, user state on Vercel's ephemeral filesystem resets between cold starts. Use Supabase for production persistence.
 
 ## Scripts
 
@@ -63,7 +81,9 @@ Without credentials the app runs Chrono24-only. With credentials, the feed pulls
 |---------|-------------|
 | `npm run dev` | Development server |
 | `npm run build` | Production build |
-| `npm run sync:listings` | Copy scraper output into `data/chrono24/` (skips if empty) |
+| `npm run sync:listings` | Copy Chrono24 scraper output into `data/chrono24/` |
+| `npm run sync:ebay` | Fetch eBay listings and write `data/ebay/vintage_timex.json` |
+| `npm run enrich:chrono24` | Enrich Chrono24 snapshot with real image URLs (needs FlareSolverr) |
 
 ## Docs
 

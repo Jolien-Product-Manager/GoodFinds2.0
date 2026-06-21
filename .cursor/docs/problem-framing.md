@@ -22,6 +22,7 @@
 - **2.1 Total cost** — Users want to know upfront the total delivered cost to secure a watch under $X: list + shipping + duties/tax, not list price alone.
 - **2.2 Deliverability** — Users only want to see what can actually reach them. If it can't ship to M6K1V8, it shouldn't be surfaced.
   *"Less than $50 in total cost (including shipping to M6K1V8)."*
+- **2.3 Continuity** — Hunts, dismissals, and saved listings should follow the user across devices (optional Supabase sign-in).
 
 ### 3. Trust — can I believe what the listing tells me?
 
@@ -49,7 +50,7 @@ A knowledgeable, nostalgia- and design-driven hobbyist hunting cheap, characterf
 
 ## How We Measure Success
 
-**North Star:** *Saves per session* — how many watches a user stars each time they open the tool.
+**North Star:** *Saves per session* — how many watches a user marks **Interesting** each time they open the tool.
 
 **Efficiency guardrail:** *Time to first save* — how long from opening the tool to starring the first watch.
 

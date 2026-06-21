@@ -1,3 +1,5 @@
+import { TIMEX_MODELS } from "@/lib/models/catalog";
+
 export type AttrKey =
   | "model"
   | "collab"
@@ -6,15 +8,23 @@ export type AttrKey =
   | "era"
   | "case"
   | "mvmt"
-  | "storeFind"
-  | "cond";
+  | "cond"
+  | "traits";
 
 export interface HuntAttribute {
   picks: string[];
   customs: string[];
 }
 
-export type HuntGender = "mens" | "womens" | "both";
+export type HuntGender =
+  | "mens"
+  | "womens"
+  | "both"
+  | "unisex"
+  | "childrens"
+  | "boys"
+  | "girls"
+  | "unisex_children";
 
 /** How badly the user wants this hunt (1 = mild, 4 = must-have). */
 export type HuntHearts = 1 | 2 | 3 | 4;
@@ -52,15 +62,7 @@ export const ATTR_OPTIONS: Record<
 > = {
   model: {
     label: "Model / line",
-    options: [
-      "Marlin",
-      "Viscount",
-      "Mercury",
-      "17/21 jewel",
-      "Camper",
-      "Electric",
-      "Diver",
-    ],
+    options: [...TIMEX_MODELS].sort((a, b) => a.localeCompare(b)),
   },
   collab: {
     label: "Collaboration",
@@ -94,15 +96,6 @@ export const ATTR_OPTIONS: Record<
     label: "Movement",
     options: ["Manual wind", "Self-wind / auto", "Electric"],
   },
-  storeFind: {
-    label: "Store find",
-    options: [
-      "Deadstock",
-      "Tags attached",
-      "With original box",
-      "Open box",
-    ],
-  },
   cond: {
     label: "Condition grade",
     options: [
@@ -114,15 +107,111 @@ export const ATTR_OPTIONS: Record<
       "For parts / project",
     ],
   },
+  traits: {
+    label: "Your characteristics",
+    options: [],
+  },
 };
 
 export const ATTR_KEYS = Object.keys(ATTR_OPTIONS) as AttrKey[];
+
+/** Preset attribute rows in the hunt builder (excludes free-form traits). */
+export const PRESET_ATTR_KEYS = ATTR_KEYS.filter((k) => k !== "traits") as Exclude<
+  AttrKey,
+  "traits"
+>[];
 
 export const HUNT_GENDER_OPTIONS: { value: HuntGender; label: string }[] = [
   { value: "both", label: "Men's & Women's" },
   { value: "mens", label: "Men's" },
   { value: "womens", label: "Women's" },
+  { value: "unisex", label: "Unisex" },
+  { value: "childrens", label: "Children's" },
+  { value: "boys", label: "Boys" },
+  { value: "girls", label: "Girls" },
+  { value: "unisex_children", label: "Unisex children's" },
 ];
+
+const VALID_HUNT_GENDERS = new Set<HuntGender>(
+  HUNT_GENDER_OPTIONS.map((o) => o.value)
+);
+
+/** Preset + saved custom options for a hunt attribute section. */
+export function attributeChipOptions(
+  key: AttrKey,
+  savedCustoms: string[],
+  hunt?: Hunt,
+  hidden: string[] = []
+): string[] {
+  const hiddenNorms = new Set(hidden.map(normalizeCustomValue));
+  const presets = ATTR_OPTIONS[key].options.filter(
+    (p) => !hiddenNorms.has(normalizeCustomValue(p))
+  );
+  const extras = [
+    ...(hunt?.attributes[key]?.picks ?? []),
+    ...(hunt?.attributes[key]?.customs ?? []),
+    ...savedCustoms,
+  ].filter((v) => !hiddenNorms.has(normalizeCustomValue(v)));
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const value of [...presets, ...extras]) {
+    const norm = normalizeCustomValue(value);
+    if (!norm || seen.has(norm)) continue;
+    seen.add(norm);
+    out.push(value);
+  }
+  return out;
+}
+
+export function isAttributeValueSelected(
+  attr: HuntAttribute | undefined,
+  value: string
+): boolean {
+  if (!attr) return false;
+  const norm = normalizeCustomValue(value);
+  return [...attr.picks, ...attr.customs].some(
+    (v) => normalizeCustomValue(v) === norm
+  );
+}
+
+export function toggleAttributePick(
+  attr: HuntAttribute,
+  value: string
+): HuntAttribute {
+  const norm = normalizeCustomValue(value);
+  const selected = [...attr.picks, ...attr.customs].some(
+    (v) => normalizeCustomValue(v) === norm
+  );
+  if (selected) {
+    return {
+      picks: attr.picks.filter((v) => normalizeCustomValue(v) !== norm),
+      customs: attr.customs.filter((v) => normalizeCustomValue(v) !== norm),
+    };
+  }
+  return {
+    picks: [...attr.picks, value],
+    customs: attr.customs.filter((v) => normalizeCustomValue(v) !== norm),
+  };
+}
+
+function consolidateAttributeValues(
+  key: AttrKey,
+  picks: string[],
+  customs: string[]
+): HuntAttribute {
+  const presetByNorm = new Map(
+    ATTR_OPTIONS[key].options.map((p) => [normalizeCustomValue(p), p])
+  );
+  const seen = new Set<string>();
+  const merged: string[] = [];
+  for (const raw of [...picks, ...customs]) {
+    const norm = normalizeCustomValue(raw);
+    if (!norm || seen.has(norm)) continue;
+    seen.add(norm);
+    merged.push(presetByNorm.get(norm) ?? raw);
+  }
+  return { picks: merged, customs: [] };
+}
 
 export function emptyHuntAttributes(): Record<AttrKey, HuntAttribute> {
   const attrs = {} as Record<AttrKey, HuntAttribute>;
@@ -156,12 +245,27 @@ export function normalizeHunt(hunt: Partial<Hunt> & Pick<Hunt, "id" | "name">): 
     };
   }
 
-  // Migrate legacy Deadstock picks from condition → store find
+  // Migrate legacy storeFind picks/customs → traits
+  const legacyStoreFind = (hunt.attributes as Record<string, HuntAttribute> | undefined)
+    ?.storeFind;
+  if (legacyStoreFind) {
+    const migrated = [...legacyStoreFind.picks, ...legacyStoreFind.customs]
+      .map(normalizeCustomValue)
+      .filter(Boolean);
+    if (migrated.length > 0) {
+      merged.traits = {
+        picks: [],
+        customs: [...new Set([...merged.traits.customs, ...migrated])],
+      };
+    }
+  }
+
+  // Deadstock in condition → traits (legacy)
   const condPicks = merged.cond.picks;
   if (condPicks.includes("Deadstock")) {
-    merged.storeFind = {
-      picks: [...new Set([...merged.storeFind.picks, "Deadstock"])],
-      customs: merged.storeFind.customs,
+    merged.traits = {
+      picks: [],
+      customs: [...new Set([...merged.traits.customs, "deadstock"])],
     };
     merged.cond = {
       picks: condPicks.filter((p) => p !== "Deadstock"),
@@ -169,12 +273,21 @@ export function normalizeHunt(hunt: Partial<Hunt> & Pick<Hunt, "id" | "name">): 
     };
   }
 
+  for (const k of ATTR_KEYS) {
+    merged[k] = consolidateAttributeValues(
+      k,
+      merged[k].picks,
+      merged[k].customs
+    );
+  }
+
   const now = new Date().toISOString();
   return {
     id: hunt.id,
     name: hunt.name,
     saved: hunt.saved ?? false,
-    gender: hunt.gender ?? "both",
+    gender:
+      hunt.gender && VALID_HUNT_GENDERS.has(hunt.gender) ? hunt.gender : "both",
     hearts: resolveHuntHearts(hunt),
     attributes: merged,
     createdAt: hunt.createdAt ?? now,

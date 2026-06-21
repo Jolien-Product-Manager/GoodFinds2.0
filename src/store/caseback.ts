@@ -10,11 +10,14 @@ import {
   emptyHuntAttributes,
   normalizeCustomValue,
   normalizeHunt,
+  ATTR_OPTIONS,
   type GlobalFilters,
   type Hunt,
   type HuntHearts,
   type PurchasedWatch,
+  type AttrKey,
 } from "@/lib/hunts/types";
+import type { AttributeLibrary } from "@/lib/persistence/types";
 import { normalizePurchasedWatch } from "@/lib/hunts/purchased-watch";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
@@ -33,6 +36,8 @@ interface CasebackState {
   hunts: Hunt[];
   globalFilters: GlobalFilters;
   purchasedWatches: PurchasedWatch[];
+  attributeLibrary: AttributeLibrary;
+  attributeHidden: AttributeLibrary;
   dismissListing: (id: string) => void;
   restoreListing: (id: string) => void;
   toggleInterested: (id: string) => void;
@@ -45,6 +50,9 @@ interface CasebackState {
   setHunts: (hunts: Hunt[]) => void;
   setGlobalFilters: (filters: Partial<GlobalFilters>) => void;
   setPurchasedWatches: (watches: PurchasedWatch[]) => void;
+  addAttributeLibraryOption: (key: AttrKey, value: string) => void;
+  removeAttributeOption: (key: AttrKey, value: string) => void;
+  restoreAllAttributeTiles: () => void;
 }
 
 function huntTargetsModel(hunt: Hunt, model: string): boolean {
@@ -110,6 +118,8 @@ export const useCasebackStore = create<CasebackState>()(
         postalCode: "M6K1V8",
       },
       purchasedWatches: [],
+      attributeLibrary: {},
+      attributeHidden: {},
 
       dismissListing: (id) =>
         set((s) => ({
@@ -161,9 +171,56 @@ export const useCasebackStore = create<CasebackState>()(
           };
         }),
       setPurchasedWatches: (purchasedWatches) => set({ purchasedWatches }),
+      addAttributeLibraryOption: (key, value) =>
+        set((s) => {
+          const trimmed = value.trim();
+          if (!trimmed) return s;
+          const norm = normalizeCustomValue(trimmed);
+          const library = s.attributeLibrary ?? {};
+          const existing = library[key] ?? [];
+          if (existing.some((v) => normalizeCustomValue(v) === norm)) {
+            return s;
+          }
+          return {
+            attributeLibrary: {
+              ...library,
+              [key]: [...existing, trimmed],
+            },
+          };
+        }),
+      removeAttributeOption: (key, value) =>
+        set((s) => {
+          const trimmed = value.trim();
+          if (!trimmed) return s;
+          const norm = normalizeCustomValue(trimmed);
+          const library = s.attributeLibrary ?? {};
+          const hidden = s.attributeHidden ?? {};
+          const existingHidden = hidden[key] ?? [];
+          if (existingHidden.some((v) => normalizeCustomValue(v) === norm)) {
+            return s;
+          }
+          const presetLabel = ATTR_OPTIONS[key].options.find(
+            (o) => normalizeCustomValue(o) === norm
+          );
+          const label = presetLabel ?? trimmed;
+          const nextLibrary = { ...library };
+          if (library[key]?.some((v) => normalizeCustomValue(v) === norm)) {
+            nextLibrary[key] = library[key]!.filter(
+              (v) => normalizeCustomValue(v) !== norm
+            );
+          }
+          return {
+            attributeLibrary: nextLibrary,
+            attributeHidden: {
+              ...hidden,
+              [key]: [...existingHidden, label],
+            },
+          };
+        }),
+      restoreAllAttributeTiles: () => set({ attributeHidden: {} }),
     }),
     {
-      name: "caseback-state-v3",
+      name: "caseback-state-v5",
       onRehydrateStorage: () => (state) => {
         if (!state) return;
         const legacy = state as CasebackState & {
@@ -177,6 +234,8 @@ export const useCasebackStore = create<CasebackState>()(
         legacy.purchasedWatches = (legacy.purchasedWatches ?? []).map((p) =>
           normalizePurchasedWatch(p)
         );
+        legacy.attributeLibrary = legacy.attributeLibrary ?? {};
+        legacy.attributeHidden = legacy.attributeHidden ?? {};
         const feedView = state.feedView as string;
         if (feedView === "interested") {
           state.feedView = "starred";

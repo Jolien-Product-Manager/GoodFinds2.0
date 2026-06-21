@@ -5,10 +5,6 @@ import { normalizeCustomValue } from "@/lib/hunts/types";
 import { specificityMultiplier, huntTightness } from "@/lib/hunts/summary";
 import { collabPickMatchesListing, resolveListingCollab } from "@/lib/listings/collab";
 import { listingMatchesHuntGender } from "@/lib/listings/gender";
-import {
-  resolveListingStoreFind,
-  storeFindPickMatchesListing,
-} from "@/lib/listings/store-find";
 
 export type AttributeMatchStatus = "hit" | "miss" | "unverified";
 
@@ -43,6 +39,7 @@ export const FEED_SCORE_MAX = 8;
 
 function effectiveValues(hunt: Hunt, key: keyof Hunt["attributes"]): string[] {
   const attr = hunt.attributes[key];
+  if (!attr) return [];
   const values = [...attr.picks, ...attr.customs.map(normalizeCustomValue)];
   return values.map(normalizeCustomValue);
 }
@@ -81,11 +78,29 @@ function listingValueForAttr(
       return f.mvmt?.toLowerCase();
     case "cond":
       return f.cond?.toLowerCase();
-    case "storeFind":
-      return f.storeFind?.toLowerCase();
     default:
       return undefined;
   }
+}
+
+function listingSearchText(listing: AppListing): string {
+  const f = listing.features;
+  return normalizeCustomValue(
+    [
+      listing.title,
+      f.model,
+      f.collab,
+      f.dial,
+      f.color,
+      f.era,
+      f.case,
+      f.mvmt,
+      f.cond,
+      f.storeFind,
+    ]
+      .filter(Boolean)
+      .join(" ")
+  );
 }
 
 export function scoreListingAgainstHunt(
@@ -155,28 +170,14 @@ export function scoreListingAgainstHunt(
       continue;
     }
 
-    if (key === "storeFind") {
-      const hit = wanted.some((w) => storeFindPickMatchesListing(w, listing));
-      const inferred = resolveListingStoreFind(listing);
-      if (hit) {
+    if (key === "traits") {
+      const haystack = listingSearchText(listing);
+      const matched = wanted.find((w) => w.length > 0 && haystack.includes(w));
+      if (matched) {
         hits += 1;
-        matches.push({
-          key,
-          label,
-          status: "hit",
-          confidence: inferred
-            ? (listing.features.confidence.storeFind ?? "medium")
-            : listing.features.confidence.storeFind,
-        });
-      } else if (!inferred) {
-        matches.push({
-          key,
-          label,
-          status: "unverified",
-          confidence: listing.features.confidence.storeFind,
-        });
+        matches.push({ key, label: matched, status: "hit", confidence: "medium" });
       } else {
-        matches.push({ key, label, status: "miss" });
+        matches.push({ key, label: wanted[0] ?? key, status: "miss" });
       }
       continue;
     }

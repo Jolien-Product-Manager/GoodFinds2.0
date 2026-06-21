@@ -1,8 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import Image from "next/image";
-import { Check, ChevronLeft, ChevronRight, ExternalLink, Square, Star, X } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, ExternalLink, Square, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { AppListing } from "@/lib/listings/types";
 import type { AttributeMatch, HuntMatchResult } from "@/lib/listings/hunt-match";
@@ -22,7 +21,7 @@ const ATTR_SHORT: Partial<Record<AttrKey, string>> = {
   case: "Case",
   mvmt: "Movement",
   cond: "Condition",
-  storeFind: "Store find",
+  traits: "Trait",
 };
 
 function listingFeatureValue(listing: AppListing, key: string): string | undefined {
@@ -44,8 +43,8 @@ function listingFeatureValue(listing: AppListing, key: string): string | undefin
       return f.mvmt;
     case "cond":
       return f.cond;
-    case "storeFind":
-      return f.storeFind;
+    case "traits":
+      return undefined;
     default:
       return undefined;
   }
@@ -54,6 +53,10 @@ function listingFeatureValue(listing: AppListing, key: string): string | undefin
 function attributeTagLabel(match: AttributeMatch, listing: AppListing): string {
   const short = ATTR_SHORT[match.key as AttrKey];
   const full = ATTR_OPTIONS[match.key as AttrKey]?.label ?? match.label;
+
+  if (match.key === "traits") {
+    return match.label;
+  }
 
   if (match.status === "hit") {
     return listingFeatureValue(listing, match.key) ?? short ?? full;
@@ -72,10 +75,9 @@ function matchQualityLabel(score: number): string {
 
 function ListingPhotoCarousel({
   listing,
-  compact,
 }: {
   listing: AppListing;
-  compact: boolean;
+  compact?: boolean;
 }) {
   const [index, setIndex] = useState(0);
   const [failed, setFailed] = useState<Set<number>>(() => new Set());
@@ -90,43 +92,38 @@ function ListingPhotoCarousel({
   const currentSrc = imageSrcs[safeIndex];
   const currentFailed = failed.has(safeIndex);
   const hasMultiple = imageSrcs.length > 1;
-  const anyLoaded = imageSrcs.some((_, i) => !failed.has(i));
 
-  if (imageSrcs.length === 0 || !anyLoaded) {
+  if (imageSrcs.length === 0) {
     return (
-      <div className="flex h-full flex-col items-center justify-center bg-[#c9b896]/35">
+      <div className="flex h-full w-full flex-col items-center justify-center bg-[#c9b896]/35">
         <Square className="h-10 w-10 text-ink/15" strokeWidth={1.25} />
       </div>
     );
   }
 
   return (
-    <>
-      <div className="absolute inset-0 bg-[#c9b896]/20">
-        {currentSrc && !currentFailed ? (
-          <Image
-            src={currentSrc}
-            alt={`${listing.title} photo ${safeIndex + 1}`}
-            fill
-            className="object-cover"
-            sizes={
-              compact ? "(max-width: 640px) 50vw, 25vw" : "(max-width: 680px) 100vw, 33vw"
-            }
-            unoptimized
-            onError={() =>
-              setFailed((prev) => {
-                const next = new Set(prev);
-                next.add(safeIndex);
-                return next;
-              })
-            }
-          />
-        ) : (
-          <div className="flex h-full items-center justify-center bg-[#c9b896]/35 text-xs text-ink-soft">
-            Photo unavailable
-          </div>
-        )}
-      </div>
+    <div className="relative h-full w-full overflow-hidden">
+      {currentSrc && !currentFailed ? (
+        // eslint-disable-next-line @next/next/no-img-element -- proxied CDN URLs; native img keeps card layout stable
+        <img
+          src={currentSrc}
+          alt={`${listing.title} photo ${safeIndex + 1}`}
+          className="h-full w-full object-cover"
+          loading="lazy"
+          decoding="async"
+          onError={() =>
+            setFailed((prev) => {
+              const next = new Set(prev);
+              next.add(safeIndex);
+              return next;
+            })
+          }
+        />
+      ) : (
+        <div className="flex h-full w-full items-center justify-center bg-[#c9b896]/35 text-xs text-ink-soft">
+          Photo unavailable
+        </div>
+      )}
 
       {hasMultiple && (
         <>
@@ -156,7 +153,7 @@ function ListingPhotoCarousel({
           </button>
         </>
       )}
-    </>
+    </div>
   );
 }
 
@@ -169,22 +166,24 @@ function AttributeTag({
 }) {
   const label = attributeTagLabel(match, listing);
   const isHit = match.status === "hit";
+  const isMiss = match.status === "miss";
   const isUnverified = match.status === "unverified";
 
-  if (!isHit && !isUnverified) return null;
+  if (!isHit && !isMiss && !isUnverified) return null;
 
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px] leading-none",
-        isHit && "border border-line-strong bg-brass/10 text-ink",
+        "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] leading-none font-medium",
+        isHit && "bg-brass/12 text-ink",
+        isMiss && "bg-steal/10 text-steal",
         isUnverified && "border border-dashed border-line bg-card/50 text-ink-soft"
       )}
     >
       {isHit ? (
-        <Check className="h-3 w-3 shrink-0 text-brass" strokeWidth={2.5} />
+        <Check className="h-2.5 w-2.5 shrink-0 text-brass" strokeWidth={2.5} />
       ) : (
-        <Square className="h-3 w-3 shrink-0 opacity-40" strokeWidth={1.5} />
+        <Square className="h-2.5 w-2.5 shrink-0 opacity-50" strokeWidth={1.5} />
       )}
       {label}
     </span>
@@ -217,13 +216,11 @@ export function AlertListingCard({
   const costs = getTotalCost(listing, DEFAULT_CRITERIA.postalCode);
   const conditionLabel = listing.condition;
   const matchLabel = match && match.score > 0 ? matchQualityLabel(match.score) : "";
-  const bestHuntName =
-    match?.scoreBreakdown?.bestHuntName ?? match?.matchedHuntNames[0];
   const attributeMatches = match?.attributeMatches ?? [];
   const visibleAttributes = attributeMatches.filter(
-    (m) => m.status === "hit" || m.status === "unverified"
+    (m) => m.status === "hit" || m.status === "miss"
   );
-  const showMatchFooter = Boolean(bestHuntName && match && match.score > 0);
+  const showAttributeRow = visibleAttributes.length > 0;
 
   const metaLine = [listing.features.era, listing.year].filter(Boolean).join(" · ");
 
@@ -234,8 +231,8 @@ export function AlertListingCard({
         muted && "opacity-60"
       )}
     >
-      <div className={cn("relative", compact ? "aspect-[4/3]" : "aspect-[4/3]")}>
-        <ListingPhotoCarousel listing={listing} compact={compact} />
+      <div className="relative aspect-[4/3] w-full shrink-0 overflow-hidden bg-[#c9b896]/20">
+        <ListingPhotoCarousel listing={listing} />
 
         <span className="absolute left-3 top-3 rounded-full bg-ink px-2.5 py-0.5 text-[11px] font-medium lowercase tracking-wide text-card">
           {listing.source}
@@ -301,89 +298,80 @@ export function AlertListingCard({
 
         <div className={cn("flex items-center gap-2", compact ? "text-xs" : "text-sm")}>
           <span className="text-ink-soft">Condition</span>
-          <span className="rounded-full bg-brass/12 px-2.5 py-0.5 text-[11px] font-medium text-ink">
+          <span className="rounded-full bg-brass/12 px-2 py-0.5 text-[10px] font-medium text-ink">
             {conditionLabel}
           </span>
         </div>
 
-        {showMatchFooter && (
-          <div className="border-t border-line pt-2.5">
-            <p className={cn("flex items-center gap-2 text-ink-soft", compact ? "text-xs" : "text-sm")}>
-              <Check className="h-3.5 w-3.5 shrink-0 text-brass" strokeWidth={2.5} />
-              <span>
-                Matches your{" "}
-                <span className="font-medium text-steal">{bestHuntName}</span> hunt
-              </span>
-            </p>
+        <div className="mt-auto border-t border-line pt-2">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            {onToggleInterested && (
+              <button
+                type="button"
+                onClick={onToggleInterested}
+                className={cn(
+                  "inline-flex shrink-0 items-center gap-1 text-[11px] font-medium transition-colors",
+                  interested ? "text-steal" : "text-steal/80 hover:text-steal"
+                )}
+              >
+                {interested ? (
+                  <Check className="h-3 w-3 shrink-0" strokeWidth={2.5} />
+                ) : (
+                  <Square className="h-3 w-3 shrink-0" strokeWidth={2} />
+                )}
+                Interesting
+              </button>
+            )}
 
-            {visibleAttributes.length > 0 && (
-              <div className="mt-2 flex flex-wrap gap-1.5">
+            {showAttributeRow && (
+              <div className="flex min-w-0 flex-1 flex-wrap justify-end gap-1">
                 {visibleAttributes.map((m) => (
                   <AttributeTag key={m.key} match={m} listing={listing} />
                 ))}
               </div>
             )}
           </div>
-        )}
 
-        <div className={cn("mt-auto flex gap-2", compact ? "pt-1" : "pt-2")}>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className={cn(
-              "flex-1 rounded-lg border-line-strong bg-card text-ink hover:bg-paper",
-              compact && "h-8 text-xs",
-              interested && "border-steal/40 bg-steal/5 text-steal"
+          <div className="mt-1.5 flex items-center gap-1.5">
+            {onDismiss && (
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-8 w-8 shrink-0 rounded-md border-line-strong bg-card text-ink hover:bg-paper"
+                onClick={onDismiss}
+                aria-label="Dismiss listing"
+              >
+                <X className="h-3.5 w-3.5" />
+              </Button>
             )}
-            onClick={onToggleInterested}
-          >
-            <Star className={cn("mr-1.5 h-3.5 w-3.5", interested && "fill-steal")} />
-            {interested ? "Starred" : "Star"}
-          </Button>
-          {onDismiss && (
+            {onRestore && (
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-8 w-8 shrink-0 rounded-md border-line-strong bg-card text-ink hover:bg-paper"
+                onClick={onRestore}
+                aria-label="Restore listing"
+              >
+                <Check className="h-3.5 w-3.5" />
+              </Button>
+            )}
             <Button
               type="button"
-              variant="outline"
               size="sm"
               className={cn(
-                "flex-1 rounded-lg border-line-strong bg-card text-ink hover:bg-paper",
-                compact && "h-8 text-xs"
+                "h-8 min-w-0 flex-[2] rounded-md bg-ink px-3 text-xs text-card hover:bg-ink/90",
+                compact && "text-xs"
               )}
-              onClick={onDismiss}
+              asChild
             >
-              <X className="mr-1.5 h-3.5 w-3.5" />
-              Dismiss
+              <a href={listing.url} target="_blank" rel="noopener noreferrer">
+                View
+                <ExternalLink className="ml-1.5 h-3 w-3" />
+              </a>
             </Button>
-          )}
-          {onRestore && (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className={cn(
-                "flex-1 rounded-lg border-line-strong bg-card text-ink hover:bg-paper",
-                compact && "h-8 text-xs"
-              )}
-              onClick={onRestore}
-            >
-              Restore
-            </Button>
-          )}
-          <Button
-            type="button"
-            size="sm"
-            className={cn(
-              "flex-1 rounded-lg bg-ink text-card hover:bg-ink/90",
-              compact && "h-8 text-xs"
-            )}
-            asChild
-          >
-            <a href={listing.url} target="_blank" rel="noopener noreferrer">
-              View
-              <ExternalLink className="ml-1.5 h-3 w-3" />
-            </a>
-          </Button>
+          </div>
         </div>
       </div>
     </article>

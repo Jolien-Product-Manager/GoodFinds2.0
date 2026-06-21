@@ -3,6 +3,12 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   outputFileTracingRoot: process.cwd(),
   images: {
+    localPatterns: [
+      {
+        pathname: "/api/listing-image",
+        search: "url=*",
+      },
+    ],
     remotePatterns: [
       { protocol: "https", hostname: "**.ebayimg.com" },
       { protocol: "https", hostname: "**.chrono24.com" },

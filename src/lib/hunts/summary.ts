@@ -9,17 +9,9 @@ const SUMMARY_ORDER: AttrKey[] = [
   "collab",
   "case",
   "mvmt",
-  "storeFind",
   "cond",
+  "traits",
 ];
-
-function formatStoreFind(value: string): string {
-  if (value === "Deadstock") return "deadstock / tagged";
-  if (value === "Tags attached") return "tags on";
-  if (value === "With original box") return "with box";
-  if (value === "Open box") return "open box";
-  return value.toLowerCase();
-}
 
 function formatCollab(value: string): string {
   if (value === "Any collab") return "collab edition";
@@ -52,20 +44,26 @@ export function buildHuntSummary(hunt: Hunt): string {
 
   if (hunt.gender === "mens") parts.push("Men's");
   else if (hunt.gender === "womens") parts.push("Women's");
+  else if (hunt.gender === "unisex") parts.push("Unisex");
+  else if (hunt.gender === "childrens") parts.push("Children's");
+  else if (hunt.gender === "boys") parts.push("Boys");
+  else if (hunt.gender === "girls") parts.push("Girls");
+  else if (hunt.gender === "unisex_children") parts.push("Unisex children's");
 
   for (const key of SUMMARY_ORDER) {
-    if (key === "cond" || key === "storeFind") continue;
+    if (key === "cond") continue;
     const values = attributeValues(hunt, key);
     if (values.length === 0) continue;
 
     if (key === "collab") {
       parts.push(values.map(formatCollab).join(" or "));
+    } else if (key === "traits") {
+      parts.push(values.join(" · "));
     } else {
       parts.push(values.join(" or "));
     }
   }
 
-  const storeFindValues = attributeValues(hunt, "storeFind");
   const condValues = attributeValues(hunt, "cond");
   let sentence =
     parts.length > 0
@@ -74,10 +72,6 @@ export function buildHuntSummary(hunt: Hunt): string {
 
   if (!attributeValues(hunt, "model").length) {
     sentence = sentence === "Any vintage Timex" ? "Any vintage Timex" : `${sentence} Timex`;
-  }
-
-  if (storeFindValues.length > 0) {
-    sentence += ` · ${storeFindValues.map(formatStoreFind).join(" or ")}`;
   }
 
   if (condValues.length > 0) {

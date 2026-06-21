@@ -9,6 +9,8 @@
     "start": "next start",
     "lint": "next lint",
     "sync:listings": "node scripts/sync-listings.mjs",
+    "sync:ebay": "tsx scripts/fetch-ebay.ts",
+    "enrich:chrono24": "cd scripts/chrono24 && python3 enrich_images.py --in ../../data/chrono24/vintage_timex.json",
     "commit": "./commit"
   },
   "repository": {

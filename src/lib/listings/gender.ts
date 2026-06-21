@@ -1,3 +1,4 @@
+import type { HuntGender } from "@/lib/hunts/types";
 import type { ListingGender } from "./types";
 
 /** Word-boundary patterns — catches "Lady", "Ladies", "Women's", etc. */
@@ -12,7 +13,15 @@ const WOMENS_PATTERNS = [
   /\bfor women\b/,
   /\bmisses\b/,
   /\bpetite\b/,
-  /\bgirls?\b/,
+];
+
+const CHILDRENS_PATTERNS = [
+  /\bchildren'?s?\b/,
+  /\bkids?\b/,
+  /\bchild'?s?\b/,
+  /\byouth\b/,
+  /\bjuniors?\b/,
+  /\btoddlers?\b/,
 ];
 
 const MENS_PATTERNS = [
@@ -35,6 +44,23 @@ export function hasWomensSignals(text: string): boolean {
 export function hasMensSignals(text: string): boolean {
   const lower = text.toLowerCase();
   return MENS_PATTERNS.some((re) => re.test(lower));
+}
+
+export function hasBoysSignals(text: string): boolean {
+  return /\bboys?\b/.test(text.toLowerCase());
+}
+
+export function hasGirlsSignals(text: string): boolean {
+  return /\bgirls?\b/.test(text.toLowerCase());
+}
+
+export function hasChildrensSignals(text: string): boolean {
+  const lower = text.toLowerCase();
+  return (
+    CHILDRENS_PATTERNS.some((re) => re.test(lower)) ||
+    hasBoysSignals(text) ||
+    hasGirlsSignals(text)
+  );
 }
 
 /** Largest case diameter mentioned in title (e.g. "22mm", "33 mm"). */
@@ -66,7 +92,7 @@ export function inferListingGender(title: string): ListingGender {
 
 export function listingMatchesHuntGender(
   listingGender: ListingGender,
-  huntGender: "mens" | "womens" | "both",
+  huntGender: HuntGender,
   title: string
 ): boolean {
   if (huntGender === "both") return true;
@@ -76,13 +102,46 @@ export function listingMatchesHuntGender(
     hasWomensSignals(title) ||
     isLikelyWomensBySize(title);
   const mensHint = listingGender === "mens" || hasMensSignals(title);
+  const childrensHint = hasChildrensSignals(title);
+  const boysHint = hasBoysSignals(title);
+  const girlsHint = hasGirlsSignals(title);
+
+  if (huntGender === "boys") {
+    return boysHint;
+  }
+
+  if (huntGender === "girls") {
+    return girlsHint;
+  }
+
+  if (huntGender === "unisex_children") {
+    if (!childrensHint) return false;
+    if (boysHint && girlsHint) return true;
+    if (boysHint && !girlsHint) return false;
+    if (girlsHint && !boysHint) return false;
+    return true;
+  }
+
+  if (huntGender === "childrens") {
+    return childrensHint;
+  }
+
+  if (huntGender === "unisex") {
+    if (listingGender === "unisex") return true;
+    if (womensHint && mensHint) return true;
+    if (womensHint && !mensHint) return false;
+    if (mensHint && !womensHint) return false;
+    return true;
+  }
 
   if (huntGender === "mens") {
+    if (childrensHint && !mensHint) return false;
     if (womensHint && !mensHint) return false;
     return true;
   }
 
   if (huntGender === "womens") {
+    if (childrensHint && !womensHint) return false;
     if (mensHint && !womensHint) return false;
     return true;
   }

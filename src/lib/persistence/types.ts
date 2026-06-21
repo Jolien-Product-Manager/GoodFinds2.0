@@ -4,8 +4,10 @@ import type {
   AlertScope,
   MarketplaceFilter,
 } from "@/lib/listings/types";
-import type { Hunt, GlobalFilters, PurchasedWatch } from "@/lib/hunts/types";
+import type { Hunt, GlobalFilters, PurchasedWatch, AttrKey } from "@/lib/hunts/types";
 import type { FeedView } from "@/store/caseback";
+
+export type AttributeLibrary = Partial<Record<AttrKey, string[]>>;
 
 export interface PersistedState {
   seen: string[];
@@ -19,6 +21,8 @@ export interface PersistedState {
   hunts: Hunt[];
   globalFilters: GlobalFilters;
   purchasedWatches: PurchasedWatch[];
+  attributeLibrary: AttributeLibrary;
+  attributeHidden: AttributeLibrary;
 }
 
 export const DEFAULT_PERSISTED_STATE: PersistedState = {
@@ -44,4 +48,6 @@ export const DEFAULT_PERSISTED_STATE: PersistedState = {
     postalCode: "M6K1V8",
   },
   purchasedWatches: [],
+  attributeLibrary: {},
+  attributeHidden: {},
 };

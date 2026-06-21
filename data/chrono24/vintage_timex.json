@@ -1,53 +1,739 @@
 {
-  "scraped_at": "2026-06-20T12:00:00Z",
-  "query_count": 0,
-  "listing_count": 4,
+  "scraped_at": "2026-06-21T00:09:13Z",
+  "query_count": 10,
+  "listing_count": 46,
   "listings": [
     {
-      "listing_id": "38326337",
-      "title": "Timex Calendar Day Date Vintage",
-      "price_value": 28,
+      "listing_id": "46961690",
+      "title": "Timex Marlin GMT Classic Vintage Style",
+      "price_value": 216.0,
       "price_currency": "USD",
-      "url": "https://www.chrono24.com/timex/timex-calendar-day-date-vintage--id38326337.htm",
-      "image_url": "https://picsum.photos/seed/timex-calendar-38326337/800/600",
-      "image_urls": ["https://picsum.photos/seed/timex-calendar-38326337/800/600"],
-      "year": 1970,
+      "url": "https://www.chrono24.com/timex/marlin-gmt-classic-vintage-style--id46961690.htm",
+      "image_url": "https://img.chrono24.com/images/uhren/md0uqeqzv1sa-h1jrz6zyr5yq9v1dji7irqxs-ExtraLarge.jpg",
+      "image_urls": [
+        "https://img.chrono24.com/images/uhren/md0uqeqzv1sa-h1jrz6zyr5yq9v1dji7irqxs-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/2v185e3kigzk-kdhf5j3kiebv4lq7902lojz2-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/cslmkqk3hlgp-pkypjlclyv258r90r9evdt82-ExtraLarge.jpg"
+      ],
+      "year": null,
       "is_vintage": true,
       "source": "chrono24"
     },
     {
-      "listing_id": "36498802",
-      "title": "Timex Indiglo WR30M Two Tone Gold Day Date Vintage",
-      "price_value": 28,
+      "listing_id": "46950323",
+      "title": "Timex Skin Diver 1969 Non Working Rare Vintage",
+      "price_value": 110.0,
       "price_currency": "USD",
-      "url": "https://www.chrono24.com/timex/timex-indiglo-wr30m-two-tone-gold-stainless-steel-day-date-black-dial-gold-numbers-vintage--id36498802.htm",
-      "image_url": "https://picsum.photos/seed/timex-indiglo-36498802/800/600",
-      "image_urls": ["https://picsum.photos/seed/timex-indiglo-36498802/800/600"],
+      "url": "https://www.chrono24.com/timex/skin-diver--id46950323.htm",
+      "image_url": "https://img.chrono24.com/images/uhren/46950323-m59ili5r81dnosijkdj9l0az-ExtraLarge.jpg",
+      "image_urls": [
+        "https://img.chrono24.com/images/uhren/46950323-m59ili5r81dnosijkdj9l0az-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/46950323-m19yao45c53fn23hxdtaosa7-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/46950323-spdny3mj6lw898hen2agfwuk-ExtraLarge.jpg"
+      ],
+      "year": 1969,
+      "is_vintage": true,
+      "source": "chrono24"
+    },
+    {
+      "listing_id": "46889421",
+      "title": "Timex Zulu Time Vintage Timex Zulu Time Ana-Digi (1993) Rare",
+      "price_value": 264.0,
+      "price_currency": "USD",
+      "url": "https://www.chrono24.com/timex/zulu-time--id46889421.htm",
+      "image_url": "https://img.chrono24.com/images/uhren/ma6qc94jzi0u-8j2rvl2yvxs4xidry0jvu2gk-ExtraLarge.jpg",
+      "image_urls": [
+        "https://img.chrono24.com/images/uhren/ma6qc94jzi0u-8j2rvl2yvxs4xidry0jvu2gk-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/9ljy05wffyc7-vnpo4y0b0zcqgmjr9xvvy7pq-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/kni7j5but1d7-lw0sidqmxus5f3t2n9aco9w0-ExtraLarge.jpg"
+      ],
+      "year": 1993,
+      "is_vintage": true,
+      "source": "chrono24"
+    },
+    {
+      "listing_id": "46883970",
+      "title": "Timex Marlin 26560\u20112572 \u2013 1972 \u2013 Gold Tone \u2013 Handwind \u2013 Date Vintage",
+      "price_value": 229.0,
+      "price_currency": "USD",
+      "url": "https://www.chrono24.com/timex/marlin--id46883970.htm",
+      "image_url": "https://img.chrono24.com/images/uhren/46883970-nnl2ddgpi33noah5k93u5feu-ExtraLarge.jpg",
+      "image_urls": [
+        "https://img.chrono24.com/images/uhren/46883970-nnl2ddgpi33noah5k93u5feu-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/46883970-p1mwgqifboeqj301x6umpl1t-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/46883970-qzc2ewr2lfw1z1vv92vto64m-ExtraLarge.jpg"
+      ],
+      "year": 1972,
+      "is_vintage": true,
+      "source": "chrono24"
+    },
+    {
+      "listing_id": "46870442",
+      "title": "Timex N CELL Vintage Timex \"N Cell\" Ladies Quartz Wristwatch - Fully Work",
+      "price_value": 41.0,
+      "price_currency": "USD",
+      "url": "https://www.chrono24.com/timex/n-cell--id46870442.htm",
+      "image_url": "https://img.chrono24.com/images/uhren/tdunjv4wjoq4-tvzg3aon10i88c22cfir1h8m-ExtraLarge.jpg",
+      "image_urls": [
+        "https://img.chrono24.com/images/uhren/tdunjv4wjoq4-tvzg3aon10i88c22cfir1h8m-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/fvgqbs8kgjj8-5zg72e2lcu08t2ag6zwx22aq-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/ib44tuyjfcnx-gl8a7a35vshb0w2ktocv4wid-ExtraLarge.jpg"
+      ],
+      "year": null,
+      "is_vintage": true,
+      "source": "chrono24"
+    },
+    {
+      "listing_id": "46295466",
+      "title": "Timex marlin Vintage Marlin 1967 (Working condition)",
+      "price_value": 89.0,
+      "price_currency": "USD",
+      "url": "https://www.chrono24.com/timex/marlin--id46295466.htm",
+      "image_url": "https://img.chrono24.com/images/uhren/gd7u4780vydr-3y9aqsm2wi5mdle3ghx82ai6-ExtraLarge.jpg",
+      "image_urls": [
+        "https://img.chrono24.com/images/uhren/gd7u4780vydr-3y9aqsm2wi5mdle3ghx82ai6-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/q8m8cr8lvm4w-0t5fs6gz1ai5pe0ivd0e8o2v-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/gip0q7ps7mv6-ld36l6vyokuc6b2qi1ju15zl-ExtraLarge.jpg"
+      ],
+      "year": 1967,
+      "is_vintage": true,
+      "source": "chrono24"
+    },
+    {
+      "listing_id": "46774328",
+      "title": "Timex Viscount New Old Stock NOS Great Britain Automatic vintage SERVICED WARRANTY",
+      "price_value": 363.0,
+      "price_currency": "USD",
+      "url": "https://www.chrono24.com/timex/timex-viscount-new-old-stock-nos-great-britain-automatic-vintage-serviced-warranty--id46774328.htm",
+      "image_url": "https://img.chrono24.com/images/uhren/46774328-a5awjpxfu1lktk3k1em1o1ax-ExtraLarge.jpg",
+      "image_urls": [
+        "https://img.chrono24.com/images/uhren/46774328-a5awjpxfu1lktk3k1em1o1ax-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/46774328-vn43wufte2jhrqtficzn62n9-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/46774328-7bs3ttjyozpuni6vvnrqc2eg-ExtraLarge.jpg"
+      ],
+      "year": null,
+      "is_vintage": true,
+      "source": "chrono24"
+    },
+    {
+      "listing_id": "46754158",
+      "title": "Timex Electric World Time vintage 1973",
+      "price_value": 94.0,
+      "price_currency": "USD",
+      "url": "https://www.chrono24.com/timex/montre-timex-electric-world-time-vintage-1973--id46754158.htm",
+      "image_url": "https://img.chrono24.com/images/uhren/ftx6qmgb9qd3-7605y5k1qa1ozypyjj0auxf1-ExtraLarge.jpg",
+      "image_urls": [
+        "https://img.chrono24.com/images/uhren/ftx6qmgb9qd3-7605y5k1qa1ozypyjj0auxf1-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/2pynqkncjt4u-byekmm681lmvj18w1uia8vxm-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/68zu3a3dl41u-xffk6hc7himy0pttfdm1w0n6-ExtraLarge.jpg"
+      ],
+      "year": 1973,
+      "is_vintage": true,
+      "source": "chrono24"
+    },
+    {
+      "listing_id": "46753940",
+      "title": "Timex M63 vintage Timex vintage hybrid with balance wheel",
+      "price_value": 188.0,
+      "price_currency": "USD",
+      "url": "https://www.chrono24.com/timex/m63-vintage--id46753940.htm",
+      "image_url": "https://img.chrono24.com/images/uhren/46753940-jcubblhsuz5e3jq6dp3ni31i-ExtraLarge.jpg",
+      "image_urls": [
+        "https://img.chrono24.com/images/uhren/46753940-jcubblhsuz5e3jq6dp3ni31i-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/46753940-nlnkm5dpzftfeg1ni99hk0m2-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/46753940-i9t1hmhto0yb12fsha2062xn-ExtraLarge.jpg"
+      ],
+      "year": null,
+      "is_vintage": true,
+      "source": "chrono24"
+    },
+    {
+      "listing_id": "46739038",
+      "title": "Timex vintage wrist watch - year 1975",
+      "price_value": 69.0,
+      "price_currency": "USD",
+      "url": "https://www.chrono24.com/timex/vintage-wrist-watch---year-1975--id46739038.htm",
+      "image_url": "https://img.chrono24.com/images/uhren/46739038-0utdjhvvea0xv2ean70bao9o-ExtraLarge.jpg",
+      "image_urls": [
+        "https://img.chrono24.com/images/uhren/46739038-0utdjhvvea0xv2ean70bao9o-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/46739038-tvc9606ctrjhz4sbmncvwcxl-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/46739038-bw7regiu3f62oxgh4kmmg1yn-ExtraLarge.jpg"
+      ],
       "year": 1975,
       "is_vintage": true,
       "source": "chrono24"
     },
     {
-      "listing_id": "30835323",
-      "title": "Timex Marlin Manual Wind Champagne Dial Vintage 1978",
-      "price_value": 28,
+      "listing_id": "46586769",
+      "title": "Timex Quartz vintage watch",
+      "price_value": 112.0,
       "price_currency": "USD",
-      "url": "https://www.chrono24.com/timex/timex-marlin-manual-wind-light-champagne-dial-vintage-1978--mens-watch33mm--id30835323.htm",
-      "image_url": "https://picsum.photos/seed/timex-marlin-30835323/800/600",
-      "image_urls": ["https://picsum.photos/seed/timex-marlin-30835323/800/600"],
-      "year": 1978,
+      "url": "https://www.chrono24.com/timex/quartz-vintage-watch--id46586769.htm",
+      "image_url": "https://img.chrono24.com/images/uhren/46586769-fjvvz3c5un6w3klujz6822l4-ExtraLarge.jpg",
+      "image_urls": [
+        "https://img.chrono24.com/images/uhren/46586769-fjvvz3c5un6w3klujz6822l4-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/46586769-cae8q7t1px43jqpvqtmy9mv3-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/46586769-mals7o5yn3h92l6f4as2k3xo-ExtraLarge.jpg"
+      ],
+      "year": null,
       "is_vintage": true,
       "source": "chrono24"
     },
     {
-      "listing_id": "31434846",
-      "title": "Timex Marlin Date Circa 1974 Roman Numeral Dial",
-      "price_value": 28,
+      "listing_id": "46581439",
+      "title": "Timex Quartz Vintage Timex Quartz watch vignette dial",
+      "price_value": 176.0,
       "price_currency": "USD",
-      "url": "https://www.chrono24.com/timex/timex-marlin-date-circa-1974-roman-numeral-dial-stainless-steel-mens-watch33mm--id31434846.htm",
-      "image_url": "https://picsum.photos/seed/timex-marlin-31434846/800/600",
-      "image_urls": ["https://picsum.photos/seed/timex-marlin-31434846/800/600"],
-      "year": 1974,
+      "url": "https://www.chrono24.com/timex/quartz--id46581439.htm",
+      "image_url": "https://img.chrono24.com/images/uhren/t4lkfwhvy33m-1r1p3immaaynap0soyipsvxa-ExtraLarge.jpg",
+      "image_urls": [
+        "https://img.chrono24.com/images/uhren/t4lkfwhvy33m-1r1p3immaaynap0soyipsvxa-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/e34c1gmma4eg-q96y98avp1gks8uld62eqrou-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/t1ekhi4q6xeo-x6p1ken5l3labhik4j5lfomm-ExtraLarge.jpg"
+      ],
+      "year": null,
+      "is_vintage": true,
+      "source": "chrono24"
+    },
+    {
+      "listing_id": "46530504",
+      "title": "Timex Vintage - Rare Blue Dial",
+      "price_value": 300.0,
+      "price_currency": "USD",
+      "url": "https://www.chrono24.com/timex/timex-vintage---rare-blue-dial--id46530504.htm",
+      "image_url": "https://img.chrono24.com/images/uhren/46530504-okgv7fk78fkde2rndhnw7zhy-ExtraLarge.jpg",
+      "image_urls": [
+        "https://img.chrono24.com/images/uhren/46530504-okgv7fk78fkde2rndhnw7zhy-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/46530504-hv1zpeoqfr4fuu9wky7lf86y-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/46530504-9rz604dl4m8j3z22z6xfhk2p-ExtraLarge.jpg"
+      ],
+      "year": null,
+      "is_vintage": true,
+      "source": "chrono24"
+    },
+    {
+      "listing_id": "46267965",
+      "title": "Timex Vintage",
+      "price_value": 141.0,
+      "price_currency": "USD",
+      "url": "https://www.chrono24.com/timex/vintage--id46267965.htm",
+      "image_url": "https://img.chrono24.com/images/uhren/473lka4rriwm-warfcj6bwdv2ujyzurbts1rv-ExtraLarge.jpg",
+      "image_urls": [
+        "https://img.chrono24.com/images/uhren/473lka4rriwm-warfcj6bwdv2ujyzurbts1rv-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/fawdug6ju6lo-z3zrukh6oxrvf95a2goox7fj-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/165x8gi6y6f2-w06w9xyjh747nfg5q72iof7q-ExtraLarge.jpg"
+      ],
+      "year": null,
+      "is_vintage": true,
+      "source": "chrono24"
+    },
+    {
+      "listing_id": "46257657",
+      "title": "Timex Military Style Black Dial GMT Stainless Steel Vintage Ref.#1158-2466",
+      "price_value": 195.0,
+      "price_currency": "USD",
+      "url": "https://www.chrono24.com/timex/timex-military-style-black-dial-gmt-stainless-steel-vintage-ref1158-2466--id46257657.htm",
+      "image_url": "https://img.chrono24.com/images/uhren/46257657-xvwkidax3fh470hlk7cjbzqy-ExtraLarge.jpg",
+      "image_urls": [
+        "https://img.chrono24.com/images/uhren/46257657-xvwkidax3fh470hlk7cjbzqy-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/46257657-m5s29zzjgzuxqznnkyllvrmw-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/46257657-qgokqi28dhdvdvk5rwsfikpe-ExtraLarge.jpg"
+      ],
+      "year": null,
+      "is_vintage": true,
+      "source": "chrono24"
+    },
+    {
+      "listing_id": "46176000",
+      "title": "Timex 1970 Vintage 1970s Timex Classic Ladies Watch Gold Tone",
+      "price_value": 34.0,
+      "price_currency": "USD",
+      "url": "https://www.chrono24.com/timex/1970--id46176000.htm",
+      "image_url": "https://img.chrono24.com/images/uhren/4fahfj50hi0z-y2xmuvttyg8u252zcxvxxcg0-ExtraLarge.jpg",
+      "image_urls": [
+        "https://img.chrono24.com/images/uhren/4fahfj50hi0z-y2xmuvttyg8u252zcxvxxcg0-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/osj78lmx0gfy-02l8i45dmwrrstnid5w6qyn4-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/4243sl2rtxqt-onkgjm7d432qkjcc5rsupt8z-ExtraLarge.jpg"
+      ],
+      "year": 1970,
+      "is_vintage": true,
+      "source": "chrono24"
+    },
+    {
+      "listing_id": "46165541",
+      "title": "Timex Submariner Vintage 90s diver",
+      "price_value": 223.0,
+      "price_currency": "USD",
+      "url": "https://www.chrono24.com/timex/submariner--id46165541.htm",
+      "image_url": "https://img.chrono24.com/images/uhren/46165541-gwhjf69pxl068gs798is3w59-ExtraLarge.jpg",
+      "image_urls": [
+        "https://img.chrono24.com/images/uhren/46165541-gwhjf69pxl068gs798is3w59-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/46165541-ydpbk3rm4900qtiddyciujuh-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/46165541-mprlda2dfobmk180d8n9pitc-ExtraLarge.jpg"
+      ],
+      "year": null,
+      "is_vintage": true,
+      "source": "chrono24"
+    },
+    {
+      "listing_id": "46146089",
+      "title": "Timex Electric World Time 1972 Timex Electric World Time Vintage 1972 Originale \u2013 Funzionan",
+      "price_value": 222.0,
+      "price_currency": "USD",
+      "url": "https://www.chrono24.com/timex/timex-electric-world-time-1972--id46146089.htm",
+      "image_url": "https://img.chrono24.com/images/uhren/8uqtfosaxsxv-o9s5xngz82lqxntud99gjiv5-ExtraLarge.jpg",
+      "image_urls": [
+        "https://img.chrono24.com/images/uhren/8uqtfosaxsxv-o9s5xngz82lqxntud99gjiv5-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/hckku1mkf1ua-69ha0au37i1jzh6fomc83sfx-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/pkjko3nkcelo-5bb9yymxqmbz1xjnoebzrpww-ExtraLarge.jpg"
+      ],
+      "year": 1972,
+      "is_vintage": true,
+      "source": "chrono24"
+    },
+    {
+      "listing_id": "46049812",
+      "title": "Timex Automatic Orologiodepoca Timex Vintage Automic Nos",
+      "price_value": 165.0,
+      "price_currency": "USD",
+      "url": "https://www.chrono24.com/timex/automatic--id46049812.htm",
+      "image_url": "https://img.chrono24.com/images/uhren/o7ec974exzak-grkdd2te9m31yx62wi1nnrh6-ExtraLarge.jpg",
+      "image_urls": [
+        "https://img.chrono24.com/images/uhren/o7ec974exzak-grkdd2te9m31yx62wi1nnrh6-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/h0e1kxya1q4w-fcodnow72kk2aq6cnctnxmeu-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/mj6omk4dee9z-jd0m296np1gw4evc2csfu621-ExtraLarge.jpg"
+      ],
+      "year": null,
+      "is_vintage": true,
+      "source": "chrono24"
+    },
+    {
+      "listing_id": "46034840",
+      "title": "Timex digital vintage",
+      "price_value": 24.0,
+      "price_currency": "USD",
+      "url": "https://www.chrono24.com/timex/digital-vintage--id46034840.htm",
+      "image_url": "https://img.chrono24.com/images/uhren/8ctfb5lm8gd0-joiqx3qz73heu7am8zg6mq8z-ExtraLarge.jpg",
+      "image_urls": [
+        "https://img.chrono24.com/images/uhren/8ctfb5lm8gd0-joiqx3qz73heu7am8zg6mq8z-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/fti3mxq518a1-bfhhnsb00owje94kch7pr08l-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/4167k9js0u8y-24wsznlx6qc8wz8m8wkfgjqa-ExtraLarge.jpg"
+      ],
+      "year": null,
+      "is_vintage": true,
+      "source": "chrono24"
+    },
+    {
+      "listing_id": "45990872",
+      "title": "Timex Indiglo vintage quartz watch - April 1997",
+      "price_value": 45.0,
+      "price_currency": "USD",
+      "url": "https://www.chrono24.com/timex/indiglo-vintage-quartz-watch---april-1997--id45990872.htm",
+      "image_url": "https://img.chrono24.com/images/uhren/45990872-0a8737f15yq42sgwbarjjfrv-ExtraLarge.jpg",
+      "image_urls": [
+        "https://img.chrono24.com/images/uhren/45990872-0a8737f15yq42sgwbarjjfrv-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/45990872-7x2rq440idl4hnq4t2x7sxm2-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/45990872-a14jo8dqk13lww6twjpspqyr-ExtraLarge.jpg"
+      ],
+      "year": 1997,
+      "is_vintage": true,
+      "source": "chrono24"
+    },
+    {
+      "listing_id": "45674125",
+      "title": "Timex Marlin Vintage 1969 (Working condition)",
+      "price_value": 103.0,
+      "price_currency": "USD",
+      "url": "https://www.chrono24.com/timex/marlin--id45674125.htm",
+      "image_url": "https://img.chrono24.com/images/uhren/xyw6659lu0ii-up805qfjs6d6l35975e5y5ts-ExtraLarge.jpg",
+      "image_urls": [
+        "https://img.chrono24.com/images/uhren/xyw6659lu0ii-up805qfjs6d6l35975e5y5ts-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/e7t34hrfnywg-rhjdripro3qe02kyisflm999-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/x6r41t6o6vh4-14k9amp48tfxsr8xzo0xaiat-ExtraLarge.jpg"
+      ],
+      "year": 1969,
+      "is_vintage": true,
+      "source": "chrono24"
+    },
+    {
+      "listing_id": "45990702",
+      "title": "Timex vintage quartz watch - May 1995",
+      "price_value": 53.0,
+      "price_currency": "USD",
+      "url": "https://www.chrono24.com/timex/vintage-quartz-watch---may-1995--id45990702.htm",
+      "image_url": "https://img.chrono24.com/images/uhren/45990702-l3014bhr0kn30ohwea54oo8t-ExtraLarge.jpg",
+      "image_urls": [
+        "https://img.chrono24.com/images/uhren/45990702-l3014bhr0kn30ohwea54oo8t-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/45990702-6j709tr1pxs8l9igzwl0vmq6-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/45990702-vmpfxmrflgrkvhvh681ulaa3-ExtraLarge.jpg"
+      ],
+      "year": 1995,
+      "is_vintage": true,
+      "source": "chrono24"
+    },
+    {
+      "listing_id": "45985752",
+      "title": "Timex Women's Vintage Mechanical 70\u2019s Era Classic",
+      "price_value": 36.0,
+      "price_currency": "USD",
+      "url": "https://www.chrono24.com/timex/womens-vintage-mechanical--id45985752.htm",
+      "image_url": "https://img.chrono24.com/images/uhren/45985752-bys9x0ft8ob8cnf1z77i47rd-ExtraLarge.jpg",
+      "image_urls": [
+        "https://img.chrono24.com/images/uhren/45985752-bys9x0ft8ob8cnf1z77i47rd-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/45985752-z1b5j3ifhpnbrq5fm1fdlq3r-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/45985752-bg3e38vicw33g7g2gbdcudek-ExtraLarge.jpg"
+      ],
+      "year": null,
+      "is_vintage": true,
+      "source": "chrono24"
+    },
+    {
+      "listing_id": "45924283",
+      "title": "Timex 11a69 Vintage",
+      "price_value": 50.0,
+      "price_currency": "USD",
+      "url": "https://www.chrono24.com/timex/11a69--id45924283.htm",
+      "image_url": "https://img.chrono24.com/images/uhren/45924283-f9h1lo4dr3pcd05irbmc4pmd-ExtraLarge.jpg",
+      "image_urls": [
+        "https://img.chrono24.com/images/uhren/45924283-f9h1lo4dr3pcd05irbmc4pmd-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/45924283-1h310gstsxjwjfb4ryxgopb5-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/45924283-0dxqhgqol8ka7p8jdmlyqf83-ExtraLarge.jpg"
+      ],
+      "year": null,
+      "is_vintage": true,
+      "source": "chrono24"
+    },
+    {
+      "listing_id": "45854302",
+      "title": "Timex Manual Winding Date Vintage Watch Ca 1970s",
+      "price_value": 349.0,
+      "price_currency": "USD",
+      "url": "https://www.chrono24.com/timex/timex-manual--winding--date-vintage-watch-ca-1970s--id45854302.htm",
+      "image_url": "https://img.chrono24.com/images/uhren/45854302-uufjcbd2ujp9f5imyx51xl2m-ExtraLarge.jpg",
+      "image_urls": [
+        "https://img.chrono24.com/images/uhren/45854302-uufjcbd2ujp9f5imyx51xl2m-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/45854302-vbk22siwc80sx7dldw8bxehl-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/45854302-12sjbbdxqpisq0fxlsa8kkb5-ExtraLarge.jpg"
+      ],
+      "year": null,
+      "is_vintage": true,
+      "source": "chrono24"
+    },
+    {
+      "listing_id": "45842388",
+      "title": "Timex Self Winding Day Date Vintage Watch Ca. 1970s",
+      "price_value": 395.0,
+      "price_currency": "USD",
+      "url": "https://www.chrono24.com/timex/timex-self-winding---day-date-vintage-watch-ca-1970s--id45842388.htm",
+      "image_url": "https://img.chrono24.com/images/uhren/45842388-t32v9y8sqn73gd79rhg6k3i3-ExtraLarge.jpg",
+      "image_urls": [
+        "https://img.chrono24.com/images/uhren/45842388-t32v9y8sqn73gd79rhg6k3i3-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/45842388-qik9fyaub45jtrjftgjbojvv-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/45842388-69m9ek76kp8ul357j0a2qmrl-ExtraLarge.jpg"
+      ],
+      "year": null,
+      "is_vintage": true,
+      "source": "chrono24"
+    },
+    {
+      "listing_id": "45771732",
+      "title": "Timex A4 Vintage Timex Opwindbaar",
+      "price_value": 159.0,
+      "price_currency": "USD",
+      "url": "https://www.chrono24.com/timex/a4--id45771732.htm",
+      "image_url": "https://img.chrono24.com/images/uhren/4l0cir1zpruz-5za2i4lqqmoho4ga3v5nmm05-ExtraLarge.jpg",
+      "image_urls": [
+        "https://img.chrono24.com/images/uhren/4l0cir1zpruz-5za2i4lqqmoho4ga3v5nmm05-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/suf8neexc6zq-qh5zp4jhohux809hxxk0n270-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/v5zrz7oq5m53-43nkl06xag57kxhspilzkpbl-ExtraLarge.jpg"
+      ],
+      "year": null,
+      "is_vintage": true,
+      "source": "chrono24"
+    },
+    {
+      "listing_id": "45736328",
+      "title": "Timex Electric Date Vintage Watch Ca 1980s",
+      "price_value": 349.0,
+      "price_currency": "USD",
+      "url": "https://www.chrono24.com/timex/timex-electric-date-vintage-watch-ca-1980s--id45736328.htm",
+      "image_url": "https://img.chrono24.com/images/uhren/45736328-uhie3dl8sggtn741eovjuea3-ExtraLarge.jpg",
+      "image_urls": [
+        "https://img.chrono24.com/images/uhren/45736328-uhie3dl8sggtn741eovjuea3-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/45736328-uuocoubm7vkf9j9mzke1di3m-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/45736328-s3p11bcbndvlfm7kmhiwmpj5-ExtraLarge.jpg"
+      ],
+      "year": null,
+      "is_vintage": true,
+      "source": "chrono24"
+    },
+    {
+      "listing_id": "45572800",
+      "title": "Timex Self Winding Day Date Vintage Watch Ca. 1970s",
+      "price_value": 395.0,
+      "price_currency": "USD",
+      "url": "https://www.chrono24.com/timex/timex-self-winding---day-date-vintage-watch-ca-1970s--id45572800.htm",
+      "image_url": "https://img.chrono24.com/images/uhren/45572800-rp47pbcuomp1kjvvd9f9twnd-ExtraLarge.jpg",
+      "image_urls": [
+        "https://img.chrono24.com/images/uhren/45572800-rp47pbcuomp1kjvvd9f9twnd-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/45572800-3aygy8pb1xm5zhh937ce3ofq-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/45572800-p8sl2p2tld0shskh75fmajax-ExtraLarge.jpg"
+      ],
+      "year": null,
+      "is_vintage": true,
+      "source": "chrono24"
+    },
+    {
+      "listing_id": "46921247",
+      "title": "Timex Marlin 1965 Hand-Wound 34mm Leather Strap Watch",
+      "price_value": 215.0,
+      "price_currency": "USD",
+      "url": "https://www.chrono24.com/timex/marlin-1965-hand-wound--id46921247.htm",
+      "image_url": "https://img.chrono24.com/images/uhren/46921247-cxbtpa1id1mswt0kvn9nrq3f-ExtraLarge.jpg",
+      "image_urls": [
+        "https://img.chrono24.com/images/uhren/46921247-cxbtpa1id1mswt0kvn9nrq3f-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/46921247-sy6nph11tsnctv9yr8u2mh8l-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/46921247-to19xv4gmflo0oh86wx4nrv0-ExtraLarge.jpg"
+      ],
+      "year": 1965,
+      "is_vintage": true,
+      "source": "chrono24"
+    },
+    {
+      "listing_id": "46799832",
+      "title": "Timex Marlin Gold Plated 1984 Mechanical Caliber M116",
+      "price_value": 176.0,
+      "price_currency": "USD",
+      "url": "https://www.chrono24.com/timex/marlin-gold-plated-1984--id46799832.htm",
+      "image_url": "https://img.chrono24.com/images/uhren/46799832-mq7o094to3yvhtlybjatpov0-ExtraLarge.jpg",
+      "image_urls": [
+        "https://img.chrono24.com/images/uhren/46799832-mq7o094to3yvhtlybjatpov0-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/46799832-1ncqnxg7eyct0mdd5953ikz4-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/46799832-rsupewou96zvx75qitivtbwn-ExtraLarge.jpg"
+      ],
+      "year": 1984,
+      "is_vintage": true,
+      "source": "chrono24"
+    },
+    {
+      "listing_id": "46652270",
+      "title": "Timex marlin 1976 timex marlin mechanical sunburst dial",
+      "price_value": 88.0,
+      "price_currency": "USD",
+      "url": "https://www.chrono24.com/timex/marlin--id46652270.htm",
+      "image_url": "https://img.chrono24.com/images/uhren/u8i8p9cfy1ks-bmazyvdmy7w58l6o7r9cmz7s-ExtraLarge.jpg",
+      "image_urls": [
+        "https://img.chrono24.com/images/uhren/u8i8p9cfy1ks-bmazyvdmy7w58l6o7r9cmz7s-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/9b0h6e2kcdsy-l90id399264ayorec98tqnpk-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/2a3m3dy8bd9g-3ukvwakydwpxg7qgrbw7hj0c-ExtraLarge.jpg"
+      ],
+      "year": 1976,
+      "is_vintage": true,
+      "source": "chrono24"
+    },
+    {
+      "listing_id": "45372769",
+      "title": "Timex Marlin Vintage 1976 (Working condition)",
+      "price_value": 91.0,
+      "price_currency": "USD",
+      "url": "https://www.chrono24.com/timex/marlin--id45372769.htm",
+      "image_url": "https://img.chrono24.com/images/uhren/45372769-jvbtpjf1xiwqx0kue0ehd1q6-ExtraLarge.jpg",
+      "image_urls": [
+        "https://img.chrono24.com/images/uhren/45372769-jvbtpjf1xiwqx0kue0ehd1q6-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/45372769-spgyelwrzp9hax03w72644tk-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/45372769-1heei2bte5b7dsmrdq73wtw6-ExtraLarge.jpg"
+      ],
+      "year": 1976,
+      "is_vintage": true,
+      "source": "chrono24"
+    },
+    {
+      "listing_id": "44233005",
+      "title": "Timex Viscount 1970's",
+      "price_value": 496.0,
+      "price_currency": "USD",
+      "url": "https://www.chrono24.com/timex/viscount-1970s--id44233005.htm",
+      "image_url": "https://img.chrono24.com/images/uhren/44233005-zxuhe5pl0zfdxbgtmi4a6waj-ExtraLarge.jpg",
+      "image_urls": [
+        "https://img.chrono24.com/images/uhren/44233005-zxuhe5pl0zfdxbgtmi4a6waj-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/44233005-r4fa1evu8uqemvj856vj9w0d-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/44233005-05guf40pcjzsuagsrbicur85-ExtraLarge.jpg"
+      ],
+      "year": 1970,
+      "is_vintage": true,
+      "source": "chrono24"
+    },
+    {
+      "listing_id": "46705529",
+      "title": "Timex 25 Metres Automatic Skin Diver Timex 25 Metres 1970\u2019 Men\u2019s Watch",
+      "price_value": 200.0,
+      "price_currency": "USD",
+      "url": "https://www.chrono24.com/timex/25-metres--id46705529.htm",
+      "image_url": "https://img.chrono24.com/images/uhren/46705529-ckf93v6b2e29nj8uwdftov02-ExtraLarge.jpg",
+      "image_urls": [
+        "https://img.chrono24.com/images/uhren/46705529-ckf93v6b2e29nj8uwdftov02-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/46705529-3e7wj4kbjxf5pf62tv3gkd4v-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/46705529-6zmkshmjk4wdo1skfkdzgpwv-ExtraLarge.jpg"
+      ],
+      "year": 1970,
+      "is_vintage": true,
+      "source": "chrono24"
+    },
+    {
+      "listing_id": "45707780",
+      "title": "Timex REISSUE 1983 Automatic TW2W70800 TW2W70800 Japan Official New Full Set",
+      "price_value": 488.0,
+      "price_currency": "USD",
+      "url": "https://www.chrono24.com/timex/timex-timex-reissue-1983-automatic-tw2w70800-tw2w70800-japan-official-new-full-set--id45707780.htm",
+      "image_url": "https://img.chrono24.com/images/uhren/w1h1yq0e7df5-48xhexvybeg9btlelerultuc-ExtraLarge.jpg",
+      "image_urls": [
+        "https://img.chrono24.com/images/uhren/w1h1yq0e7df5-48xhexvybeg9btlelerultuc-ExtraLarge.jpg"
+      ],
+      "year": 1983,
+      "is_vintage": true,
+      "source": "chrono24"
+    },
+    {
+      "listing_id": "45014751",
+      "title": "Timex Automatic 1983 E Line Date automatic 5 bar easy adjust bracelet",
+      "price_value": 182.0,
+      "price_currency": "USD",
+      "url": "https://www.chrono24.com/timex/timex-automatic-1983-e-line--id45014751.htm",
+      "image_url": "https://img.chrono24.com/images/uhren/p83w0gjfa2ju-if88gkfjmxtcq9k55vtfyjpt-ExtraLarge.jpg",
+      "image_urls": [
+        "https://img.chrono24.com/images/uhren/p83w0gjfa2ju-if88gkfjmxtcq9k55vtfyjpt-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/nij50kx1rcvm-r5e7o0icypg72vr8i5sq48m8-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/29r98stt1v35-rlg7arqj31akw2lu5oth6cq8-ExtraLarge.jpg"
+      ],
+      "year": 1983,
+      "is_vintage": true,
+      "source": "chrono24"
+    },
+    {
+      "listing_id": "44739080",
+      "title": "Timex Automatic 1983 E-Line New In Box with papers from official Timex eShop (11/2025).",
+      "price_value": 364.0,
+      "price_currency": "USD",
+      "url": "https://www.chrono24.com/timex/automatic-1983-e-line--id44739080.htm",
+      "image_url": "https://img.chrono24.com/images/uhren/44739080-e549exudbazrjjheop251i6g-ExtraLarge.jpg",
+      "image_urls": [
+        "https://img.chrono24.com/images/uhren/44739080-e549exudbazrjjheop251i6g-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/44739080-e3r37t2iyv30s16ppu05hh6d-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/44739080-8d160lkpg5xuqhiytydlbdde-ExtraLarge.jpg"
+      ],
+      "year": 1983,
+      "is_vintage": true,
+      "source": "chrono24"
+    },
+    {
+      "listing_id": "33852685",
+      "title": "Timex Automatic Calendar Day Date Stainless Steel Original Box Vintage",
+      "price_value": 185.0,
+      "price_currency": "USD",
+      "url": "https://www.chrono24.com/timex/timex-automatic-calendar-day-date-stainless-steel-original-box-vintage--id33852685.htm",
+      "image_url": "https://img.chrono24.com/images/uhren/33852685-sz9j9g0u1pk5w869ntzytb6y-ExtraLarge.jpg",
+      "image_urls": [
+        "https://img.chrono24.com/images/uhren/33852685-sz9j9g0u1pk5w869ntzytb6y-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/33852685-jl0rdxge9won4a3gl3mpdkzs-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/33852685-m307xxg2sqvp6jusdla2hmqh-ExtraLarge.jpg"
+      ],
+      "year": null,
+      "is_vintage": true,
+      "source": "chrono24"
+    },
+    {
+      "listing_id": "45566358",
+      "title": "Timex Self Winding Vintage Watch Ca. 1970s",
+      "price_value": 395.0,
+      "price_currency": "USD",
+      "url": "https://www.chrono24.com/timex/timex-self-winding---vintage-watch-ca-1970s--id45566358.htm",
+      "image_url": "https://img.chrono24.com/images/uhren/45566358-7z3pqzc4e6g6vwntsizenoah-ExtraLarge.jpg",
+      "image_urls": [
+        "https://img.chrono24.com/images/uhren/45566358-7z3pqzc4e6g6vwntsizenoah-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/45566358-4k4fdoux9y2bm4gkca41akoc-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/45566358-w0vzue3q3b6exgn74r1rehjn-ExtraLarge.jpg"
+      ],
+      "year": null,
+      "is_vintage": true,
+      "source": "chrono24"
+    },
+    {
+      "listing_id": "45465363",
+      "title": "Timex Self Winding Vintage Watch Ca. 1970s",
+      "price_value": 395.0,
+      "price_currency": "USD",
+      "url": "https://www.chrono24.com/timex/timex-self-winding---vintage-watch-ca-1970s--id45465363.htm",
+      "image_url": "https://img.chrono24.com/images/uhren/45465363-5vcy4mkpnmruz1jwpblgi9yw-ExtraLarge.jpg",
+      "image_urls": [
+        "https://img.chrono24.com/images/uhren/45465363-5vcy4mkpnmruz1jwpblgi9yw-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/45465363-7780dhcfor28h7adq3suitay-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/45465363-09lnakea56xamkzltudfredd-ExtraLarge.jpg"
+      ],
+      "year": null,
+      "is_vintage": true,
+      "source": "chrono24"
+    },
+    {
+      "listing_id": "43737074",
+      "title": "Timex Manual Winding Date Vintage Watch Ca 1970s",
+      "price_value": 349.0,
+      "price_currency": "USD",
+      "url": "https://www.chrono24.com/timex/timex-manual--winding--date-vintage-watch-ca-1970s--id43737074.htm",
+      "image_url": "https://img.chrono24.com/images/uhren/43737074-kgkiqgik6q8uhwm3xpyjk3c7-ExtraLarge.jpg",
+      "image_urls": [
+        "https://img.chrono24.com/images/uhren/43737074-kgkiqgik6q8uhwm3xpyjk3c7-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/43737074-iqtc6hik8djknbpomzouwdx9-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/43737074-cj3vwzyg07lm9cvm0m8zaqg1-ExtraLarge.jpg"
+      ],
+      "year": null,
+      "is_vintage": true,
+      "source": "chrono24"
+    },
+    {
+      "listing_id": "43736971",
+      "title": "Timex Self Winding Vintage Watch Ca. 1970s",
+      "price_value": 395.0,
+      "price_currency": "USD",
+      "url": "https://www.chrono24.com/timex/timex-self-winding---vintage-watch-ca-1970s--id43736971.htm",
+      "image_url": "https://img.chrono24.com/images/uhren/43736971-qedqeyn0cr39kcw2owmpqnru-ExtraLarge.jpg",
+      "image_urls": [
+        "https://img.chrono24.com/images/uhren/43736971-qedqeyn0cr39kcw2owmpqnru-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/43736971-rp62au14qxlxlpg9ijx73ns4-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/43736971-mxzoc1d65abmjulendrx0l9w-ExtraLarge.jpg"
+      ],
+      "year": null,
+      "is_vintage": true,
+      "source": "chrono24"
+    },
+    {
+      "listing_id": "43597766",
+      "title": "Timex Manual Winding Date Vintage Watch Ca 1970s",
+      "price_value": 349.0,
+      "price_currency": "USD",
+      "url": "https://www.chrono24.com/timex/timex-manual--winding--date-vintage-watch-ca-1970s--id43597766.htm",
+      "image_url": "https://img.chrono24.com/images/uhren/43597766-hbiy113hec990j9rs60ciph5-ExtraLarge.jpg",
+      "image_urls": [
+        "https://img.chrono24.com/images/uhren/43597766-hbiy113hec990j9rs60ciph5-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/43597766-ctync5f2wva9skrqz1k675gr-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/43597766-zu46vu6k2wo98fg2ysrb310e-ExtraLarge.jpg"
+      ],
+      "year": null,
+      "is_vintage": true,
+      "source": "chrono24"
+    },
+    {
+      "listing_id": "42117367",
+      "title": "Timex Vintage Timex Watch \u2013 A Survivor of Time (c. 1968\u20131972)",
+      "price_value": 40.0,
+      "price_currency": "USD",
+      "url": "https://www.chrono24.com/timex/vintage--id42117367.htm",
+      "image_url": "https://img.chrono24.com/images/uhren/42117367-z7v79kvvsp4rjrcaeil5esv7-ExtraLarge.jpg",
+      "image_urls": [
+        "https://img.chrono24.com/images/uhren/42117367-z7v79kvvsp4rjrcaeil5esv7-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/4qi3km89nd6x-ihomqqr1l7ulr03cbq0y2g5b-ExtraLarge.jpg",
+        "https://img.chrono24.com/images/uhren/f8u5sw61r4bn-h1j577lvk0x3zf95tqnx36wy-ExtraLarge.jpg"
+      ],
+      "year": 1968,
       "is_vintage": true,
       "source": "chrono24"
     }

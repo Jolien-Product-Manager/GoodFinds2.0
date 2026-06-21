@@ -1,6 +1,6 @@
 # GoodFinds — Feature List & Build Plan
 
-**Status:** Phases 0–6 **complete** (scaffold through production deploy). App name: **GoodFinds**.
+**Status:** Phases 0–6 **complete** (scaffold through production deploy). App name: **GoodFinds**. Recent work: feed sidebar UI, hunt builder tile editing, extended gender options, Supabase auth + cloud state sync, eBay snapshot caching.
 
 **Design reference:** Before building or changing any UI, read [`design.md`](design.md) — tokens (`paper`, `card`, `ink`, `brass`, `steal`, …), typography (Fraunces / JetBrains Mono / Inter), spacing. Behaviour specs live in the feature docs below.
 
@@ -12,7 +12,7 @@
 2. **Generate Feed screen** — `vintage-timex-watches-feed.md` + `design.md` → **F5, F6, F8, F9** (+ partial **F7**)
 3. **Hunt & preferences page** — `hunt-builder-spec.md` → **F10–F16, F22, F23**
 4. **Feed filtering / matching** — `hunt-feed-filtering-criteria.md` → **F17–F21**, completes **F7**
-5. **Back-end saving** — `/api/state` + localStorage → **F8**, hunts, global filters, purchases
+5. **Back-end saving** — `/api/state` + localStorage + Supabase → **F8**, hunts, global filters, purchases
 6. **Deploy to production** — Vercel, env vars, README
 
 **Git:** Phase commits on `main`. Use `./commit` for detailed commits with change summaries.
@@ -23,27 +23,27 @@
 
 ### Marketplace ingestion
 
-- **F1. Chrono24 scraper** — Offline Python scraper (~10 vintage query terms), per-article HTML parsing, dedupes by listing ID, URL canonicalization, writes JSON snapshot.
-- **F2. eBay Browse API** — Live fetch (`timex vintage watch`, newlyListed), **400 listings** (2×200 paginated), cached OAuth, Chrono24-only fallback if creds fail.
+- **F1. Chrono24 scraper** — Offline Python scraper (~10 vintage query terms), per-article HTML parsing, dedupes by listing ID, URL canonicalization, writes JSON snapshot. Images proxied via `/api/listing-image` (CDN blocks hotlinking).
+- **F2. eBay Browse API** — Live fetch via `npm run sync:ebay` (`timex vintage watch`, newlyListed), up to **2000** listings (paginated at 200/request). **Page loads serve disk snapshot only** (`data/ebay/vintage_timex.json`) to avoid rate limits; set `EBAY_FORCE_REFRESH=1` to force live fetch.
 - **F3. Normalize & merge** — Combines sources, drops missing price/ID, namespaces eBay IDs, infers listing gender from titles.
 - **F4. Vintage filter** — Keeps listings where title says "vintage" or parsed year ≤ 2000.
 
 ### Feed (inbox)
 
 - **F5. New section** — Single pool of unseen, gated listings ranked by best hunt score (no 24h/Older split).
-- **F6. View toggle (New | Starred | Dismissed)** — Three top-level tabs; Starred = `listingStatus.interested` (UI: Star).
-- **F7. Scope under New** — **All** | **Watch-list** (saved hunt matches). Top picks / per-hunt chips: code only, not in UI.
-- **F8. Dismiss / Restore** — Dismissed is a top-level tab; undo toast on dismiss.
-- **F9. Bulk + refresh actions** — "Mark all dismissed" (scoped) and "Check for new listings" (`router.refresh`).
+- **F6. View toggle (New | Starred | Dismissed)** — Three views in sidebar; Starred = `listingStatus.interested` (UI label: **Interesting**).
+- **F7. Scope under New** — Sidebar filters: **All listings** | **Top matches** (`feedScore ≥ 4.0`) | **Hunt matches** (saved hunt matches) with per-hunt sub-chips. **Marketplace** filter: All / eBay / Chrono24.
+- **F8. Dismiss / Restore** — Dismissed is a top-level view; undo toast on dismiss.
+- **F9. Bulk + refresh actions** — "Check for new listings" (`router.refresh`).
 
 ### Hunt Builder
 
-- **F10. Saved hunts bar** — Chips for saved hunts + "New hunt"; drafts never appear as chips.
-- **F11. Hunt form (8 attributes + gender)** — Collapsible form; multi-select chips + free-text per attribute.
-- **F12. Summary sentence + tightness badge** — Plain-language hunt description; Wide open → Very specific.
+- **F10. Saved hunts list** — Inline cards with summary + Edit; drafts appear as editor panel, not chips.
+- **F11. Hunt form (9 attributes + gender)** — Inline editor per hunt; multi-select chips + free-text per attribute. **Edit tiles** mode removes preset/custom suggestion chips (persisted in `attributeHidden`). Custom values persist per section in `attributeLibrary`.
+- **F12. Summary sentence + tightness badge** — Plain-language hunt description; Wide open → Very specific. Hearts shown in summary (`· N♥`).
 - **F13. Draft vs. saved + working copy** — New hunts transient until Save; `normalizeHunt()` on load/rehydrate.
 - **F14. Custom-value normalization** — Presets and customs normalized identically before match.
-- **F23. Hunt gender filter** — Men's / Women's / Both per hunt; title + case-size inference on listings; gender-only hunts active for Watch-list.
+- **F23. Hunt gender filter** — Men's / Women's / Men's & Women's / Unisex / Children's / Boys / Girls / Unisex children's per hunt; title + case-size inference on listings; gender-only hunts active for Hunt matches.
 
 ### Global filters (gates)
 
@@ -54,36 +54,43 @@
 
 - **F17. Feature extraction + confidence** — Model, era, condition from titles; partial extraction with unverified states.
 - **F18. Gates exclude, taste ranks** — Global gates hide listings; taste affects score.
-- **F19. Multi-hunt scoring** — Best hunt score wins; Watch-list = ≥1 hunt match.
+- **F19. Multi-hunt scoring** — Best hunt score wins; Hunt matches = ≥1 hunt match.
 - **F20. Dealbreaker promotion** — Not shipped.
 - **F21. Match reasons on cards** — Why note + attribute hit/miss/unverified.
 
 ### Collection
 
-- **F22. Purchased watches** — Paste URL → simulated parse into feature pills on `/hunts`.
+- **F22. Purchased watches** — Paste URL → simulated parse into feature pills on `/hunts`; optional image upload per row.
 
-### Persistence
+### Persistence & auth
 
-- Zustand (`caseback-state-v3`) + [`/api/state`](../src/app/api/state/route.ts) → `data/store/state.json`. On Vercel, server file is ephemeral — see [README](../README.md).
+- Zustand (`caseback-state-v5`) + [`/api/state`](../src/app/api/state/route.ts):
+  - **Signed in:** Supabase `user_state` table (magic-link email auth)
+  - **Local fallback:** `data/store/state.json` when Supabase is not configured
+- Persisted fields include hunts, dismissals, stars, feed scope, `marketplaceFilter`, `attributeLibrary`, `attributeHidden`.
+- On Vercel without Supabase, server file is ephemeral — see [README](../README.md).
 
 ---
 
 ## User flows
 
 ### Create a hunt
-New hunt → expand form → set gender → toggle attribute chips / type customs → watch summary + tightness → name → Save → chip in saved bar.
+New hunt → inline editor opens → set gender → toggle attribute chips / type customs → **Edit tiles** to hide unwanted suggestions → set hearts → watch summary + tightness → name → Save → card in Defined hunts list.
 
 ### Daily triage
-Land on Feed (**New**, sorted by hunt score) → scan match reasons → Dismiss noise / **Star** keepers → **Watch-list** scope for hunt-only view → **Starred** tab to revisit saved listings.
+Land on Feed (**New**, sorted by hunt score) → use sidebar **Top matches** or **Hunt matches** → scan match reasons → Dismiss noise / mark **Interesting** → **Starred** view to revisit saved listings.
 
 ### Narrow what you see
-Under **New**, tap **Watch-list** → feed shows only listings matching ≥1 saved hunt (gender + taste).
+Under **New**, tap **Hunt matches** → expand per-hunt sub-chips → or filter by **eBay** / **Chrono24** in Marketplace section.
 
 ### Tune buy-ability
 On **Hunts** → Global filters → price ceiling and ships-to-me + postal code → gates exclude before feed.
 
 ### Log a purchase
 Paste listing URL in Purchased watches → "Reading listing…" → review parsed pills.
+
+### Sign in (optional)
+Magic-link email via masthead auth button → state syncs to Supabase across devices.
 
 ---
 

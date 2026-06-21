@@ -4,7 +4,7 @@ import { chrono24SnapshotSchema, type Chrono24Listing } from "./schema";
 
 const DATA_PATH = path.join(process.cwd(), "data/chrono24/vintage_timex.json");
 
-/** Bundled seed listings used when the on-disk snapshot is missing or empty. */
+/** Minimal seed listings when snapshot is missing — images filled by scraper/enricher. */
 const FALLBACK_LISTINGS: Chrono24Listing[] = [
   {
     listing_id: "38326337",
@@ -12,8 +12,8 @@ const FALLBACK_LISTINGS: Chrono24Listing[] = [
     price_value: 28,
     price_currency: "USD",
     url: "https://www.chrono24.com/timex/timex-calendar-day-date-vintage--id38326337.htm",
-    image_url: "https://picsum.photos/seed/timex-calendar-38326337/800/600",
-    image_urls: ["https://picsum.photos/seed/timex-calendar-38326337/800/600"],
+    image_url: null,
+    image_urls: [],
     year: 1970,
     is_vintage: true,
     source: "chrono24",
@@ -24,8 +24,8 @@ const FALLBACK_LISTINGS: Chrono24Listing[] = [
     price_value: 28,
     price_currency: "USD",
     url: "https://www.chrono24.com/timex/timex-indiglo-wr30m-two-tone-gold-stainless-steel-day-date-black-dial-gold-numbers-vintage--id36498802.htm",
-    image_url: "https://picsum.photos/seed/timex-indiglo-36498802/800/600",
-    image_urls: ["https://picsum.photos/seed/timex-indiglo-36498802/800/600"],
+    image_url: null,
+    image_urls: [],
     year: 1975,
     is_vintage: true,
     source: "chrono24",
@@ -36,8 +36,8 @@ const FALLBACK_LISTINGS: Chrono24Listing[] = [
     price_value: 28,
     price_currency: "USD",
     url: "https://www.chrono24.com/timex/timex-marlin-manual-wind-light-champagne-dial-vintage-1978--mens-watch33mm--id30835323.htm",
-    image_url: "https://picsum.photos/seed/timex-marlin-30835323/800/600",
-    image_urls: ["https://picsum.photos/seed/timex-marlin-30835323/800/600"],
+    image_url: null,
+    image_urls: [],
     year: 1978,
     is_vintage: true,
     source: "chrono24",
@@ -48,8 +48,8 @@ const FALLBACK_LISTINGS: Chrono24Listing[] = [
     price_value: 28,
     price_currency: "USD",
     url: "https://www.chrono24.com/timex/timex-marlin-date-circa-1974-roman-numeral-dial-stainless-steel-mens-watch33mm--id31434846.htm",
-    image_url: "https://picsum.photos/seed/timex-marlin-31434846/800/600",
-    image_urls: ["https://picsum.photos/seed/timex-marlin-31434846/800/600"],
+    image_url: null,
+    image_urls: [],
     year: 1974,
     is_vintage: true,
     source: "chrono24",

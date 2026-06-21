@@ -7,8 +7,15 @@ import {
   ebaySearchResponseSchema,
   type EbayItemSummary,
 } from "./schema";
+import {
+  ebaySnapshotAgeMinutes,
+  readEbaySnapshot,
+  writeEbaySnapshot,
+} from "./snapshot";
 
-const REVALIDATE_SECONDS = 300;
+const REVALIDATE_SECONDS = 3600;
+/** In-process cache — avoids duplicate fetches during dev hot reload. */
+const MEMORY_TTL_MS = 6 * 60 * 60 * 1000;
 
 interface TokenCache {
   token: string;
@@ -16,6 +23,8 @@ interface TokenCache {
 }
 
 let tokenCache: TokenCache | null = null;
+let memoryCache: { listings: EbayItemSummary[]; fetchedAt: number } | null = null;
+let inFlightFetch: Promise<EbayItemSummary[]> | null = null;
 
 function getEbayConfig() {
   const clientId = process.env.EBAY_CLIENT_ID;
@@ -33,6 +42,29 @@ function getEbayConfig() {
       : "https://api.ebay.com";
 
   return { clientId, clientSecret, marketplaceId, baseUrl };
+}
+
+function resolveSearchLimit(): number {
+  const raw = process.env.EBAY_SEARCH_LIMIT;
+  if (raw) {
+    const n = Number(raw);
+    if (Number.isFinite(n) && n > 0) return Math.floor(n);
+  }
+  return EBAY_SEARCH_LIMIT;
+}
+
+/** Live page-load fetch: one page by default. Full pagination is for manual sync only. */
+function resolveLiveFetchLimit(): number {
+  const raw = process.env.EBAY_LIVE_FETCH_LIMIT;
+  if (raw) {
+    const n = Number(raw);
+    if (Number.isFinite(n) && n > 0) return Math.min(Math.floor(n), EBAY_PAGE_SIZE);
+  }
+  return EBAY_PAGE_SIZE;
+}
+
+function forceRefreshRequested(): boolean {
+  return process.env.EBAY_FORCE_REFRESH === "1";
 }
 
 async function getAccessToken(config: NonNullable<ReturnType<typeof getEbayConfig>>): Promise<string> {
@@ -72,7 +104,7 @@ async function fetchEbaySearchPage(
   token: string,
   offset: number,
   limit: number
-): Promise<EbayItemSummary[]> {
+): Promise<{ items: EbayItemSummary[]; rateLimited: boolean }> {
   const aspectFilter = `categoryId:${EBAY_WRISTWATCH_CATEGORY_ID},Brand:{${EBAY_BRAND}}`;
   const params = new URLSearchParams({
     q: EBAY_DEFAULT_QUERY,
@@ -91,50 +123,124 @@ async function fetchEbaySearchPage(
         "X-EBAY-C-MARKETPLACE-ID": config.marketplaceId,
         Accept: "application/json",
       },
-      next: { revalidate: REVALIDATE_SECONDS },
+      cache: "no-store",
     }
   );
 
   if (!res.ok) {
     console.warn("eBay search failed:", res.status, "offset", offset);
-    return [];
+    return { items: [], rateLimited: res.status === 429 };
   }
 
   const json = await res.json();
   const parsed = ebaySearchResponseSchema.safeParse(json);
   if (!parsed.success) {
     console.warn("eBay response validation failed:", parsed.error.message);
-    return [];
+    return { items: [], rateLimited: false };
   }
 
-  return parsed.data.itemSummaries ?? [];
+  return { items: parsed.data.itemSummaries ?? [], rateLimited: false };
 }
 
-export async function fetchEbayListings(): Promise<EbayItemSummary[]> {
+async function fetchEbayListingsFromApi(
+  config: NonNullable<ReturnType<typeof getEbayConfig>>,
+  maxResults: number
+): Promise<EbayItemSummary[]> {
+  const token = await getAccessToken(config);
+  const results: EbayItemSummary[] = [];
+  let offset = 0;
+
+  while (results.length < maxResults) {
+    const pageSize = Math.min(EBAY_PAGE_SIZE, maxResults - results.length);
+    const { items, rateLimited } = await fetchEbaySearchPage(config, token, offset, pageSize);
+    if (items.length === 0) {
+      if (rateLimited && results.length > 0) break;
+      break;
+    }
+    results.push(...items);
+    offset += items.length;
+    if (items.length < pageSize) break;
+  }
+
+  return results;
+}
+
+function useMemoryCache(): EbayItemSummary[] | null {
+  if (!memoryCache) return null;
+  if (Date.now() - memoryCache.fetchedAt > MEMORY_TTL_MS) return null;
+  return memoryCache.listings;
+}
+
+function cacheListings(listings: EbayItemSummary[]): EbayItemSummary[] {
+  memoryCache = { listings, fetchedAt: Date.now() };
+  if (listings.length > 0) writeEbaySnapshot(listings);
+  return listings;
+}
+
+function useDiskCache(reason: string): EbayItemSummary[] {
+  const cached = readEbaySnapshot();
+  if (!cached || cached.length === 0) return [];
+  const age = ebaySnapshotAgeMinutes();
+  console.warn(
+    `Using cached eBay listings (${cached.length}) — ${reason}` +
+      (age != null ? ` (cache ${age}m old)` : "")
+  );
+  memoryCache = { listings: cached, fetchedAt: Date.now() };
+  return cached;
+}
+
+async function fetchEbayListingsInternal(): Promise<EbayItemSummary[]> {
   const config = getEbayConfig();
   if (!config) {
     return [];
   }
 
-  try {
-    const token = await getAccessToken(config);
-    const results: EbayItemSummary[] = [];
-    let offset = 0;
+  const fromMemory = useMemoryCache();
+  if (fromMemory) {
+    return fromMemory;
+  }
 
-    while (results.length < EBAY_SEARCH_LIMIT) {
-      const pageSize = Math.min(EBAY_PAGE_SIZE, EBAY_SEARCH_LIMIT - results.length);
-      const page = await fetchEbaySearchPage(config, token, offset, pageSize);
-      if (page.length === 0) break;
-      results.push(...page);
-      offset += page.length;
-      if (page.length < pageSize) break;
+  const diskCached = readEbaySnapshot();
+  const hasDiskCache = (diskCached?.length ?? 0) > 0;
+
+  // Normal page loads: serve snapshot only — never hit Browse API without cache.
+  if (!forceRefreshRequested()) {
+    if (hasDiskCache) {
+      return useDiskCache("snapshot preferred over live fetch");
     }
-
-    return results;
-  } catch (err) {
-    console.warn("eBay fetch error:", err);
     return [];
   }
+
+  const fetchLimit = forceRefreshRequested()
+    ? resolveSearchLimit()
+    : resolveLiveFetchLimit();
+
+  try {
+    const fresh = await fetchEbayListingsFromApi(config, fetchLimit);
+    if (fresh.length > 0) {
+      return cacheListings(fresh);
+    }
+  } catch (err) {
+    console.warn("eBay fetch error:", err);
+  }
+
+  if (hasDiskCache) {
+    return useDiskCache("API returned no results");
+  }
+
+  return [];
+}
+
+export async function fetchEbayListings(): Promise<EbayItemSummary[]> {
+  if (inFlightFetch) {
+    return inFlightFetch;
+  }
+
+  inFlightFetch = fetchEbayListingsInternal().finally(() => {
+    inFlightFetch = null;
+  });
+
+  return inFlightFetch;
 }
 
 export function hasEbayCredentials(): boolean {

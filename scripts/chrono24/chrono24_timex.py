@@ -38,6 +38,98 @@ LISTING_LINK_RE = re.compile(r'href="(/[^"]*--id(\d+)\.htm)"')
 TITLE_RE = re.compile(r'class="text-bold[^"]*"[^>]*>([^<]+)</')
 PRICE_RE = re.compile(r'class="text-bold[^"]*"[^>]*>\s*\$?([\d,]+(?:\.\d{2})?)')
 IMAGE_RE = re.compile(r'data-src="(https://[^"]+chrono24[^"]+)"')
+IMAGE_RES = [
+    re.compile(
+        r"(https://(?:img|cdn2)\.chrono24\.com/images/uhren/[^'\"\s<>]+\.(?:jpg|webp|jpeg))",
+        re.I,
+    ),
+    re.compile(
+        r'data-(?:src|lazy-src|zoom-image|original)="(https://[^"]+chrono24[^"]+\.(?:jpg|webp|jpeg)[^"]*)"',
+        re.I,
+    ),
+    re.compile(
+        r'src="(https://(?:img|cdn2)\.chrono24\.com/images/uhren/[^"]+\.(?:jpg|webp|jpeg))"',
+        re.I,
+    ),
+]
+
+
+def normalize_image_url(url: str) -> str:
+    url = url.replace("&amp;", "&")
+    return (
+        url.replace("-Square_SIZE_.jpg", "-ExtraLarge.jpg")
+        .replace("-Square420.jpg", "-ExtraLarge.jpg")
+        .replace("-Square210.jpg", "-ExtraLarge.jpg")
+    )
+
+
+def extract_images(html: str) -> list[str]:
+    urls: list[str] = []
+    for pattern in IMAGE_RES:
+        urls.extend(pattern.findall(html))
+    legacy = IMAGE_RE.findall(html)
+    urls.extend(legacy)
+    cleaned: list[str] = []
+    for url in urls:
+        url = normalize_image_url(url)
+        if "chrono24.com" in url and url not in cleaned:
+            cleaned.append(url)
+    return cleaned[:3]
+
+
+def parse_modern_listing_block(block: str) -> dict[str, Any] | None:
+    link = re.search(r'href="(/timex/[^"]+--id(\d+)\.htm)"', block)
+    if not link:
+        return None
+    listing_id = link.group(2)
+    brand = re.search(r'class="text-bold text-sm[^"]*"[^>]*>\s*([^<]+)\s*</', block)
+    subtitle = re.search(r'class="text-ellipsis m-b-0 text-sm[^"]*"[^>]*>\s*([^<]+)\s*</', block)
+    price = re.search(r'class="text-bold text-md[^"]*"[^>]*>\s*\$?([\d,]+(?:\.\d{2})?)', block)
+    brand_text = brand.group(1).strip() if brand else "Timex"
+    subtitle_text = subtitle.group(1).strip() if subtitle else ""
+    title = f"{brand_text} {subtitle_text}".strip()
+    price_value = float(price.group(1).replace(",", "")) if price else None
+    image_urls = extract_images(block)
+    return {
+        "listing_id": listing_id,
+        "title": title,
+        "price_value": price_value,
+        "price_currency": "USD" if price_value else None,
+        "url": canonicalize_chrono24_url(listing_id, link.group(1)),
+        "image_url": image_urls[0] if image_urls else None,
+        "image_urls": image_urls,
+    }
+
+
+def parse_search_html(html: str, max_listings: int) -> list[dict[str, Any]]:
+    listings: list[dict[str, Any]] = []
+    seen: set[str] = set()
+
+    article_blocks = list(ARTICLE_BLOCK_RE.finditer(html))
+    if article_blocks:
+        for match in article_blocks:
+            if len(listings) >= max_listings:
+                break
+            lid = match.group(1)
+            if lid in seen:
+                continue
+            seen.add(lid)
+            parsed = parse_article_block(match.group(2), lid)
+            listings.append(parsed)
+        return listings
+
+    containers = html.split(
+        'class="js-listing-item-container listing-item-container wt-listing-item wt-search-result"'
+    )[1:]
+    for block in containers:
+        if len(listings) >= max_listings:
+            break
+        parsed = parse_modern_listing_block(block)
+        if not parsed or parsed["listing_id"] in seen:
+            continue
+        seen.add(parsed["listing_id"])
+        listings.append(parsed)
+    return listings
 
 
 def canonicalize_chrono24_url(listing_id: str, url: str | None = None) -> str:
@@ -53,8 +145,7 @@ def canonicalize_chrono24_url(listing_id: str, url: str | None = None) -> str:
 def parse_article_block(block: str, listing_id: str) -> dict[str, Any]:
     title_match = TITLE_RE.search(block)
     price_match = PRICE_RE.search(block)
-    image_match = IMAGE_RE.search(block)
-    image_urls = list(dict.fromkeys(IMAGE_RE.findall(block)))[:3]
+    image_urls = extract_images(block)
 
     url = None
     for link_match in LISTING_LINK_RE.finditer(block):
@@ -74,8 +165,8 @@ def parse_article_block(block: str, listing_id: str) -> dict[str, Any]:
         "price_value": price_value,
         "price_currency": "USD" if price_value else None,
         "url": canonicalize_chrono24_url(listing_id, url),
-        "image_url": image_urls[0] if image_urls else (image_match.group(1) if image_match else None),
-        "image_urls": image_urls or ([image_match.group(1)] if image_match else []),
+        "image_url": image_urls[0] if image_urls else None,
+        "image_urls": image_urls,
     }
 
 
@@ -116,6 +207,24 @@ def flaresolverr_get(url: str, session: requests.Session) -> str:
     return data["solution"]["response"]
 
 
+def fetch_html(url: str, session: requests.Session, use_flaresolverr: bool) -> str:
+    try:
+        from curl_cffi import requests as curl_requests
+
+        resp = curl_requests.get(url, impersonate="chrome120", timeout=30)
+        if resp.status_code == 200 and "Just a moment" not in resp.text[:5000]:
+            return resp.text
+    except Exception:
+        pass
+
+    if use_flaresolverr:
+        return flaresolverr_get(url, session)
+
+    r = session.get(url, timeout=30)
+    r.raise_for_status()
+    return r.text
+
+
 def fetch_query(
     query: str,
     session: requests.Session,
@@ -134,27 +243,19 @@ def fetch_query(
         else:
             url = base_url.replace("index.htm", f"index-{page}.htm")
         try:
-            if use_flaresolverr:
-                html = flaresolverr_get(url, session)
-            else:
-                r = session.get(url, timeout=30)
-                r.raise_for_status()
-                html = r.text
+            html = fetch_html(url, session, use_flaresolverr)
         except Exception as exc:
             print(f"  fetch failed page {page}: {exc}", file=sys.stderr)
             break
 
-        article_blocks = list(ARTICLE_BLOCK_RE.finditer(html))
-        if not article_blocks:
+        page_listings = parse_search_html(html, max_listings - len(listings))
+        if not page_listings:
             break
 
         new_on_page = 0
-        for match in article_blocks:
+        for parsed in page_listings:
             if len(listings) >= max_listings:
                 break
-            lid = match.group(1)
-            block = match.group(2)
-            parsed = parse_article_block(block, lid)
             year = parse_year(parsed["title"])
             vintage = is_vintage_listing(parsed["title"], year)
             listings.append(

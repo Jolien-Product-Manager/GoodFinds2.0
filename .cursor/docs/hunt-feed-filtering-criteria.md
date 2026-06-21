@@ -40,17 +40,26 @@ Gates run **before** matching. Gender runs **inside** `scoreListingAgainstHunt()
 
 ## Gender filtering (shipped)
 
-Each hunt has `gender: "mens" | "womens" | "both"` ([`src/lib/hunts/types.ts`](../src/lib/hunts/types.ts)). Each listing gets `gender` at normalize time via [`inferListingGender()`](../src/lib/listings/gender.ts) from title (and case size heuristics).
+Each hunt has `gender` from eight options ([`HUNT_GENDER_OPTIONS`](../src/lib/hunts/types.ts)):
+
+`mens` · `womens` · `both` · `unisex` · `childrens` · `boys` · `girls` · `unisex_children`
+
+Each listing gets `gender` at normalize time via [`inferListingGender()`](../src/lib/listings/gender.ts) from title (and case size heuristics).
 
 At match time, [`listingMatchesHuntGender()`](../src/lib/listings/gender.ts) re-checks the **full title**:
 
 | Hunt gender | Listing handling |
 |-------------|------------------|
 | **both** | All listings pass gender gate |
-| **mens** | Exclude if women's/ladies title signals, or ≤30mm case without men's label; neutral titles pass |
-| **womens** | Exclude if men's title signals without women's; symmetric to men's |
+| **mens** | Exclude women's/children's title signals without men's; neutral titles pass |
+| **womens** | Exclude men's/children's title signals without women's; symmetric to men's |
+| **unisex** | Pass if both men's and women's signals, or listing gender is `unisex`; exclude one-sided gendered titles |
+| **childrens** | Pass if children's/kids/youth/boys/girls signals in title |
+| **boys** | Pass only if explicit boys signal |
+| **girls** | Pass only if explicit girls signal |
+| **unisex_children** | Pass children's signals that are not exclusively boys-only or girls-only |
 
-A hunt with **only gender set** (no attribute chips) is still active via `huntHasActiveCriteria()` — gender-only hunts populate **Hunt Finds** (`watchlist` scope).
+A hunt with **only gender set** (no attribute chips) is still active via `huntHasActiveCriteria()` — gender-only hunts populate **Hunt matches** (`watchlist` scope).
 
 Summary sentence on Hunts page includes gender when not `both` ([`buildHuntSummary`](../src/lib/hunts/summary.ts)).
 
@@ -79,7 +88,7 @@ Matching quality depends on [`ExtractedFeatures`](../src/lib/listings/types.ts) 
 | `cond` | Inferred from title | low |
 | `gender` | Title + size heuristics | medium |
 | `collab` | Title via [`inferCollabFromTitle()`](../src/lib/listings/collab.ts) (Peanuts, Disney, Keith Haring, etc.) | medium |
-| `storeFind` | Title via [`inferStoreFindFromTitle()`](../src/lib/listings/store-find.ts) (Deadstock, tags, box) | medium |
+| `storeFind` / `traits` | Title via store-find inference (Deadstock, tags, box) → migrated to `traits` attribute | medium |
 
 **Collab meta-options at match time:** "Any collab" matches any detected co-brand; "House brand only" matches listings with no collab signal; named partners match title keywords or extracted `features.collab`.
 
@@ -131,9 +140,11 @@ feedScore(listing) = max( score(listing, hunt) for hunt in matchedHunts )
 
 - A listing's feed score is its **best** matching hunt's score. A hunt the listing does **not** match is
   simply absent from the set — it never lowers the score. No cross-hunt penalty, no averaging.
-- **All** scope (New tab): unseen listings that pass global gates.
-- **Hunt Finds** scope (`watchlist`): same pool, filtered to listings with `matchedHuntIds.length > 0` for ≥1 saved hunt.
-- **Per-hunt** scope (`hunt:{id}`): Hunt Finds sub-chips filter to a single saved hunt (shipped in UI).
+- **All listings** scope (New tab): unseen listings that pass global gates.
+- **Top matches** scope (`top`): unseen listings with `feedScore ≥ 4.0` (shipped in sidebar).
+- **Hunt matches** scope (`watchlist`): same pool, filtered to listings with `matchedHuntIds.length > 0` for ≥1 saved hunt.
+- **Per-hunt** scope (`hunt:{id}`): Hunt matches sub-chips filter to a single saved hunt (shipped in sidebar).
+- **Marketplace** filter (`marketplaceFilter`): `all` | `ebay` | `chrono24` — independent of hunt scope.
 - Tie-break by recency (`listedAt` desc).
 
 [`alertSort`](../src/lib/listings/selectors.ts): best score desc → `listedAt` desc.
@@ -168,12 +179,13 @@ Disliked-model exclusion is independent of hearts and stays.
 
 ## Feed scope (shipped vs future)
 
-| Scope | Shipped in UI | Behavior |
+| Scope / filter | Shipped in UI | Behavior |
 |---|---|---|
-| `all` | Yes | All unseen gated listings |
-| `watchlist` (**Hunt Finds**) | Yes | Unseen + ≥1 hunt match |
-| `hunt:{id}` | Yes | Single hunt filter (sub-chips under Hunt Finds) |
-| `top` (**Top matches**) | No | `feedScore ≥` strong-match threshold (`≥ 4.0`); exact value TBD |
+| `all` | Yes (All listings) | All unseen gated listings |
+| `top` (**Top matches**) | Yes | `feedScore ≥ 4.0` |
+| `watchlist` (**Hunt matches**) | Yes | Unseen + ≥1 hunt match |
+| `hunt:{id}` | Yes | Single hunt filter (sub-chips under Hunt matches) |
+| `marketplaceFilter` | Yes | All / eBay / Chrono24 |
 
 ---
 
@@ -185,7 +197,7 @@ signal; a hearted model becomes a **one-attribute hunt** (`model = X`, default h
 | Surface | Was (model-hearts) | Becomes |
 |---|---|---|
 | `alertSort` tie-break | hearts desc → recency | recency only (desire lives in `H`) |
-| **Hunt Finds** scope | models with ≥1 heart | ≥1 hunt match |
+| **Hunt matches** scope | models with ≥1 heart | ≥1 hunt match |
 | **Top picks (3♥)** chip | models with 3 hearts | **Top matches** — `feedScore ≥` threshold |
 | Card heart badge | heart when model on list | matched-hunt chip |
 | **Explore** "heart a model" | adds model to Watch List | creates/opens a one-attribute model hunt |
@@ -203,26 +215,29 @@ then drop the model-hearts field in [`src/store/caseback.ts`](../src/store/caseb
 
 | Shipped | Future |
 |---|---|
-| `C × S × H` scoring (hearts + specificity) | Top matches threshold UI |
-| Hunt match scoring + Hunt Finds scope | Dealbreaker taste weights |
-| Gender per hunt + title inference | Full dial/case/mvmt from specs |
-| Per-hunt scope chips under Hunt Finds | Tap hunt chip to scope feed (partial — chips exist) |
-| Model + era + cond + collab + storeFind extraction (partial) | Per-attribute nice/want/dealbreaker weights |
-| Card match reasons + 0–8 score | Explore tab / model triage |
+| `C × S × H` scoring (hearts + specificity) | Dealbreaker taste weights |
+| Hunt match scoring + Hunt matches scope | Full dial/case/mvmt from specs |
+| Top matches sidebar filter (`≥ 4.0`) | Explore tab / model triage |
+| Extended gender (8 options) + title inference | Per-attribute nice/want/dealbreaker weights |
+| Per-hunt sub-chips + marketplace filter | — |
+| Feed sidebar (Views / Filters / Marketplace) | — |
+| Model + era + cond + collab + traits extraction (partial) | — |
+| Card match reasons + 0–8 score + image proxy | — |
 | model-hearts retirement + migration | — |
+| Supabase auth + cloud state sync | — |
 
 ---
 
 ## Acceptance criteria
 
 - **FC1:** Global gates run before listings appear in New.
-- **FC2:** Hunt Finds shows unseen listings matching ≥1 saved hunt (gender + taste).
+- **FC2:** Hunt matches shows unseen listings matching ≥1 saved hunt (gender + taste).
 - **FC3:** Rank = best hunt score, then recency.
 - **FC4:** Gender-only hunts (e.g. Men's only) actively match listings.
 - **FC5:** Men's hunt excludes ladies/women's title signals and small-case women's heuristics.
 - **FC6:** Custom and preset values normalized identically before compare.
 - **FC7:** Cards show match note and attribute status where available.
-- **FC8:** `alertScope` resolves to `all`, `watchlist` (Hunt Finds), or `hunt:{id}` in UI.
+- **FC8:** `alertScope` resolves to `all`, `top`, `watchlist` (Hunt matches), or `hunt:{id}` in sidebar UI.
 - **FC9:** Per-hunt score = `C × S × H`; a 4-heart hunt scores 4× a 1-heart hunt at equal completeness and specificity.
 - **FC10:** At equal completeness and hearts, a "Very specific" hunt outranks a "Loose" hunt.
 - **FC11:** Feed score = max over matched hunts; a hunt a listing does not match never lowers its score.
@@ -231,9 +246,9 @@ then drop the model-hearts field in [`src/store/caseback.ts`](../src/store/caseb
 
 ## Open decisions
 
-1. `top` / Top-matches threshold on the `0–8` scale (code uses `≥ 4.0`; UI not exposed).
-2. Default heart value for a new hunt (`2`).
-3. Whether the Watch List tab survives as a model-only-hunt view or retires.
+1. Top-matches threshold tuning on the `0–8` scale (currently `≥ 4.0`).
+2. Default heart value for a new hunt (`2`) — shipped default.
+3. Whether Explore / model-only-hunt view returns as a separate surface.
 
 ---
 
