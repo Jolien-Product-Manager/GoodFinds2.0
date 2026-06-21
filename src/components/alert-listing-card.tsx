@@ -26,6 +26,7 @@ import {
 import { getListingImageSrcs } from "@/lib/listings/image-url";
 import { getTotalCost } from "@/lib/shipping";
 import { DEFAULT_CRITERIA } from "@/lib/criteria";
+import { MarketplaceIcon } from "@/components/marketplace-logo";
 import { cn } from "@/lib/utils";
 
 function attributeTagLabel(match: AttributeMatch, listing: AppListing): string {
@@ -232,7 +233,7 @@ function ListingPhotoCarousel({
         <img
           src={currentSrc}
           alt={`${listing.title} photo ${safeIndex + 1}`}
-          className="h-full w-full object-cover"
+          className="h-full w-full object-contain object-center"
           loading="lazy"
           decoding="async"
           onError={() =>
@@ -413,6 +414,14 @@ export function AlertListingCard({
     >
       {useDetailPanel ? (
         <div className="flex flex-col">
+          {isNew && (
+            <div className="border-b border-line px-3 py-0.5">
+              <span className="font-mono text-[9px] font-medium uppercase tracking-wide text-ok">
+                New
+              </span>
+            </div>
+          )}
+
           <div className="relative aspect-[4/3] w-full shrink-0 overflow-hidden bg-[#c9b896]/20">
             <ListingPhotoCarousel listing={listing} />
 
@@ -422,16 +431,6 @@ export function AlertListingCard({
                 onToggle={onToggleInterested}
                 className="absolute left-3 top-3 z-10"
               />
-            )}
-
-            <span className="absolute bottom-3 left-3 rounded-full bg-ink px-2.5 py-0.5 text-[11px] font-medium lowercase tracking-wide text-card">
-              {listing.source}
-            </span>
-
-            {isNew && (
-              <span className="absolute bottom-3 right-3 rounded-sm bg-ok px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-card">
-                New
-              </span>
             )}
 
             {matchQuality != null && (
@@ -458,14 +457,17 @@ export function AlertListingCard({
                 >
                   {listing.title}
                 </h3>
-                <span
-                  className={cn(
-                    "shrink-0 font-display font-semibold tabular-nums text-ink",
-                    compact ? "text-lg" : "text-xl"
-                  )}
-                >
-                  ${costs.total.toFixed(2)}
-                </span>
+                <div className="flex w-fit shrink-0 flex-col items-center gap-0.5 text-center">
+                  <span
+                    className={cn(
+                      "block w-full font-display font-semibold tabular-nums text-ink",
+                      compact ? "text-lg" : "text-xl"
+                    )}
+                  >
+                    ${costs.total.toFixed(2)}
+                  </span>
+                  <MarketplaceIcon source={listing.source} />
+                </div>
               </div>
             </div>
 
@@ -574,6 +576,14 @@ export function AlertListingCard({
           )}
         >
           <div className="flex flex-col [backface-visibility:hidden]">
+            {isNew && (
+              <div className="border-b border-line px-3 py-0.5">
+                <span className="font-mono text-[9px] font-medium uppercase tracking-wide text-ok">
+                  New
+                </span>
+              </div>
+            )}
+
             <div className="relative aspect-[4/3] w-full shrink-0 overflow-hidden bg-[#c9b896]/20">
               <ListingPhotoCarousel listing={listing} />
 
@@ -584,10 +594,6 @@ export function AlertListingCard({
                   className="absolute left-3 top-3 z-10"
                 />
               )}
-
-              <span className="absolute bottom-3 left-3 rounded-full bg-ink px-2.5 py-0.5 text-[11px] font-medium lowercase tracking-wide text-card">
-                {listing.source}
-              </span>
 
               {matchQuality != null && (
                 <span className="absolute right-3 top-3 inline-flex items-center gap-1.5 rounded-full border border-line bg-card/95 px-2.5 py-1 text-[11px] font-medium text-ink shadow-sm">
@@ -619,14 +625,17 @@ export function AlertListingCard({
                   >
                     {listing.title}
                   </h3>
-                  <span
-                    className={cn(
-                      "shrink-0 font-display font-semibold tabular-nums text-ink",
-                      compact ? "text-lg" : "text-xl"
-                    )}
-                  >
-                    ${costs.total.toFixed(2)}
-                  </span>
+                  <div className="flex w-fit shrink-0 flex-col items-center gap-0.5 text-center">
+                    <span
+                      className={cn(
+                        "block w-full font-display font-semibold tabular-nums text-ink",
+                        compact ? "text-lg" : "text-xl"
+                      )}
+                    >
+                      ${costs.total.toFixed(2)}
+                    </span>
+                    <MarketplaceIcon source={listing.source} />
+                  </div>
                 </div>
               </div>
 

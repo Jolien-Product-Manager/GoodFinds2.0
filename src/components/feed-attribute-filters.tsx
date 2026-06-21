@@ -419,6 +419,15 @@ export function FeedAttributeFilters({
   const showCustomAdd =
     trimmedSectionQuery.length > 0 && !searchLoading && visibleKeys.length === 0;
 
+  const showSectionClear = hasActiveFilters || trimmedSectionQuery.length > 0;
+
+  const handleClearSection = useCallback(() => {
+    setSectionQuery("");
+    setSearchMatches(null);
+    setSearchLoading(false);
+    onClear?.();
+  }, [onClear]);
+
   const applySectionSearch = useCallback(() => {
     if (!trimmedSectionQuery) return;
     const matches = finalizeFeedFilterMatches(
@@ -475,10 +484,10 @@ export function FeedAttributeFilters({
             aria-hidden
           />
         </CollapsibleTrigger>
-        {hasActiveFilters && onClear && (
+        {showSectionClear && (
           <button
             type="button"
-            onClick={onClear}
+            onClick={handleClearSection}
             className="shrink-0 text-xs text-brass underline-offset-2 hover:underline"
           >
             Clear

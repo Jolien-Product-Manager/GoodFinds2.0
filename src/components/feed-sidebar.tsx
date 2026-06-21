@@ -102,7 +102,20 @@ export function FeedSidebar({
           </div>
         )}
 
-        <FilterSection label="Views">
+        <FilterSection
+          label="Views"
+          action={
+            feedView !== "new" ? (
+              <button
+                type="button"
+                onClick={() => selectNewWithScope("all")}
+                className="text-xs text-brass underline-offset-2 hover:underline"
+              >
+                Clear
+              </button>
+            ) : undefined
+          }
+        >
           <FilterTableRow
             selected={feedView === "all"}
             count={counts.all}

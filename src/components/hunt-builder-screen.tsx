@@ -54,7 +54,6 @@ import {
   partitionHuntFilterPills,
   sortSavedHunts,
   sortArchivedHunts,
-  simulateListingParse,
   type HuntFilterPill,
 } from "@/lib/hunts/summary";
 import {
@@ -62,6 +61,7 @@ import {
   findListingMetadataForPurchaseUrl,
   type ListingImageRef,
 } from "@/lib/hunts/purchased-watch";
+import { extractPurchasedWatchFeatures } from "@/lib/hunts/purchased-watch-features";
 import {
   mergePurchaseListingMetadata,
   type PurchaseListingMetadata,
@@ -286,16 +286,32 @@ export function HuntBuilderScreen() {
       return;
     }
 
-    const id = workingCopy.id;
-    setHunts(useCasebackStore.getState().hunts.filter((h) => h.id !== id));
-
-    const alertScope = useCasebackStore.getState().alertScope;
-    if (alertScope === `hunt:${id}`) {
-      useCasebackStore.getState().setAlertScope("all");
-    }
-
+    deleteHuntById(workingCopy.id);
     setWorkingCopy(null);
     setEditingId(null);
+    toast("Hunt deleted");
+  };
+
+  const deleteHuntById = useCallback(
+    (id: string) => {
+      setHunts(useCasebackStore.getState().hunts.filter((h) => h.id !== id));
+
+      const alertScope = useCasebackStore.getState().alertScope;
+      if (alertScope === `hunt:${id}`) {
+        useCasebackStore.getState().setAlertScope("all");
+      }
+
+      if (editingId === id) {
+        setEditingId(null);
+        setDraft(null);
+        setWorkingCopy(null);
+      }
+    },
+    [editingId, setHunts]
+  );
+
+  const handleDeleteHunt = (hunt: Hunt) => {
+    deleteHuntById(hunt.id);
     toast("Hunt deleted");
   };
 
@@ -343,18 +359,17 @@ export function HuntBuilderScreen() {
     const metadata = mergePurchaseListingMetadata(fromFeed, fromApi);
 
     setPurchasedWatches(
-      useCasebackStore.getState().purchasedWatches.map((p) =>
-        p.id === id
-          ? applyPurchaseListingMetadata(
-              {
-                ...p,
-                parsing: false,
-                features: simulateListingParse(url),
-              },
-              metadata
-            )
-          : p
-      )
+      useCasebackStore.getState().purchasedWatches.map((p) => {
+        if (p.id !== id) return p;
+        const withMetadata = applyPurchaseListingMetadata(
+          { ...p, parsing: false },
+          metadata
+        );
+        return {
+          ...withMetadata,
+          features: extractPurchasedWatchFeatures(withMetadata),
+        };
+      })
     );
   }, [purchaseUrl, purchasedWatches, setPurchasedWatches]);
 
@@ -387,9 +402,14 @@ export function HuntBuilderScreen() {
         if (cancelled) return;
 
         setPurchasedWatches(
-          useCasebackStore.getState().purchasedWatches.map((p) =>
-            p.id === watch.id ? updated : p
-          )
+          useCasebackStore.getState().purchasedWatches.map((p) => {
+            if (p.id !== watch.id) return p;
+            const withMetadata = applyPurchaseListingMetadata(watch, metadata);
+            return {
+              ...withMetadata,
+              features: extractPurchasedWatchFeatures(withMetadata),
+            };
+          })
         );
       }
     }
@@ -463,6 +483,7 @@ export function HuntBuilderScreen() {
             editorOpen={editorOpen}
             onEdit={openEdit}
             onArchive={handleArchive}
+            onDelete={handleDeleteHunt}
             action={
               <Button variant="outline" size="sm" className="h-8 shrink-0" onClick={startNewHunt}>
                 <Plus className="mr-1 h-3 w-3" />
@@ -507,6 +528,7 @@ export function HuntBuilderScreen() {
                       isActive={editingId === hunt.id && editorOpen}
                       onEdit={() => openEdit(hunt)}
                       onUnarchive={() => handleUnarchive(hunt)}
+                      onDelete={() => handleDeleteHunt(hunt)}
                     />
                   ))}
                 </ul>
@@ -579,6 +601,7 @@ function HuntListGroup({
   editorOpen,
   onEdit,
   onArchive,
+  onDelete,
   action,
   emptyMessage,
 }: {
@@ -589,6 +612,7 @@ function HuntListGroup({
   editorOpen: boolean;
   onEdit: (hunt: Hunt) => void;
   onArchive?: (hunt: Hunt) => void;
+  onDelete?: (hunt: Hunt) => void;
   action?: React.ReactNode;
   emptyMessage?: string;
 }) {
@@ -613,6 +637,7 @@ function HuntListGroup({
               isActive={editingId === hunt.id && editorOpen}
               onEdit={() => onEdit(hunt)}
               onArchive={onArchive ? () => onArchive(hunt) : undefined}
+              onDelete={onDelete ? () => onDelete(hunt) : undefined}
             />
           ))}
         </ul>
@@ -627,14 +652,18 @@ function SavedHuntCard({
   onEdit,
   onArchive,
   onUnarchive,
+  onDelete,
 }: {
   hunt: Hunt;
   isActive: boolean;
   onEdit: () => void;
   onArchive?: () => void;
   onUnarchive?: () => void;
+  onDelete?: () => void;
 }) {
   const tightnessForHunt = huntTightness(hunt);
+  const actionClassName =
+    "inline-flex items-center gap-1 rounded-sm px-1.5 py-1 text-[11px] text-ink-soft transition-colors hover:bg-paper hover:text-ink";
 
   return (
     <li>
@@ -671,12 +700,21 @@ function SavedHuntCard({
             {buildHuntSummary(hunt, { omitGender: true })}
           </p>
         </button>
-        <div className="flex shrink-0 items-center gap-1">
+        <div className="flex shrink-0 items-center gap-0.5">
+          <button
+            type="button"
+            onClick={onEdit}
+            className={actionClassName}
+            aria-label={`Edit ${hunt.name}`}
+          >
+            <Pencil className="h-3 w-3" />
+            Edit
+          </button>
           {onArchive ? (
             <button
               type="button"
               onClick={onArchive}
-              className="inline-flex items-center gap-1 rounded-sm px-1.5 py-1 text-[11px] text-ink-soft transition-colors hover:bg-paper hover:text-ink"
+              className={actionClassName}
               aria-label={`Archive ${hunt.name}`}
             >
               <Archive className="h-3 w-3" />
@@ -687,21 +725,27 @@ function SavedHuntCard({
             <button
               type="button"
               onClick={onUnarchive}
-              className="inline-flex items-center gap-1 rounded-sm px-1.5 py-1 text-[11px] text-ink-soft transition-colors hover:bg-paper hover:text-ink"
+              className={actionClassName}
               aria-label={`Restore ${hunt.name}`}
             >
               <ArchiveRestore className="h-3 w-3" />
               Restore
             </button>
           ) : null}
-          <button
-            type="button"
-            onClick={onEdit}
-            className="inline-flex items-center gap-1 rounded-sm px-1.5 py-1 text-[11px] text-ink-soft transition-colors hover:bg-paper hover:text-ink"
-          >
-            <Pencil className="h-3 w-3" />
-            Edit
-          </button>
+          {onDelete ? (
+            <>
+              <span className="mx-0.5 h-4 w-px bg-line" aria-hidden />
+              <button
+                type="button"
+                onClick={onDelete}
+                className="inline-flex items-center gap-1 rounded-sm px-1.5 py-1 text-[11px] text-steal transition-colors hover:bg-steal/10 hover:text-steal"
+                aria-label={`Delete ${hunt.name}`}
+              >
+                <Trash2 className="h-3 w-3" />
+                Delete
+              </button>
+            </>
+          ) : null}
         </div>
       </div>
     </li>

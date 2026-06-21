@@ -36,7 +36,18 @@ export function HuntQuickFilter({
 
   return (
     <div className={cn(filterSectionClassName(), className)}>
-      <p className={filterSectionLabelClassName()}>Hunt finds</p>
+      <div className="flex items-center justify-between gap-2">
+        <p className={filterSectionLabelClassName()}>Hunt finds</p>
+        {alertScope !== "all" && (
+          <button
+            type="button"
+            onClick={() => onScopeChange("all")}
+            className="shrink-0 text-xs text-brass underline-offset-2 hover:underline"
+          >
+            Clear
+          </button>
+        )}
+      </div>
       <div className="mt-1.5 flex max-w-2xl flex-wrap gap-x-1.5 gap-y-1">
         <button
           type="button"

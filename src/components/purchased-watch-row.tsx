@@ -5,6 +5,7 @@ import Image from "next/image";
 import { Camera, ExternalLink, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { purchasedWatchFeatureTags } from "@/lib/hunts/purchased-watch-features";
 import type { PurchasedWatch } from "@/lib/hunts/types";
 import { getListingImageSrc } from "@/lib/listings/image-url";
 import { cn } from "@/lib/utils";
@@ -27,6 +28,7 @@ export function PurchasedWatchRow({
     watch.imageUrl?.startsWith("data:") ? watch.imageUrl : remoteSrc;
   const displayTitle = watch.title?.trim();
   const modelLabel = displayTitle ?? "Purchased watch";
+  const featureTags = purchasedWatchFeatureTags(watch);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -134,15 +136,15 @@ export function PurchasedWatchRow({
           <span className="text-ink-soft italic">Reading listing…</span>
         )}
 
-        {watch.features && Object.keys(watch.features).length > 0 && (
+        {(featureTags.length > 0 || (imageSrc && !imageFailed)) && (
           <div className="flex flex-wrap items-center gap-1">
-            {Object.entries(watch.features).map(([key, value]) => (
+            {featureTags.map((tag) => (
               <Badge
-                key={key}
+                key={tag}
                 variant="outline"
                 className="h-5 px-1.5 text-[10px] font-normal"
               >
-                {key}: {value}
+                {tag}
               </Badge>
             ))}
             {imageSrc && !imageFailed && (

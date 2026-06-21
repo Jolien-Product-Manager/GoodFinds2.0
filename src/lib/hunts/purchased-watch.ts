@@ -1,6 +1,7 @@
 import { extractChrono24ListingId } from "@/lib/chrono24/urls";
 import type { AppListing } from "@/lib/listings/types";
 import { DEFAULT_PURCHASED_WATCHES } from "./default-purchased-watches";
+import { extractPurchasedWatchFeatures } from "./purchased-watch-features";
 import {
   EMPTY_PURCHASE_LISTING_METADATA,
   mergePurchaseListingMetadata,
@@ -164,12 +165,18 @@ export function mergeDefaultPurchasedWatches(
     const normalized = normalizePurchasedWatch(watch);
     const key = purchaseUrlKey(normalized.url);
     const seed = key ? defaultByUrl.get(key) : undefined;
-    if (!seed) return normalized;
+    const merged = seed
+      ? {
+          ...normalized,
+          imageUrl: normalized.imageUrl ?? seed.imageUrl,
+          title: normalized.title ?? seed.title,
+          description: normalized.description ?? seed.description,
+        }
+      : normalized;
 
     return {
-      ...normalized,
-      imageUrl: normalized.imageUrl ?? seed.imageUrl,
-      title: normalized.title ?? seed.title,
+      ...merged,
+      features: extractPurchasedWatchFeatures(merged),
     };
   });
 }

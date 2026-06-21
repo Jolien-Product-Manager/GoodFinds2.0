@@ -1,4 +1,5 @@
 import type { Hunt, AttrKey, HuntGender } from "./types";
+import { extractPurchasedWatchFeatures } from "./purchased-watch-features";
 import {
   HUNT_GENDER_OPTIONS,
   isGenderRequired,
@@ -256,14 +257,10 @@ export function buildHuntHuntingForLine(hunt: Hunt): string {
   return `${parts.join(" · ")}.`;
 }
 
-export function simulateListingParse(url: string): Record<string, string> {
-  const lower = url.toLowerCase();
-  const features: Record<string, string> = {};
-  if (lower.includes("marlin")) features.model = "Marlin";
-  if (lower.includes("viscount")) features.model = "Viscount";
-  if (lower.includes("electric")) features.mvmt = "Electric";
-  if (lower.includes("1960")) features.era = "1960s";
-  if (lower.includes("1970")) features.era = "1970s";
-  if (Object.keys(features).length === 0) features.model = "Timex";
-  return features;
+export function simulateListingParse(
+  url: string,
+  title?: string | null,
+  description?: string | null
+): Record<string, string> {
+  return extractPurchasedWatchFeatures({ url, title: title ?? null, description: description ?? null });
 }
