@@ -99,15 +99,40 @@ function listingFeatureForMatch(
   }
 }
 
-function attributeMatchLabel(match: AttributeMatch, listing: AppListing): string {
-  const optionLabel =
-    ATTR_OPTIONS[match.key as keyof typeof ATTR_OPTIONS]?.label ?? match.label;
+function stripPresetAlias(label: string): string {
+  const base = label.replace(/\s*\([^)]*\)\s*$/, "").trim();
+  return base || label;
+}
+
+function isCategoryLabel(key: string, label: string): boolean {
+  const categoryLabel = ATTR_OPTIONS[key as keyof typeof ATTR_OPTIONS]?.label;
+  return Boolean(
+    categoryLabel &&
+      normalizeCustomValue(label) === normalizeCustomValue(categoryLabel)
+  );
+}
+
+/** User-facing chip text — the matched characteristic, not the category name. */
+export function characteristicDisplayLabel(
+  match: AttributeMatch,
+  listing?: AppListing
+): string {
   if (match.key === "traits") return match.label;
-  if (match.status === "hit") {
-    const value = listingFeatureForMatch(listing, match.key);
-    return value ? `${optionLabel}: ${value}` : optionLabel;
+
+  const listingValue = listing
+    ? listingFeatureForMatch(listing, match.key)
+    : undefined;
+  if (listingValue) return listingValue;
+
+  if (match.label && !isCategoryLabel(match.key, match.label)) {
+    return stripPresetAlias(match.label);
   }
-  return optionLabel;
+
+  return stripPresetAlias(match.label);
+}
+
+function attributeMatchLabel(match: AttributeMatch, listing: AppListing): string {
+  return characteristicDisplayLabel(match, listing);
 }
 
 function genderMatchedLabels(hunt: Hunt, listing: AppListing): string[] {
@@ -140,11 +165,21 @@ function matchedOnLabels(
   return [];
 }
 
-function effectiveValues(hunt: Hunt, key: keyof Hunt["attributes"]): string[] {
+function effectivePickLabels(
+  hunt: Hunt,
+  key: keyof Hunt["attributes"]
+): string[] {
   const attr = hunt.attributes[key];
   if (!attr) return [];
-  const values = [...attr.picks, ...attr.customs.map(normalizeCustomValue)];
-  return values.map(normalizeCustomValue);
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of [...attr.picks, ...attr.customs]) {
+    const norm = normalizeCustomValue(raw);
+    if (!norm || seen.has(norm)) continue;
+    seen.add(norm);
+    out.push(raw);
+  }
+  return out;
 }
 
 function huntHasAnyTaste(hunt: Hunt): boolean {
@@ -238,11 +273,12 @@ function categoryPasses(
     const hit = wanted.some((w) => collabPickMatchesListing(w, listing));
     const inferred = resolveListingCollab(listing);
     if (hit) {
+      const matched = wanted.find((w) => collabPickMatchesListing(w, listing));
       return {
         passed: true,
         match: {
           key,
-          label,
+          label: matched ?? inferred ?? label,
           status: "hit",
           confidence: inferred
             ? (listing.features.confidence.collab ?? "medium")
@@ -288,12 +324,15 @@ function categoryPasses(
   if (key === "complete") {
     const hit = wanted.some((w) => completenessPickMatchesTitle(w, listing.title));
     const resolved = listing.features.complete;
+    const matched = wanted.find((w) =>
+      completenessPickMatchesTitle(w, listing.title)
+    );
     if (hit) {
       return {
         passed: true,
         match: {
           key,
-          label,
+          label: matched ?? resolved ?? label,
           status: "hit",
           confidence: resolved
             ? (listing.features.confidence.complete ?? "medium")
@@ -354,11 +393,15 @@ function categoryPasses(
   });
 
   if (hit) {
+    const matched = wanted.find((w) => {
+      const norm = normalizeCustomValue(w);
+      return normalizedListing.includes(norm) || norm.includes(normalizedListing);
+    });
     return {
       passed: true,
       match: {
         key,
-        label,
+        label: matched ?? listingVal ?? label,
         status: "hit",
         confidence:
           listing.features.confidence[key as keyof typeof listing.features.confidence],
@@ -409,7 +452,7 @@ export function scoreListingAgainstHunt(
     keyof Hunt["attributes"],
     Hunt["attributes"][keyof Hunt["attributes"]],
   ][]) {
-    const wanted = effectiveValues(hunt, key);
+    const wanted = effectivePickLabels(hunt, key);
     if (wanted.length === 0) continue;
 
     totalCategories += 1;

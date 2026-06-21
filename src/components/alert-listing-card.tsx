@@ -13,80 +13,16 @@ import {
 import { Button } from "@/components/ui/button";
 import type { AppListing } from "@/lib/listings/types";
 import type { AttributeMatch, HuntMatchResult } from "@/lib/listings/hunt-match";
-import { ATTR_OPTIONS, type AttrKey } from "@/lib/hunts/types";
+import { characteristicDisplayLabel } from "@/lib/listings/hunt-match";
 import { getListingImageSrcs } from "@/lib/listings/image-url";
 import { getTotalCost } from "@/lib/shipping";
 import { DEFAULT_CRITERIA } from "@/lib/criteria";
 import { cn } from "@/lib/utils";
 
-const ATTR_SHORT: Partial<Record<AttrKey, string>> = {
-  complications: "Complication",
-  model: "Model",
-  era: "Era",
-  datecode: "Code",
-  dialOrig: "Dial orig.",
-  plating: "Plating",
-  crystal: "Crystal",
-  running: "Runs",
-  complete: "Set",
-  dial: "Pattern",
-  color: "Colour",
-  collab: "Collab",
-  mvmt: "Mvmt",
-  traits: "Trait",
-};
-
-function listingFeatureValue(listing: AppListing, key: string): string | undefined {
-  const f = listing.features;
-  switch (key) {
-    case "model":
-      return f.model ?? listing.model ?? undefined;
-    case "collab":
-      return f.collab;
-    case "complications":
-      return f.complications;
-    case "dial":
-      return f.dial;
-    case "color":
-      return f.color;
-    case "era":
-      return f.era;
-    case "datecode":
-      return f.datecode;
-    case "dialOrig":
-      return f.dialOrig;
-    case "plating":
-      return f.plating;
-    case "crystal":
-      return f.crystal;
-    case "running":
-      return f.running;
-    case "complete":
-      return f.complete;
-    case "mvmt":
-      return f.mvmt;
-    case "traits":
-      return undefined;
-    default:
-      return undefined;
-  }
-}
-
 function attributeTagLabel(match: AttributeMatch, listing: AppListing): string {
-  const short = ATTR_SHORT[match.key as AttrKey];
-  const full = ATTR_OPTIONS[match.key as AttrKey]?.label ?? match.label;
-
-  if (match.key === "traits") {
-    return match.label;
-  }
-
-  if (match.status === "hit") {
-    return listingFeatureValue(listing, match.key) ?? short ?? full;
-  }
-  if (match.status === "unverified") {
-    return `${short ?? full}?`;
-  }
-  return short ?? full;
+  const label = characteristicDisplayLabel(match, listing);
+  if (match.status === "unverified") return `${label}?`;
+  return label;
 }
 
 function ListingPhotoCarousel({

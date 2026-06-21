@@ -33,12 +33,11 @@ function feedContextSuffix(
   marketplaceFilter: MarketplaceFilter,
   activeHunts: { id: string; name: string }[]
 ): string {
-  if (feedView === "starred") return "starred";
+  if (feedView === "starred") return "saved";
   if (feedView === "dismissed") return "dismissed";
   if (feedView === "all") {
     let suffix = "all listings";
-    if (alertScope === "top") suffix = "all · top matches";
-    else if (alertScope.startsWith("hunt:")) {
+    if (alertScope.startsWith("hunt:")) {
       const huntId = alertScope.slice(5);
       const hunt = activeHunts.find((h) => h.id === huntId);
       suffix = `all · matching ${hunt?.name ?? "this hunt"}`;
@@ -52,8 +51,7 @@ function feedContextSuffix(
   }
 
   let suffix = "new listings";
-  if (alertScope === "top") suffix = "new listings · top matches";
-  else if (alertScope.startsWith("hunt:")) {
+  if (alertScope.startsWith("hunt:")) {
     const huntId = alertScope.slice(5);
     const hunt = activeHunts.find((h) => h.id === huntId);
     suffix = `new listings · matching ${hunt?.name ?? "this hunt"}`;
@@ -181,7 +179,6 @@ export function FeedView({ listings, ebayEnabled }: FeedViewProps) {
       new: unseenAll.length,
       starred: starred.length,
       dismissed: dismissed.length,
-      top: alertListings(listings, "top", ctxWithMatches).length,
       huntMatches: alertListings(listings, "watchlist", ctxWithMatches).length,
       perHunt,
       marketplace: {
@@ -284,7 +281,7 @@ export function FeedView({ listings, ebayEnabled }: FeedViewProps) {
   const emptyMessage =
     feedView === "starred"
       ? {
-          title: "No starred listings yet",
+          title: "No saved listings yet",
           hint: "Save listings from New — unsave or dismiss them here.",
         }
       : feedView === "dismissed"
@@ -299,15 +296,10 @@ export function FeedView({ listings, ebayEnabled }: FeedViewProps) {
                 title: "No hunt matches yet",
                 hint:
                   activeHunts.length === 0
-                    ? "Save a hunt on Hunts to populate Hunt matches."
-                    : "Nothing unseen matches your saved hunts — try Top matches, or broaden hunt criteria.",
+                    ? "Save a hunt on Hunts to populate Hunt Finds."
+                    : "Nothing unseen matches your saved hunts — try All listings or broaden hunt criteria.",
               }
-            : alertScope === "top"
-              ? {
-                  title: "No top matches yet",
-                  hint: "Top matches need a feed score of 4.0 or higher from a saved hunt.",
-                }
-              : feedView === "all"
+            : feedView === "all"
                 ? {
                     title: "No listings in this view",
                     hint: "Nothing matches your filters — try clearing filters or refreshing.",

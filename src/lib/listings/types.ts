@@ -72,6 +72,6 @@ export interface ListingStatus {
   interested?: boolean;
 }
 
-export type AlertScope = "all" | "watchlist" | "top" | `hunt:${string}`;
+export type AlertScope = "all" | "watchlist" | `hunt:${string}`;
 
 export type MarketplaceFilter = "all" | ListingSource;

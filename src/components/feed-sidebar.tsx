@@ -140,7 +140,6 @@ interface FeedSidebarProps {
     new: number;
     starred: number;
     dismissed: number;
-    top: number;
     huntMatches: number;
     perHunt: Record<string, number>;
     marketplace: {
@@ -176,9 +175,6 @@ export function FeedSidebar({
   onClearFeedAttributeFilters,
   className,
 }: FeedSidebarProps) {
-  const isHuntScope =
-    alertScope === "watchlist" || alertScope.startsWith("hunt:");
-
   const isBrowsingFeed = feedView === "new" || feedView === "all";
   const hasAttributeFilters = hasActiveFeedAttributeFilters(feedAttributeFilters);
   const hasActiveFilter =
@@ -253,7 +249,7 @@ export function FeedSidebar({
             onClick={() => selectNewWithScope("all")}
           />
           <SidebarRow
-            label="Starred"
+            label="Saved"
             count={counts.starred}
             selected={feedView === "starred"}
             onClick={() => onFeedViewChange("starred")}
@@ -271,7 +267,7 @@ export function FeedSidebar({
             <div className="space-y-1 border-t border-line pt-4">
               <div className="flex items-center justify-between gap-2 px-1">
                 <p className="text-xs font-medium uppercase tracking-wider text-ink-soft">
-                  Highlights
+                  Hunt Finds
                 </p>
                 {hasActiveFilter && (
                   <button
@@ -283,59 +279,33 @@ export function FeedSidebar({
                   </button>
                 )}
               </div>
-              <SidebarRow
-                label="Top matches"
-                count={counts.top}
-                selected={alertScope === "top"}
-                onClick={() => toggleScope("top")}
-              />
               <div className="space-y-1">
                 <SidebarRow
-                  label="Hunt matches"
+                  label="All hunts"
                   count={counts.huntMatches}
-                  selected={isHuntScope}
-                  onClick={() => {
-                    if (alertScope === "watchlist") {
-                      clearFilters();
-                    } else {
-                      selectNewWithScope("watchlist");
-                    }
-                  }}
+                  selected={alertScope === "watchlist"}
+                  onClick={() => toggleScope("watchlist")}
                 />
-
-                {isHuntScope && (
-                  <div className="space-y-1 pl-1">
+                {activeHunts.map((hunt) => {
+                  const huntScope = `hunt:${hunt.id}` as AlertScope;
+                  return (
                     <SidebarRow
-                      label="All hunts"
-                      count={counts.huntMatches}
-                      selected={alertScope === "watchlist"}
-                      indent
-                      onClick={() => toggleScope("watchlist")}
+                      key={hunt.id}
+                      label={hunt.name}
+                      count={counts.perHunt[hunt.id] ?? 0}
+                      selected={alertScope === huntScope}
+                      trailing={
+                        <HuntHeartsPicker value={hunt.hearts} size="xs" />
+                      }
+                      onClick={() => toggleScope(huntScope)}
                     />
-                    {activeHunts.map((hunt) => {
-                      const huntScope = `hunt:${hunt.id}` as AlertScope;
-                      return (
-                        <SidebarRow
-                          key={hunt.id}
-                          label={hunt.name}
-                          count={counts.perHunt[hunt.id] ?? 0}
-                          selected={alertScope === huntScope}
-                          indent
-                          trailing={
-                            <HuntHeartsPicker value={hunt.hearts} size="xs" />
-                          }
-                          onClick={() => toggleScope(huntScope)}
-                        />
-                      );
-                    })}
-                    <SidebarRow
-                      label="New hunt"
-                      indent
-                      href="/hunts"
-                      trailing={<Plus className="h-3 w-3 text-ink-soft" />}
-                    />
-                  </div>
-                )}
+                  );
+                })}
+                <SidebarRow
+                  label="New hunt"
+                  href="/hunts"
+                  trailing={<Plus className="h-3 w-3 text-ink-soft" />}
+                />
               </div>
             </div>
 

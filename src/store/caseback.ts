@@ -265,6 +265,9 @@ export const useCasebackStore = create<CasebackState>()(
         if (feedView === "interested") {
           state.feedView = "starred";
         }
+        if ((legacy.alertScope as string) === "top") {
+          legacy.alertScope = "all";
+        }
       },
     }
   )

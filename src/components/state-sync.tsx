@@ -7,12 +7,20 @@ import { isPersistedStateEmpty, mergeAttributeLibraries, mergeAttributeHidden } 
 import { normalizeHunt, emptyHuntAttributes, type Hunt, type PurchasedWatch } from "@/lib/hunts/types";
 import { withInferredHuntCriteria } from "@/lib/hunts/domain-terms";
 import { normalizePurchasedWatch } from "@/lib/hunts/purchased-watch";
+import type { AlertScope } from "@/lib/listings/types";
 
 function migrateFeedView(raw: string | undefined): FeedView {
   if (raw === "interested" || raw === "starred") return "starred";
   if (raw === "dismissed") return "dismissed";
   if (raw === "all") return "all";
   return "new";
+}
+
+function migrateAlertScope(raw: string | undefined): AlertScope {
+  if (raw === "top") return "all";
+  if (raw === "watchlist" || raw === "all") return raw;
+  if (raw?.startsWith("hunt:")) return raw as AlertScope;
+  return "all";
 }
 
 function pickPersistedState(): PersistedState {
@@ -45,7 +53,7 @@ function applyPersistedState(
   useCasebackStore.setState({
     seen: state.seen ?? [],
     listingStatus: state.listingStatus ?? {},
-    alertScope: state.alertScope ?? "all",
+    alertScope: migrateAlertScope(state.alertScope as string | undefined),
     marketplaceFilter: state.marketplaceFilter ?? "all",
     feedView: migrateFeedView(state.feedView),
     hiddenListings: state.hiddenListings ?? [],

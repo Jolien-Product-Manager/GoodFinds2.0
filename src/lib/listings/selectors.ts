@@ -10,9 +10,6 @@ import { listingPassesFeedAttributeFilters } from "@/lib/listings/feed-attribute
 import { passesCriteria } from "@/lib/shipping";
 import type { HuntMatchResult } from "@/lib/listings/hunt-match";
 
-/** Strong-match threshold on additive listing score (see listing-match-scoring.md). */
-export const TOP_MATCH_SCORE_THRESHOLD = 3.0;
-
 interface FilterContext {
   seen: string[];
   listingStatus: Record<string, { interested?: boolean }>;
@@ -103,11 +100,6 @@ export function alertListings(
     base = base.filter((l) => {
       const match = ctx.matchResults?.get(l.id);
       return match != null && match.matchedHuntIds.length > 0;
-    });
-  } else if (scope === "top") {
-    base = base.filter((l) => {
-      const match = ctx.matchResults?.get(l.id);
-      return match != null && match.score >= TOP_MATCH_SCORE_THRESHOLD;
     });
   } else if (scope.startsWith("hunt:")) {
     const huntId = scope.slice(5);

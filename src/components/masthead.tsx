@@ -7,7 +7,7 @@ import { AuthButton } from "@/components/auth-button";
 import { cn } from "@/lib/utils";
 
 const NAV_LINKS = [
-  { href: "/", label: "Feeds" },
+  { href: "/", label: "Listings" },
   { href: "/hunts", label: "Hunts" },
 ] as const;
 
