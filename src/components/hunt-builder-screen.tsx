@@ -48,6 +48,7 @@ import {
 import {
   buildHuntHuntingForLine,
   buildHuntSummary,
+  generateHuntTitle,
   huntTightness,
   partitionHuntFilterPills,
   sortSavedHunts,
@@ -220,16 +221,13 @@ export function HuntBuilderScreen() {
 
   const handleSave = () => {
     if (!workingCopy) return;
-    if (!workingCopy.name.trim()) {
-      toast.error("Name your hunt before saving");
-      return;
-    }
     if (workingCopy.hearts == null) {
       toast.error("Choose how badly you want this hunt (1–4 hearts)");
       return;
     }
     const saved: Hunt = normalizeHunt({
       ...workingCopy,
+      name: generateHuntTitle(workingCopy),
       saved: true,
       updatedAt: new Date().toISOString(),
     });
@@ -332,7 +330,11 @@ export function HuntBuilderScreen() {
           className="max-h-[min(90vh,900px)] overflow-y-auto border-line-strong bg-card p-0 sm:max-w-lg"
         >
           <DialogTitle className="sr-only">
-            {workingCopy?.saved ? `Edit ${workingCopy.name}` : "New hunt"}
+            {workingCopy
+              ? workingCopy.saved
+                ? `Edit ${generateHuntTitle(workingCopy)}`
+                : "New hunt"
+              : "New hunt"}
           </DialogTitle>
           {workingCopy && (
             <HuntEditorPanel
@@ -356,25 +358,12 @@ export function HuntBuilderScreen() {
       </Dialog>
 
       <main className="mx-auto max-w-3xl space-y-8 px-4 py-8">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h1 className="font-display text-3xl font-semibold text-ink">
-            What are you looking for?
-          </h1>
-          <Button variant="outline" size="sm" className="h-8" onClick={startNewHunt}>
-            <Plus className="mr-1 h-3 w-3" />
-            New hunt
-            {draft && (
-              <span className="ml-2 text-xs italic text-ink-soft">(unsaved)</span>
-            )}
-          </Button>
-        </div>
+        <h1 className="font-display text-3xl font-semibold text-ink">
+          What are you looking for?
+        </h1>
 
         {/* Saved hunts */}
         <section className="space-y-5">
-          {savedHuntCount === 0 && (
-            <p className="text-sm text-ink-soft">No saved hunts yet.</p>
-          )}
-
           <HuntListGroup
             title="Hunts"
             description="Specific watches or features you find interesting"
@@ -382,6 +371,18 @@ export function HuntBuilderScreen() {
             editingId={editingId}
             editorOpen={editorOpen}
             onEdit={openEdit}
+            action={
+              <Button variant="outline" size="sm" className="h-8 shrink-0" onClick={startNewHunt}>
+                <Plus className="mr-1 h-3 w-3" />
+                New hunt
+                {draft && (
+                  <span className="ml-2 text-xs italic text-ink-soft">(unsaved)</span>
+                )}
+              </Button>
+            }
+            emptyMessage={
+              savedHuntCount === 0 ? "No saved hunts yet." : undefined
+            }
           />
         </section>
 
@@ -436,6 +437,8 @@ function HuntListGroup({
   editingId,
   editorOpen,
   onEdit,
+  action,
+  emptyMessage,
 }: {
   title: string;
   description: string;
@@ -443,13 +446,21 @@ function HuntListGroup({
   editingId: string | null;
   editorOpen: boolean;
   onEdit: (hunt: Hunt) => void;
+  action?: React.ReactNode;
+  emptyMessage?: string;
 }) {
   return (
     <div className="space-y-2">
-      <div>
-        <h2 className="font-display text-lg font-medium text-ink">{title}</h2>
-        <p className="mt-0.5 text-sm text-ink-soft">{description}</p>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="font-display text-lg font-medium text-ink">{title}</h2>
+          <p className="mt-0.5 text-sm text-ink-soft">{description}</p>
+        </div>
+        {action}
       </div>
+      {emptyMessage ? (
+        <p className="text-sm text-ink-soft">{emptyMessage}</p>
+      ) : null}
       {hunts.length > 0 ? (
         <ul className="space-y-1.5">
           {hunts.map((hunt) => (
@@ -559,6 +570,14 @@ function HuntEditorPanel({
   const [heartsRequiredHint, setHeartsRequiredHint] = useState(false);
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
 
+  const autoTitle = useMemo(() => generateHuntTitle(hunt), [hunt]);
+
+  useEffect(() => {
+    if (hunt.name !== autoTitle) {
+      onUpdate({ ...hunt, name: autoTitle });
+    }
+  }, [autoTitle, hunt, onUpdate]);
+
   const { mustHave: mustHavePills, interested: interestedPills } = useMemo(
     () => partitionHuntFilterPills(hunt),
     [hunt]
@@ -645,21 +664,17 @@ function HuntEditorPanel({
 
   return (
     <section className="space-y-5 p-5 pt-8">
-      {/* Title + edit tiles */}
-      <div className="space-y-1">
-        <div className="flex items-center gap-2 pr-8">
-          <Input
-            value={hunt.name}
-            onChange={(e) => onUpdate({ ...hunt, name: e.target.value })}
-            className="h-10 min-w-0 flex-1 rounded-sm border-line-strong bg-card font-display text-base"
-            placeholder="Untitled hunt"
-          />
+      <div className="space-y-3">
+        <div className="flex items-start justify-between gap-2 pr-8">
+          <h2 className="font-display text-base font-medium leading-snug text-ink">
+            Tell us what to hunt for
+          </h2>
           <Button
             type="button"
             variant="outline"
             size="sm"
             className={cn(
-              "h-10 shrink-0 rounded-sm px-3 text-xs",
+              "h-8 shrink-0 rounded-sm px-3 text-xs",
               editingTiles && "border-brass text-brass"
             )}
             onClick={() => setEditingTiles((v) => !v)}
@@ -685,45 +700,45 @@ function HuntEditorPanel({
             )}
           </div>
         )}
-      </div>
 
-      {/* Search + must-have + add */}
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="relative min-w-[12rem] flex-1">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-soft" />
-          <Input
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search what you're looking for —"
-            className="h-10 rounded-sm border-line-strong bg-card pl-9 text-sm"
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                addFromSearch();
-              }
-            }}
-          />
+        {/* Search + must-have + add */}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative min-w-[12rem] flex-1">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-soft" />
+            <Input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="e.g. crosshair dial, Marlin, indiglo"
+              className="h-10 rounded-sm border-line-strong bg-card pl-9 text-sm"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  addFromSearch();
+                }
+              }}
+            />
+          </div>
+          <label className="flex shrink-0 cursor-pointer items-center gap-2 text-sm text-ink-soft">
+            <input
+              type="checkbox"
+              checked={mustHave}
+              onChange={(e) => setMustHave(e.target.checked)}
+              className="h-4 w-4 rounded-sm border-line-strong accent-brass"
+            />
+            Must-have
+          </label>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-10 shrink-0 rounded-sm px-4"
+            onClick={addFromSearch}
+            disabled={!searchQuery.trim() || searching}
+          >
+            <Plus className="mr-1 h-3.5 w-3.5" />
+            {searching ? "Adding…" : "Add"}
+          </Button>
         </div>
-        <label className="flex shrink-0 cursor-pointer items-center gap-2 text-sm text-ink-soft">
-          <input
-            type="checkbox"
-            checked={mustHave}
-            onChange={(e) => setMustHave(e.target.checked)}
-            className="h-4 w-4 rounded-sm border-line-strong accent-brass"
-          />
-          Must-have
-        </label>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="h-10 shrink-0 rounded-sm px-4"
-          onClick={addFromSearch}
-          disabled={!searchQuery.trim() || searching}
-        >
-          <Plus className="mr-1 h-3.5 w-3.5" />
-          {searching ? "Adding…" : "Add"}
-        </Button>
       </div>
 
       {/* Summary card */}

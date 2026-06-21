@@ -465,7 +465,7 @@ export function createDraftHunt(): Hunt {
   const now = new Date().toISOString();
   return {
     id: crypto.randomUUID(),
-    name: "Untitled hunt",
+    name: "",
     saved: false,
     gender: "both",
     hearts: null,

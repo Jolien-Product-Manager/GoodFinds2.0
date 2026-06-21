@@ -13,6 +13,7 @@ import { FeedAttributeFilters } from "@/components/feed-attribute-filters";
 import { hasActiveFeedAttributeFilters } from "@/lib/listings/feed-attribute-filter";
 import type { AlertScope, MarketplaceFilter } from "@/lib/listings/types";
 import type { AttrKey, Hunt, HuntAttribute } from "@/lib/hunts/types";
+import type { AttributeLibrary } from "@/lib/persistence/types";
 import type { FeedView } from "@/store/caseback";
 import { cn } from "@/lib/utils";
 
@@ -118,6 +119,7 @@ interface FeedSidebarProps {
   alertScope: AlertScope;
   marketplaceFilter: MarketplaceFilter;
   feedAttributeFilters: Record<AttrKey, HuntAttribute>;
+  attributeLibrary: AttributeLibrary;
   counts: {
     all: number;
     new: number;
@@ -138,6 +140,7 @@ interface FeedSidebarProps {
   onScopeChange: (scope: AlertScope) => void;
   onMarketplaceChange: (filter: MarketplaceFilter) => void;
   onToggleFeedAttributeFilter: (key: AttrKey, value: string) => void;
+  onAddFeedAttributeFilter: (key: AttrKey, value: string) => void;
   onClearFeedAttributeFilters: () => void;
   className?: string;
 }
@@ -147,12 +150,14 @@ export function FeedSidebar({
   alertScope,
   marketplaceFilter,
   feedAttributeFilters,
+  attributeLibrary,
   counts,
   activeHunts,
   onFeedViewChange,
   onScopeChange,
   onMarketplaceChange,
   onToggleFeedAttributeFilter,
+  onAddFeedAttributeFilter,
   onClearFeedAttributeFilters,
   className,
 }: FeedSidebarProps) {
@@ -336,7 +341,9 @@ export function FeedSidebar({
 
             <FeedAttributeFilters
               filters={feedAttributeFilters}
+              attributeLibrary={attributeLibrary}
               onToggle={onToggleFeedAttributeFilter}
+              onAddCustom={onAddFeedAttributeFilter}
             />
           </>
         )}

@@ -309,7 +309,10 @@ function categoryPasses(
 
   if (key === "traits") {
     const haystack = listingSearchText(listing);
-    const matched = wanted.find((w) => w.length > 0 && haystack.includes(w));
+    const matched = wanted.find((w) => {
+      const norm = normalizeCustomValue(w);
+      return norm.length > 0 && haystack.includes(norm);
+    });
     if (matched) {
       return {
         passed: true,
@@ -336,9 +339,10 @@ function categoryPasses(
   }
 
   const normalizedListing = normalizeCustomValue(listingVal);
-  const hit = wanted.some(
-    (w) => normalizedListing.includes(w) || w.includes(normalizedListing)
-  );
+  const hit = wanted.some((w) => {
+    const norm = normalizeCustomValue(w);
+    return normalizedListing.includes(norm) || norm.includes(normalizedListing);
+  });
 
   if (hit) {
     return {
@@ -377,22 +381,14 @@ export function scoreListingAgainstHunt(
     listing.description
   );
 
-  if (gender !== "both" && isGenderRequired(hunt) && !genderMatches) {
-    return {
-      pointsContributed: 0,
-      matches: [],
-      excluded: true,
-      categoriesPassed: 0,
-      totalCategories: 0,
-      hearts,
-      matchedOn: [],
-    };
-  }
-
   const matches: AttributeMatch[] = [];
   let categoriesPassed = 0;
   let totalCategories = 0;
   let requiredFailed = false;
+
+  if (gender !== "both" && isGenderRequired(hunt) && !genderMatches) {
+    requiredFailed = true;
+  }
 
   if (gender !== "both" && hunt.genderRequired === false) {
     totalCategories += 1;
@@ -418,7 +414,9 @@ export function scoreListingAgainstHunt(
 
     for (const pick of meta.requiredPicks ?? []) {
       const { passed: pickPassed } = categoryPasses(listing, key, [pick]);
-      if (!pickPassed) requiredFailed = true;
+      if (!pickPassed) {
+        requiredFailed = true;
+      }
     }
   }
 
@@ -487,14 +485,13 @@ export function matchAllHunts(
       const {
         pointsContributed,
         matches,
-        excluded,
         categoriesPassed,
         totalCategories,
         hearts,
         matchedOn,
       } = scoreListingAgainstHunt(listing, hunt);
 
-      if (excluded || pointsContributed <= 0) continue;
+      if (pointsContributed <= 0) continue;
 
       listingScore += pointsContributed;
       huntContributions.push({

@@ -209,6 +209,34 @@ function joinPillLabels(pills: HuntFilterPill[]): string {
 }
 
 /** One-line summary for the hunt builder card header. */
+const DEFAULT_HUNT_NAMES = new Set(["", "untitled hunt"]);
+
+function genderShortLabel(gender: HuntGender): string {
+  return HUNT_GENDER_OPTIONS.find((o) => o.value === gender)?.label ?? gender;
+}
+
+/** Short display name from hunt filters — used as default hunt title. */
+export function generateHuntTitle(hunt: Hunt): string {
+  const { mustHave, interested } = partitionHuntFilterPills(hunt);
+  const primary = mustHave.length > 0 ? mustHave : interested;
+
+  if (primary.length === 0) {
+    const gender = hunt.gender ?? "both";
+    if (gender !== "both") return `${genderShortLabel(gender)} Timex`;
+    return "Vintage Timex";
+  }
+
+  const labels = primary.map((p) => p.label);
+  if (labels.length <= 3) return labels.join(" · ");
+  return `${labels.slice(0, 2).join(" · ")} +${labels.length - 2}`;
+}
+
+export function isAutoHuntName(name: string, hunt: Hunt): boolean {
+  const trimmed = name.trim();
+  if (DEFAULT_HUNT_NAMES.has(trimmed.toLowerCase())) return true;
+  return trimmed === generateHuntTitle(hunt);
+}
+
 export function buildHuntHuntingForLine(hunt: Hunt): string {
   const { mustHave, interested } = partitionHuntFilterPills(hunt);
   const gender = hunt.gender ?? "both";

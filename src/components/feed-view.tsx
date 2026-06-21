@@ -17,6 +17,10 @@ import {
   unseenListings,
 } from "@/lib/listings/selectors";
 import { useCasebackStore, type FeedView } from "@/store/caseback";
+import {
+  isAttributeValueSelected,
+  type AttrKey,
+} from "@/lib/hunts/types";
 
 interface FeedViewProps {
   listings: AppListing[];
@@ -78,6 +82,7 @@ export function FeedView({ listings, ebayEnabled }: FeedViewProps) {
   const hiddenListings = useCasebackStore((s) => s.hiddenListings);
   const dislikedModels = useCasebackStore((s) => s.dislikedModels);
   const feedAttributeFilters = useCasebackStore((s) => s.feedAttributeFilters);
+  const attributeLibrary = useCasebackStore((s) => s.attributeLibrary ?? {});
 
   const dismissListing = useCasebackStore((s) => s.dismissListing);
   const dismissAllUnseen = useCasebackStore((s) => s.dismissAllUnseen);
@@ -89,6 +94,7 @@ export function FeedView({ listings, ebayEnabled }: FeedViewProps) {
   const setFeedView = useCasebackStore((s) => s.setFeedView);
   const toggleFeedAttributeFilter = useCasebackStore((s) => s.toggleFeedAttributeFilter);
   const clearFeedAttributeFilters = useCasebackStore((s) => s.clearFeedAttributeFilters);
+  const addAttributeLibraryOption = useCasebackStore((s) => s.addAttributeLibraryOption);
 
   const ctx = useMemo(
     () => ({
@@ -195,6 +201,16 @@ export function FeedView({ listings, ebayEnabled }: FeedViewProps) {
     dismissed.length,
     activeHunts,
   ]);
+
+  const handleAddFeedAttributeFilter = useCallback(
+    (key: AttrKey, value: string) => {
+      addAttributeLibraryOption(key, value);
+      if (!isAttributeValueSelected(feedAttributeFilters[key], value)) {
+        toggleFeedAttributeFilter(key, value);
+      }
+    },
+    [addAttributeLibraryOption, feedAttributeFilters, toggleFeedAttributeFilter]
+  );
 
   const handleDismiss = useCallback(
     (id: string) => {
@@ -332,12 +348,14 @@ export function FeedView({ listings, ebayEnabled }: FeedViewProps) {
           alertScope={alertScope}
           marketplaceFilter={marketplaceFilter}
           feedAttributeFilters={feedAttributeFilters}
+          attributeLibrary={attributeLibrary}
           counts={sidebarCounts}
           activeHunts={activeHunts}
           onFeedViewChange={setFeedView}
           onScopeChange={setAlertScope}
           onMarketplaceChange={setMarketplaceFilter}
           onToggleFeedAttributeFilter={toggleFeedAttributeFilter}
+          onAddFeedAttributeFilter={handleAddFeedAttributeFilter}
           onClearFeedAttributeFilters={clearFeedAttributeFilters}
           className="md:sticky md:top-4 md:col-start-2 md:row-start-1 md:max-h-[calc(100vh-1rem)] md:overflow-y-auto md:overscroll-y-contain md:pr-0.5"
         />
