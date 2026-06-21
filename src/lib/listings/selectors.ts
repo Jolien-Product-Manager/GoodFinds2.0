@@ -5,7 +5,8 @@ import type {
   CriteriaSettings,
   MarketplaceFilter,
 } from "@/lib/listings/types";
-import type { Hunt } from "@/lib/hunts/types";
+import type { HuntAttribute, AttrKey, Hunt } from "@/lib/hunts/types";
+import { listingPassesFeedAttributeFilters } from "@/lib/listings/feed-attribute-filter";
 import { passesCriteria } from "@/lib/shipping";
 import type { HuntMatchResult } from "@/lib/listings/hunt-match";
 
@@ -19,6 +20,7 @@ interface FilterContext {
   dislikedModels: string[];
   criteria?: CriteriaSettings;
   marketplaceFilter?: MarketplaceFilter;
+  feedAttributeFilters?: Partial<Record<AttrKey, HuntAttribute>>;
   matchResults?: Map<string, HuntMatchResult>;
   hunts?: Hunt[];
 }
@@ -34,6 +36,9 @@ export function passesListingFilters(
     ctx.marketplaceFilter !== "all" &&
     listing.source !== ctx.marketplaceFilter
   ) {
+    return false;
+  }
+  if (!listingPassesFeedAttributeFilters(listing, ctx.feedAttributeFilters)) {
     return false;
   }
   const criteria = ctx.criteria ?? DEFAULT_CRITERIA;
@@ -75,12 +80,24 @@ export function dismissedListings(
   );
 }
 
+export function poolListings(
+  listings: AppListing[],
+  ctx: FilterContext
+): AppListing[] {
+  return listings.filter((l) => passesListingFilters(l, ctx));
+}
+
 export function alertListings(
   listings: AppListing[],
   scope: AlertScope,
-  ctx: FilterContext
+  ctx: FilterContext,
+  options?: { mode?: "unseen" | "all" }
 ): AppListing[] {
-  let base = unseenListings(listings, ctx);
+  const mode = options?.mode ?? "unseen";
+  let base =
+    mode === "all"
+      ? poolListings(listings, ctx)
+      : unseenListings(listings, ctx);
 
   if (scope === "watchlist") {
     base = base.filter((l) => {

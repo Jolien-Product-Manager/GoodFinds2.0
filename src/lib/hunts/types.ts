@@ -208,6 +208,9 @@ export const PRESET_ATTR_KEYS = ATTR_KEYS.filter((k) => k !== "traits") as Exclu
   "traits"
 >[];
 
+/** Hunt-builder categories exposed as feed sidebar filters (excludes free-form traits). */
+export const FEED_FILTER_ATTR_KEYS = PRESET_ATTR_KEYS;
+
 export const HUNT_GENDER_OPTIONS: { value: HuntGender; label: string }[] = [
   { value: "both", label: "Men's & Women's" },
   { value: "mens", label: "Men's" },

@@ -11,9 +11,11 @@ import {
   emptyHuntAttributes,
   normalizeCustomValue,
   normalizeHunt,
+  toggleAttributePick,
   ATTR_OPTIONS,
   type GlobalFilters,
   type Hunt,
+  type HuntAttribute,
   type HuntHearts,
   type PurchasedWatch,
   type AttrKey,
@@ -23,7 +25,7 @@ import { normalizePurchasedWatch } from "@/lib/hunts/purchased-watch";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
-export type FeedView = "new" | "starred" | "dismissed";
+export type FeedView = "new" | "all" | "starred" | "dismissed";
 
 interface CasebackState {
   seen: string[];
@@ -39,6 +41,7 @@ interface CasebackState {
   purchasedWatches: PurchasedWatch[];
   attributeLibrary: AttributeLibrary;
   attributeHidden: AttributeLibrary;
+  feedAttributeFilters: Record<AttrKey, HuntAttribute>;
   dismissListing: (id: string) => void;
   restoreListing: (id: string) => void;
   toggleInterested: (id: string) => void;
@@ -54,6 +57,8 @@ interface CasebackState {
   addAttributeLibraryOption: (key: AttrKey, value: string) => void;
   removeAttributeOption: (key: AttrKey, value: string) => void;
   restoreAllAttributeTiles: () => void;
+  toggleFeedAttributeFilter: (key: AttrKey, value: string) => void;
+  clearFeedAttributeFilters: () => void;
 }
 
 function huntTargetsModel(hunt: Hunt, model: string): boolean {
@@ -121,6 +126,7 @@ export const useCasebackStore = create<CasebackState>()(
       purchasedWatches: [],
       attributeLibrary: {},
       attributeHidden: {},
+      feedAttributeFilters: emptyHuntAttributes(),
 
       dismissListing: (id) =>
         set((s) => ({
@@ -219,9 +225,23 @@ export const useCasebackStore = create<CasebackState>()(
           };
         }),
       restoreAllAttributeTiles: () => set({ attributeHidden: {} }),
+
+      toggleFeedAttributeFilter: (key, value) =>
+        set((s) => {
+          const current = s.feedAttributeFilters[key] ?? { picks: [], customs: [] };
+          return {
+            feedAttributeFilters: {
+              ...s.feedAttributeFilters,
+              [key]: toggleAttributePick(current, value),
+            },
+          };
+        }),
+
+      clearFeedAttributeFilters: () =>
+        set({ feedAttributeFilters: emptyHuntAttributes() }),
     }),
     {
-      name: "caseback-state-v6",
+      name: "caseback-state-v7",
       onRehydrateStorage: () => (state) => {
         if (!state) return;
         const legacy = state as CasebackState & {
@@ -237,6 +257,8 @@ export const useCasebackStore = create<CasebackState>()(
         );
         legacy.attributeLibrary = migrateAttributeLibrary(legacy.attributeLibrary);
         legacy.attributeHidden = migrateAttributeLibrary(legacy.attributeHidden);
+        legacy.feedAttributeFilters =
+          legacy.feedAttributeFilters ?? emptyHuntAttributes();
         const feedView = state.feedView as string;
         if (feedView === "interested") {
           state.feedView = "starred";

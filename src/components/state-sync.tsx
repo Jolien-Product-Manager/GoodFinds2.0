@@ -4,12 +4,13 @@ import { useEffect, useRef } from "react";
 import { useCasebackStore, migrateModelHeartsToHunts, type FeedView } from "@/store/caseback";
 import type { PersistedState } from "@/lib/persistence/types";
 import { isPersistedStateEmpty, mergeAttributeLibraries, mergeAttributeHidden } from "@/lib/persistence/state-utils";
-import { normalizeHunt, type Hunt, type PurchasedWatch } from "@/lib/hunts/types";
+import { normalizeHunt, emptyHuntAttributes, type Hunt, type PurchasedWatch } from "@/lib/hunts/types";
 import { normalizePurchasedWatch } from "@/lib/hunts/purchased-watch";
 
 function migrateFeedView(raw: string | undefined): FeedView {
   if (raw === "interested" || raw === "starred") return "starred";
   if (raw === "dismissed") return "dismissed";
+  if (raw === "all") return "all";
   return "new";
 }
 
@@ -29,6 +30,7 @@ function pickPersistedState(): PersistedState {
     purchasedWatches: s.purchasedWatches,
     attributeLibrary: s.attributeLibrary ?? {},
     attributeHidden: s.attributeHidden ?? {},
+    feedAttributeFilters: s.feedAttributeFilters ?? emptyHuntAttributes(),
   };
 }
 
@@ -61,6 +63,7 @@ function applyPersistedState(
       useCasebackStore.getState().attributeHidden,
       state.attributeHidden
     ),
+    feedAttributeFilters: state.feedAttributeFilters ?? emptyHuntAttributes(),
   });
 }
 

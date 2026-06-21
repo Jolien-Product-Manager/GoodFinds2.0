@@ -13,6 +13,7 @@ import {
   alertSort,
   dismissedListings,
   interestedListings,
+  poolListings,
   unseenListings,
 } from "@/lib/listings/selectors";
 import { useCasebackStore, type FeedView } from "@/store/caseback";
@@ -31,15 +32,30 @@ function feedContextSuffix(
 ): string {
   if (feedView === "starred") return "starred";
   if (feedView === "dismissed") return "dismissed";
+  if (feedView === "all") {
+    let suffix = "all listings";
+    if (alertScope === "top") suffix = "all · top matches";
+    else if (alertScope.startsWith("hunt:")) {
+      const huntId = alertScope.slice(5);
+      const hunt = activeHunts.find((h) => h.id === huntId);
+      suffix = `all · matching ${hunt?.name ?? "this hunt"}`;
+    } else if (alertScope === "watchlist") {
+      suffix = "all · matching any of your hunts";
+    }
+    if (marketplaceFilter === "ebay") suffix += " · eBay";
+    else if (marketplaceFilter === "chrono24") suffix += " · Chrono24";
+    else if (marketplaceFilter === "etsy") suffix += " · Etsy";
+    return suffix;
+  }
 
-  let suffix = "new";
-  if (alertScope === "top") suffix = "new · top matches";
+  let suffix = "new listings";
+  if (alertScope === "top") suffix = "new listings · top matches";
   else if (alertScope.startsWith("hunt:")) {
     const huntId = alertScope.slice(5);
     const hunt = activeHunts.find((h) => h.id === huntId);
-    suffix = `new · matching ${hunt?.name ?? "this hunt"}`;
+    suffix = `new listings · matching ${hunt?.name ?? "this hunt"}`;
   } else if (alertScope === "watchlist") {
-    suffix = "new · matching any of your hunts";
+    suffix = "new listings · matching any of your hunts";
   }
 
   if (marketplaceFilter === "ebay") suffix += " · eBay";
@@ -62,6 +78,7 @@ export function FeedView({ listings, ebayEnabled, etsyEnabled }: FeedViewProps) 
   const globalFilters = useCasebackStore((s) => s.globalFilters);
   const hiddenListings = useCasebackStore((s) => s.hiddenListings);
   const dislikedModels = useCasebackStore((s) => s.dislikedModels);
+  const feedAttributeFilters = useCasebackStore((s) => s.feedAttributeFilters);
 
   const dismissListing = useCasebackStore((s) => s.dismissListing);
   const dismissAllUnseen = useCasebackStore((s) => s.dismissAllUnseen);
@@ -71,6 +88,8 @@ export function FeedView({ listings, ebayEnabled, etsyEnabled }: FeedViewProps) 
   const setAlertScope = useCasebackStore((s) => s.setAlertScope);
   const setMarketplaceFilter = useCasebackStore((s) => s.setMarketplaceFilter);
   const setFeedView = useCasebackStore((s) => s.setFeedView);
+  const toggleFeedAttributeFilter = useCasebackStore((s) => s.toggleFeedAttributeFilter);
+  const clearFeedAttributeFilters = useCasebackStore((s) => s.clearFeedAttributeFilters);
 
   const ctx = useMemo(
     () => ({
@@ -80,8 +99,17 @@ export function FeedView({ listings, ebayEnabled, etsyEnabled }: FeedViewProps) 
       dislikedModels,
       criteria,
       marketplaceFilter,
+      feedAttributeFilters,
     }),
-    [seen, listingStatus, hiddenListings, dislikedModels, criteria, marketplaceFilter]
+    [
+      seen,
+      listingStatus,
+      hiddenListings,
+      dislikedModels,
+      criteria,
+      marketplaceFilter,
+      feedAttributeFilters,
+    ]
   );
 
   const matchResults = useMemo(
@@ -94,9 +122,15 @@ export function FeedView({ listings, ebayEnabled, etsyEnabled }: FeedViewProps) 
     [ctx, matchResults, hunts]
   );
 
-  const newListings = useMemo(
-    () => alertSort(alertListings(listings, alertScope, ctxWithMatches), ctxWithMatches),
-    [listings, alertScope, ctxWithMatches]
+  const listingMode = feedView === "all" ? "all" : "unseen";
+
+  const feedListings = useMemo(
+    () =>
+      alertSort(
+        alertListings(listings, alertScope, ctxWithMatches, { mode: listingMode }),
+        ctxWithMatches
+      ),
+    [listings, alertScope, ctxWithMatches, listingMode]
   );
 
   const starred = useMemo(
@@ -111,6 +145,11 @@ export function FeedView({ listings, ebayEnabled, etsyEnabled }: FeedViewProps) 
 
   const unseenAll = useMemo(
     () => unseenListings(listings, ctx),
+    [listings, ctx]
+  );
+
+  const poolAll = useMemo(
+    () => poolListings(listings, ctx),
     [listings, ctx]
   );
 
@@ -133,6 +172,7 @@ export function FeedView({ listings, ebayEnabled, etsyEnabled }: FeedViewProps) 
     const unseenForMarketplace = unseenListings(listings, ctxWithoutMarketplace);
 
     return {
+      all: poolAll.length,
       new: unseenAll.length,
       starred: starred.length,
       dismissed: dismissed.length,
@@ -151,6 +191,7 @@ export function FeedView({ listings, ebayEnabled, etsyEnabled }: FeedViewProps) 
     ctx,
     ctxWithMatches,
     unseenAll.length,
+    poolAll.length,
     starred.length,
     dismissed.length,
     activeHunts,
@@ -212,9 +253,9 @@ export function FeedView({ listings, ebayEnabled, etsyEnabled }: FeedViewProps) 
   const displayListings =
     feedView === "starred"
       ? starred
-      : feedView === "dismissed"
+        : feedView === "dismissed"
         ? dismissed
-        : newListings;
+        : feedListings;
 
   const handleDismissAll = useCallback(() => {
     const ids = displayListings.map((l) => l.id);
@@ -254,10 +295,15 @@ export function FeedView({ listings, ebayEnabled, etsyEnabled }: FeedViewProps) 
                   title: "No top matches yet",
                   hint: "Top matches need a feed score of 4.0 or higher from a saved hunt.",
                 }
-              : {
-                  title: "You're all caught up",
-                  hint: "Nothing new in this view — try refreshing or widening your scope.",
-                };
+              : feedView === "all"
+                ? {
+                    title: "No listings in this view",
+                    hint: "Nothing matches your filters — try clearing filters or refreshing.",
+                  }
+                : {
+                    title: "You're all caught up",
+                    hint: "Nothing new in this view — try refreshing or widening your scope.",
+                  };
 
   const contextSuffix = feedContextSuffix(
     feedView,
@@ -303,11 +349,14 @@ export function FeedView({ listings, ebayEnabled, etsyEnabled }: FeedViewProps) 
           feedView={feedView}
           alertScope={alertScope}
           marketplaceFilter={marketplaceFilter}
+          feedAttributeFilters={feedAttributeFilters}
           counts={sidebarCounts}
           activeHunts={activeHunts}
           onFeedViewChange={setFeedView}
           onScopeChange={setAlertScope}
           onMarketplaceChange={setMarketplaceFilter}
+          onToggleFeedAttributeFilter={toggleFeedAttributeFilter}
+          onClearFeedAttributeFilters={clearFeedAttributeFilters}
           className="md:sticky md:top-4 md:col-start-2 md:row-start-1"
         />
 
@@ -346,11 +395,15 @@ export function FeedView({ listings, ebayEnabled, etsyEnabled }: FeedViewProps) 
                   match={matchResults.get(listing.id)}
                   interested={listingStatus[listing.id]?.interested}
                   muted={feedView === "dismissed"}
-                  showHuntMatchTags={feedView === "new" && isHuntFindsScope}
+                  showHuntMatchTags={
+                    (feedView === "new" || feedView === "all") && isHuntFindsScope
+                  }
                   onDismiss={
                     feedView === "new"
                       ? () => handleDismiss(listing.id)
-                      : feedView === "starred"
+                      : feedView === "all" && !seen.includes(listing.id)
+                        ? () => handleDismiss(listing.id)
+                        : feedView === "starred"
                         ? () => handleDismissStarred(listing.id)
                         : undefined
                   }
