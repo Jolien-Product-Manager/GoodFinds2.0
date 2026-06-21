@@ -5,6 +5,7 @@ import type {
   ListingStatus,
   MarketplaceFilter,
 } from "@/lib/listings/types";
+import { migrateAttributeLibrary } from "@/lib/hunts/migrate-attributes";
 import {
   createDraftHunt,
   emptyHuntAttributes,
@@ -220,7 +221,7 @@ export const useCasebackStore = create<CasebackState>()(
       restoreAllAttributeTiles: () => set({ attributeHidden: {} }),
     }),
     {
-      name: "caseback-state-v5",
+      name: "caseback-state-v6",
       onRehydrateStorage: () => (state) => {
         if (!state) return;
         const legacy = state as CasebackState & {
@@ -234,8 +235,8 @@ export const useCasebackStore = create<CasebackState>()(
         legacy.purchasedWatches = (legacy.purchasedWatches ?? []).map((p) =>
           normalizePurchasedWatch(p)
         );
-        legacy.attributeLibrary = legacy.attributeLibrary ?? {};
-        legacy.attributeHidden = legacy.attributeHidden ?? {};
+        legacy.attributeLibrary = migrateAttributeLibrary(legacy.attributeLibrary);
+        legacy.attributeHidden = migrateAttributeLibrary(legacy.attributeHidden);
         const feedView = state.feedView as string;
         if (feedView === "interested") {
           state.feedView = "starred";

@@ -12,6 +12,11 @@ function extractEbayItemId(url: string): string | null {
   return match?.[1] ?? null;
 }
 
+function extractEtsyListingId(url: string): string | null {
+  const match = url.match(/\/listing\/(\d+)/i);
+  return match?.[1] ?? null;
+}
+
 function purchaseUrlKey(url: string): string | null {
   try {
     const parsed = new URL(url);
@@ -20,6 +25,9 @@ function purchaseUrlKey(url: string): string | null {
 
     const chronoId = extractChrono24ListingId(url);
     if (chronoId) return `chrono24:${chronoId}`;
+
+    const etsyId = extractEtsyListingId(url);
+    if (etsyId) return `etsy:${etsyId}`;
 
     return `url:${parsed.origin}${parsed.pathname}`.toLowerCase();
   } catch {

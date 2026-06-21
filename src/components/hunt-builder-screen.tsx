@@ -13,9 +13,10 @@ import { Label } from "@/components/ui/label";
 import { GlobalFiltersSection } from "@/components/global-filters-section";
 import { Badge } from "@/components/ui/badge";
 import {
-  ATTR_KEYS,
   ATTR_OPTIONS,
+  BUYER_AXIS_KEYS,
   HUNT_GENDER_OPTIONS,
+  TASTE_ATTR_KEYS,
   attributeChipOptions,
   createDraftHunt,
   isAttributeValueSelected,
@@ -510,7 +511,36 @@ function HuntEditorPanel({
         </div>
       </div>
 
-      {ATTR_KEYS.map((key) => (
+      <div className="space-y-1">
+        <Label className="text-brass">What you're scoring listings on</Label>
+        <p className="text-xs text-ink-soft">
+          Model, era, dial originality, plating, crystal, running, completeness — the axes a
+          knowledgeable buyer checks first.
+        </p>
+      </div>
+
+      {BUYER_AXIS_KEYS.map((key) => (
+        <AttributeFilterSection
+          key={key}
+          attrKey={key}
+          hunt={hunt}
+          savedCustoms={attributeLibrary[key] ?? []}
+          hiddenOptions={attributeHidden[key] ?? []}
+          editingTiles={editingTiles}
+          onTogglePick={onTogglePick}
+          onAddCustom={onAddCustom}
+          onRemoveOption={onRemoveOption}
+        />
+      ))}
+
+      <div className="space-y-1 pt-2">
+        <Label className="text-brass">Additional taste</Label>
+        <p className="text-xs text-ink-soft">
+          Collaboration, dial pattern, colour, movement type, and free-form notes.
+        </p>
+      </div>
+
+      {TASTE_ATTR_KEYS.map((key) => (
         <AttributeFilterSection
           key={key}
           attrKey={key}

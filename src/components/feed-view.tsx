@@ -20,6 +20,7 @@ import { useCasebackStore, type FeedView } from "@/store/caseback";
 interface FeedViewProps {
   listings: AppListing[];
   ebayEnabled: boolean;
+  etsyEnabled: boolean;
 }
 
 function feedContextSuffix(
@@ -43,11 +44,12 @@ function feedContextSuffix(
 
   if (marketplaceFilter === "ebay") suffix += " · eBay";
   else if (marketplaceFilter === "chrono24") suffix += " · Chrono24";
+  else if (marketplaceFilter === "etsy") suffix += " · Etsy";
 
   return suffix;
 }
 
-export function FeedView({ listings, ebayEnabled }: FeedViewProps) {
+export function FeedView({ listings, ebayEnabled, etsyEnabled }: FeedViewProps) {
   const router = useRouter();
 
   const seen = useCasebackStore((s) => s.seen);
@@ -62,7 +64,9 @@ export function FeedView({ listings, ebayEnabled }: FeedViewProps) {
   const dislikedModels = useCasebackStore((s) => s.dislikedModels);
 
   const dismissListing = useCasebackStore((s) => s.dismissListing);
+  const dismissAllUnseen = useCasebackStore((s) => s.dismissAllUnseen);
   const restoreListing = useCasebackStore((s) => s.restoreListing);
+  const restoreAll = useCasebackStore((s) => s.restoreAll);
   const toggleInterested = useCasebackStore((s) => s.toggleInterested);
   const setAlertScope = useCasebackStore((s) => s.setAlertScope);
   const setMarketplaceFilter = useCasebackStore((s) => s.setMarketplaceFilter);
@@ -139,6 +143,7 @@ export function FeedView({ listings, ebayEnabled }: FeedViewProps) {
         all: unseenForMarketplace.length,
         ebay: unseenForMarketplace.filter((l) => l.source === "ebay").length,
         chrono24: unseenForMarketplace.filter((l) => l.source === "chrono24").length,
+        etsy: unseenForMarketplace.filter((l) => l.source === "etsy").length,
       },
     };
   }, [
@@ -167,6 +172,38 @@ export function FeedView({ listings, ebayEnabled }: FeedViewProps) {
     [dismissListing, restoreListing]
   );
 
+  const handleDismissStarred = useCallback(
+    (id: string) => {
+      if (listingStatus[id]?.interested) {
+        toggleInterested(id);
+      }
+      dismissListing(id);
+      toast("Dismissed", {
+        action: {
+          label: "Undo",
+          onClick: () => restoreListing(id),
+        },
+      });
+    },
+    [dismissListing, listingStatus, restoreListing, toggleInterested]
+  );
+
+  const handleToggleInterested = useCallback(
+    (id: string) => {
+      const wasInterested = listingStatus[id]?.interested ?? false;
+      toggleInterested(id);
+      if (feedView === "starred" && wasInterested) {
+        toast("Removed from saved", {
+          action: {
+            label: "Undo",
+            onClick: () => toggleInterested(id),
+          },
+        });
+      }
+    },
+    [feedView, listingStatus, toggleInterested]
+  );
+
   const handleRefresh = useCallback(() => {
     router.refresh();
     toast("Checking for new listings…");
@@ -179,9 +216,24 @@ export function FeedView({ listings, ebayEnabled }: FeedViewProps) {
         ? dismissed
         : newListings;
 
+  const handleDismissAll = useCallback(() => {
+    const ids = displayListings.map((l) => l.id);
+    if (ids.length === 0) return;
+    dismissAllUnseen(ids);
+    toast(`Dismissed ${ids.length.toLocaleString()} listing${ids.length === 1 ? "" : "s"}`, {
+      action: {
+        label: "Undo",
+        onClick: () => restoreAll(ids),
+      },
+    });
+  }, [displayListings, dismissAllUnseen, restoreAll]);
+
   const emptyMessage =
     feedView === "starred"
-      ? { title: "No starred listings yet", hint: "Star listings from New to save them here." }
+      ? {
+          title: "No starred listings yet",
+          hint: "Save listings from New — unsave or dismiss them here.",
+        }
       : feedView === "dismissed"
         ? { title: "Nothing dismissed", hint: "Listings you dismiss will appear here." }
         : alertScope.startsWith("hunt:")
@@ -227,8 +279,22 @@ export function FeedView({ listings, ebayEnabled }: FeedViewProps) {
 
       {!ebayEnabled && (
         <p className="font-mono-data text-xs text-ink-soft">
-          eBay offline — save EBAY_CLIENT_ID and EBAY_CLIENT_SECRET in .env.local, then restart
-          npm
+          eBay offline — add EBAY_CLIENT_ID and EBAY_CLIENT_SECRET to .env.local, run{" "}
+          <code className="text-ink">npm run sync:ebay</code>, then restart.
+        </p>
+      )}
+      {!etsyEnabled && (
+        <p className="font-mono-data text-xs text-ink-soft">
+          Etsy offline — add ETSY_API_KEY to .env.local (from{" "}
+          <a
+            href="https://www.etsy.com/developers"
+            className="text-brass underline-offset-2 hover:underline"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            etsy.com/developers
+          </a>
+          ), run <code className="text-ink">npm run sync:etsy</code>, then restart.
         </p>
       )}
 
@@ -246,12 +312,24 @@ export function FeedView({ listings, ebayEnabled }: FeedViewProps) {
         />
 
         <div className="min-w-0 space-y-4 md:col-start-1 md:row-start-1">
-          <p className="font-mono-data text-sm text-ink-soft">
-            <span className="mr-1.5 inline-block rounded-sm bg-paper px-1.5 py-0.5 font-medium text-ink">
-              {displayListings.length.toLocaleString()}
-            </span>
-            {contextSuffix}
-          </p>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="font-mono-data text-sm text-ink-soft">
+              <span className="mr-1.5 inline-block rounded-sm bg-paper px-1.5 py-0.5 font-medium text-ink">
+                {displayListings.length.toLocaleString()}
+              </span>
+              {contextSuffix}
+            </p>
+            {feedView === "new" && displayListings.length > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleDismissAll}
+                className="shrink-0 text-ink-soft hover:text-ink"
+              >
+                Dismiss all
+              </Button>
+            )}
+          </div>
 
           {displayListings.length === 0 ? (
             <div className="rounded-sm border border-dashed border-line-strong bg-card/50 p-12 text-center">
@@ -270,7 +348,11 @@ export function FeedView({ listings, ebayEnabled }: FeedViewProps) {
                   muted={feedView === "dismissed"}
                   showHuntMatchTags={feedView === "new" && isHuntFindsScope}
                   onDismiss={
-                    feedView === "new" ? () => handleDismiss(listing.id) : undefined
+                    feedView === "new"
+                      ? () => handleDismiss(listing.id)
+                      : feedView === "starred"
+                        ? () => handleDismissStarred(listing.id)
+                        : undefined
                   }
                   onRestore={
                     feedView === "dismissed"
@@ -280,7 +362,7 @@ export function FeedView({ listings, ebayEnabled }: FeedViewProps) {
                         }
                       : undefined
                   }
-                  onToggleInterested={() => toggleInterested(listing.id)}
+                  onToggleInterested={() => handleToggleInterested(listing.id)}
                 />
               ))}
             </div>

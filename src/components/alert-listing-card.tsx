@@ -1,7 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { Check, ChevronLeft, ChevronRight, ExternalLink, Square, X } from "lucide-react";
+import {
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  ExternalLink,
+  Sparkles,
+  Square,
+  X,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { AppListing } from "@/lib/listings/types";
 import type { AttributeMatch, HuntMatchResult } from "@/lib/listings/hunt-match";
@@ -13,14 +21,18 @@ import { DEFAULT_CRITERIA } from "@/lib/criteria";
 import { cn } from "@/lib/utils";
 
 const ATTR_SHORT: Partial<Record<AttrKey, string>> = {
-  dial: "Dial",
+  model: "Model",
+  era: "Era",
+  datecode: "Code",
+  dialOrig: "Dial orig.",
+  plating: "Plating",
+  crystal: "Crystal",
+  running: "Runs",
+  complete: "Set",
+  dial: "Pattern",
   color: "Colour",
   collab: "Collab",
-  era: "Era",
-  model: "Model",
-  case: "Case",
-  mvmt: "Movement",
-  cond: "Condition",
+  mvmt: "Mvmt",
   traits: "Trait",
 };
 
@@ -37,12 +49,20 @@ function listingFeatureValue(listing: AppListing, key: string): string | undefin
       return f.color;
     case "era":
       return f.era;
-    case "case":
-      return f.case;
+    case "datecode":
+      return f.datecode;
+    case "dialOrig":
+      return f.dialOrig;
+    case "plating":
+      return f.plating;
+    case "crystal":
+      return f.crystal;
+    case "running":
+      return f.running;
+    case "complete":
+      return f.complete;
     case "mvmt":
       return f.mvmt;
-    case "cond":
-      return f.cond;
     case "traits":
       return undefined;
     default:
@@ -294,6 +314,20 @@ export function AlertListingCard({
             ${costs.item.toFixed(2)} + ${costs.shipping.toFixed(2)} shipping
             {!costs.shippingConfirmed && " (est.)"}
           </p>
+          <Button
+            type="button"
+            size="sm"
+            className={cn(
+              "mt-2 h-8 rounded-md bg-ink px-3 text-xs text-card hover:bg-ink/90",
+              compact ? "text-xs" : "text-sm"
+            )}
+            asChild
+          >
+            <a href={listing.url} target="_blank" rel="noopener noreferrer">
+              View listing
+              <ExternalLink className="ml-1.5 h-3 w-3" />
+            </a>
+          </Button>
         </div>
 
         <div className={cn("flex items-center gap-2", compact ? "text-xs" : "text-sm")}>
@@ -303,76 +337,69 @@ export function AlertListingCard({
           </span>
         </div>
 
-        <div className="mt-auto border-t border-line pt-2">
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+        {showAttributeRow && (
+          <div className="flex flex-wrap justify-end gap-1">
+            {visibleAttributes.map((m) => (
+              <AttributeTag key={m.key} match={m} listing={listing} />
+            ))}
+          </div>
+        )}
+
+        {(onToggleInterested || onDismiss || onRestore) && (
+          <div className="mt-auto flex items-center gap-1.5 border-t border-line pt-2">
             {onToggleInterested && (
-              <button
+              <Button
                 type="button"
+                variant="outline"
+                size="sm"
                 onClick={onToggleInterested}
+                aria-label={interested ? "Unsave listing" : "Save listing"}
+                aria-pressed={interested}
                 className={cn(
-                  "inline-flex shrink-0 items-center gap-1 text-[11px] font-medium transition-colors",
-                  interested ? "text-steal" : "text-steal/80 hover:text-steal"
+                  "h-8 flex-1 rounded-md border-line-strong bg-card px-2.5 text-xs hover:bg-paper",
+                  interested
+                    ? "text-steal hover:text-steal"
+                    : "text-brass hover:text-steal/85"
                 )}
               >
-                {interested ? (
-                  <Check className="h-3 w-3 shrink-0" strokeWidth={2.5} />
-                ) : (
-                  <Square className="h-3 w-3 shrink-0" strokeWidth={2} />
-                )}
-                Interesting
-              </button>
+                <Sparkles
+                  className={cn(
+                    "h-3.5 w-3.5 shrink-0",
+                    interested && "fill-steal/20"
+                  )}
+                  strokeWidth={interested ? 2.25 : 1.75}
+                />
+                {interested ? "Unsave" : "Save"}
+              </Button>
             )}
-
-            {showAttributeRow && (
-              <div className="flex min-w-0 flex-1 flex-wrap justify-end gap-1">
-                {visibleAttributes.map((m) => (
-                  <AttributeTag key={m.key} match={m} listing={listing} />
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="mt-1.5 flex items-center gap-1.5">
             {onDismiss && (
               <Button
                 type="button"
                 variant="outline"
-                size="icon"
-                className="h-8 w-8 shrink-0 rounded-md border-line-strong bg-card text-ink hover:bg-paper"
+                size="sm"
+                className="h-8 flex-1 rounded-md border-line-strong bg-card px-2.5 text-xs text-ink-soft hover:bg-paper hover:text-ink"
                 onClick={onDismiss}
                 aria-label="Dismiss listing"
               >
                 <X className="h-3.5 w-3.5" />
+                Dismiss
               </Button>
             )}
             {onRestore && (
               <Button
                 type="button"
                 variant="outline"
-                size="icon"
-                className="h-8 w-8 shrink-0 rounded-md border-line-strong bg-card text-ink hover:bg-paper"
+                size="sm"
+                className="h-8 flex-1 rounded-md border-line-strong bg-card px-2.5 text-xs text-ink hover:bg-paper"
                 onClick={onRestore}
                 aria-label="Restore listing"
               >
                 <Check className="h-3.5 w-3.5" />
+                Restore
               </Button>
             )}
-            <Button
-              type="button"
-              size="sm"
-              className={cn(
-                "h-8 min-w-0 flex-[2] rounded-md bg-ink px-3 text-xs text-card hover:bg-ink/90",
-                compact && "text-xs"
-              )}
-              asChild
-            >
-              <a href={listing.url} target="_blank" rel="noopener noreferrer">
-                View
-                <ExternalLink className="ml-1.5 h-3 w-3" />
-              </a>
-            </Button>
           </div>
-        </div>
+        )}
       </div>
     </article>
   );

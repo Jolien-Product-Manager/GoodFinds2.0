@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Pencil, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import { HuntHeartsPicker } from "@/components/hunt-hearts";
 import type { AlertScope, MarketplaceFilter } from "@/lib/listings/types";
 import type { Hunt } from "@/lib/hunts/types";
@@ -88,6 +88,7 @@ interface FeedSidebarProps {
       all: number;
       ebay: number;
       chrono24: number;
+      etsy: number;
     };
   };
   activeHunts: Hunt[];
@@ -189,29 +190,18 @@ export function FeedSidebar({
               onClick={() => toggleScope("top")}
             />
             <div className="space-y-1">
-              <div className="flex items-stretch gap-1">
-                <div className="min-w-0 flex-1">
-                  <SidebarRow
-                    label="Hunt matches"
-                    count={counts.huntMatches}
-                    selected={isHuntScope}
-                    onClick={() => {
-                      if (alertScope === "watchlist") {
-                        clearFilters();
-                      } else {
-                        selectNewWithScope("watchlist");
-                      }
-                    }}
-                  />
-                </div>
-                <Link
-                  href="/hunts"
-                  className="flex w-9 shrink-0 items-center justify-center self-stretch rounded-sm border border-line-strong text-ink-soft hover:border-ink/30 hover:text-ink"
-                  aria-label="Edit hunts"
-                >
-                  <Pencil className="h-3.5 w-3.5" />
-                </Link>
-              </div>
+              <SidebarRow
+                label="Hunt matches"
+                count={counts.huntMatches}
+                selected={isHuntScope}
+                onClick={() => {
+                  if (alertScope === "watchlist") {
+                    clearFilters();
+                  } else {
+                    selectNewWithScope("watchlist");
+                  }
+                }}
+              />
 
               {isHuntScope && (
                 <div className="space-y-1 pl-1">
@@ -272,6 +262,12 @@ export function FeedSidebar({
               count={counts.marketplace.chrono24}
               selected={marketplaceFilter === "chrono24"}
               onClick={() => toggleMarketplace("chrono24")}
+            />
+            <SidebarRow
+              label="Etsy"
+              count={counts.marketplace.etsy}
+              selected={marketplaceFilter === "etsy"}
+              onClick={() => toggleMarketplace("etsy")}
             />
           </div>
         )}

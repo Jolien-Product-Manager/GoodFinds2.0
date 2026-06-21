@@ -2,14 +2,18 @@ import type { Hunt, AttrKey } from "./types";
 import { ATTR_OPTIONS } from "./types";
 
 const SUMMARY_ORDER: AttrKey[] = [
-  "era",
-  "color",
-  "dial",
   "model",
+  "era",
+  "datecode",
+  "dialOrig",
+  "plating",
+  "crystal",
+  "running",
+  "complete",
   "collab",
-  "case",
+  "dial",
+  "color",
   "mvmt",
-  "cond",
   "traits",
 ];
 
@@ -51,7 +55,6 @@ export function buildHuntSummary(hunt: Hunt): string {
   else if (hunt.gender === "unisex_children") parts.push("Unisex children's");
 
   for (const key of SUMMARY_ORDER) {
-    if (key === "cond") continue;
     const values = attributeValues(hunt, key);
     if (values.length === 0) continue;
 
@@ -64,7 +67,6 @@ export function buildHuntSummary(hunt: Hunt): string {
     }
   }
 
-  const condValues = attributeValues(hunt, "cond");
   let sentence =
     parts.length > 0
       ? parts.join(" · ")
@@ -72,10 +74,6 @@ export function buildHuntSummary(hunt: Hunt): string {
 
   if (!attributeValues(hunt, "model").length) {
     sentence = sentence === "Any vintage Timex" ? "Any vintage Timex" : `${sentence} Timex`;
-  }
-
-  if (condValues.length > 0) {
-    sentence += ` in ${condValues.join(" or ")} condition`;
   }
 
   const hearts = hunt.hearts ?? 2;

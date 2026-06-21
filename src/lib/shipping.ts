@@ -12,7 +12,8 @@ function hashString(input: string): number {
 /** Deterministic shipping estimate when marketplace doesn't provide it. */
 export function estimateShipping(listing: AppListing, postalCode: string): number {
   const seed = hashString(`${listing.id}-${postalCode}`);
-  const base = listing.source === "chrono24" ? 12 : 8;
+  const base =
+    listing.source === "chrono24" ? 12 : listing.source === "etsy" ? 10 : 8;
   return base + (seed % 10);
 }
 

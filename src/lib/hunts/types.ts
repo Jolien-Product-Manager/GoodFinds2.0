@@ -1,14 +1,19 @@
 import { TIMEX_MODELS } from "@/lib/models/catalog";
+import { migrateLegacyHuntAttributes } from "@/lib/hunts/migrate-attributes";
 
 export type AttrKey =
   | "model"
+  | "era"
+  | "datecode"
+  | "dialOrig"
+  | "plating"
+  | "crystal"
+  | "running"
+  | "complete"
   | "collab"
   | "dial"
   | "color"
-  | "era"
-  | "case"
   | "mvmt"
-  | "cond"
   | "traits";
 
 export interface HuntAttribute {
@@ -56,22 +61,123 @@ export interface PurchasedWatch {
   imageUrl: string | null;
 }
 
+export const BUYER_AXIS_KEYS = [
+  "model",
+  "era",
+  "datecode",
+  "dialOrig",
+  "plating",
+  "crystal",
+  "running",
+  "complete",
+] as const satisfies readonly AttrKey[];
+
+export const TASTE_ATTR_KEYS = [
+  "collab",
+  "dial",
+  "color",
+  "mvmt",
+  "traits",
+] as const satisfies readonly AttrKey[];
+
 export const ATTR_OPTIONS: Record<
   AttrKey,
   { label: string; options: string[] }
 > = {
   model: {
-    label: "Model / line",
+    label: "Model / family",
     options: [...TIMEX_MODELS].sort((a, b) => a.localeCompare(b)),
+  },
+  era: {
+    label: "Era",
+    options: ["1950s", "Early 60s", "Late 60s", "1970s", "1980s", "1990s"],
+  },
+  datecode: {
+    label: "Date code",
+    options: [
+      "M69",
+      "M70",
+      "M71",
+      "M72",
+      "M73",
+      "M74",
+      "M75",
+      "M76",
+      "M77",
+      "M78",
+      "M79",
+      "M80",
+      "Pre-code",
+      "N/A / unreadable",
+    ],
+  },
+  dialOrig: {
+    label: "Dial originality",
+    options: [
+      "Original dial",
+      "Likely original",
+      "Redial",
+      "Repaint / refinish",
+      "Unknown",
+    ],
+  },
+  plating: {
+    label: "Case plating",
+    options: [
+      "Intact plating",
+      "Light wear",
+      "Brass showing",
+      "Heavy brassing",
+      "Re-plated",
+      "Stainless / no plate",
+      "Unknown",
+    ],
+  },
+  crystal: {
+    label: "Crystal",
+    options: [
+      "Original acrylic",
+      "Replacement acrylic",
+      "Glass / mineral",
+      "Scratches only",
+      "Cracked / damaged",
+      "Unknown",
+    ],
+  },
+  running: {
+    label: "Running status",
+    options: [
+      "Running",
+      "Running weak",
+      "Not running",
+      "Untested",
+      "For parts / movement",
+    ],
+  },
+  complete: {
+    label: "Completeness",
+    options: [
+      "Full set (box + papers)",
+      "Box only",
+      "Papers only",
+      "NOS / unworn",
+      "Watch only",
+      "Tags attached",
+    ],
   },
   collab: {
     label: "Collaboration",
     options: [
       "Any collab",
       "Peanuts",
+      "Mickey Mouse",
+      "Minnie Mouse",
+      "Donald Duck",
       "Disney",
       "Keith Haring",
       "Coca-Cola",
+      "Pac-Man",
+      "NASA",
       "Todd Snyder",
       "House brand only",
     ],
@@ -84,28 +190,9 @@ export const ATTR_OPTIONS: Record<
     label: "Dial color",
     options: ["Silver", "Champagne", "Black", "Blue", "White", "Patina"],
   },
-  era: {
-    label: "Era",
-    options: ["1950s", "Early 60s", "Late 60s", "1970s", "1980s"],
-  },
-  case: {
-    label: "Case size",
-    options: ["Under 32mm", "32–35mm", "35–38mm", "Over 38mm"],
-  },
   mvmt: {
-    label: "Movement",
-    options: ["Manual wind", "Self-wind / auto", "Electric"],
-  },
-  cond: {
-    label: "Condition grade",
-    options: [
-      "NOS / unworn",
-      "Excellent",
-      "Good / worn",
-      "Honest patina",
-      "Needs battery",
-      "For parts / project",
-    ],
+    label: "Movement type",
+    options: ["Manual wind", "Self-wind / auto", "Electric", "Quartz"],
   },
   traits: {
     label: "Your characteristics",
@@ -113,7 +200,7 @@ export const ATTR_OPTIONS: Record<
   },
 };
 
-export const ATTR_KEYS = Object.keys(ATTR_OPTIONS) as AttrKey[];
+export const ATTR_KEYS = [...BUYER_AXIS_KEYS, ...TASTE_ATTR_KEYS] as AttrKey[];
 
 /** Preset attribute rows in the hunt builder (excludes free-form traits). */
 export const PRESET_ATTR_KEYS = ATTR_KEYS.filter((k) => k !== "traits") as Exclude<
@@ -236,14 +323,9 @@ export function createDraftHunt(): Hunt {
 }
 
 export function normalizeHunt(hunt: Partial<Hunt> & Pick<Hunt, "id" | "name">): Hunt {
-  const base = emptyHuntAttributes();
-  const merged = { ...base, ...(hunt.attributes ?? {}) };
-  for (const k of ATTR_KEYS) {
-    merged[k] = {
-      picks: hunt.attributes?.[k]?.picks ?? [],
-      customs: hunt.attributes?.[k]?.customs ?? [],
-    };
-  }
+  let merged = migrateLegacyHuntAttributes(
+    hunt.attributes as Record<string, HuntAttribute> | undefined
+  );
 
   // Migrate legacy storeFind picks/customs → traits
   const legacyStoreFind = (hunt.attributes as Record<string, HuntAttribute> | undefined)
@@ -258,19 +340,6 @@ export function normalizeHunt(hunt: Partial<Hunt> & Pick<Hunt, "id" | "name">): 
         customs: [...new Set([...merged.traits.customs, ...migrated])],
       };
     }
-  }
-
-  // Deadstock in condition → traits (legacy)
-  const condPicks = merged.cond.picks;
-  if (condPicks.includes("Deadstock")) {
-    merged.traits = {
-      picks: [],
-      customs: [...new Set([...merged.traits.customs, "deadstock"])],
-    };
-    merged.cond = {
-      picks: condPicks.filter((p) => p !== "Deadstock"),
-      customs: merged.cond.customs,
-    };
   }
 
   for (const k of ATTR_KEYS) {

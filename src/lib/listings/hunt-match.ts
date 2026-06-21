@@ -4,7 +4,9 @@ import type { GlobalFilters } from "@/lib/hunts/types";
 import { normalizeCustomValue } from "@/lib/hunts/types";
 import { specificityMultiplier, huntTightness } from "@/lib/hunts/summary";
 import { collabPickMatchesListing, resolveListingCollab } from "@/lib/listings/collab";
+import { completenessPickMatchesTitle } from "@/lib/listings/infer-buyer-axes";
 import { listingMatchesHuntGender } from "@/lib/listings/gender";
+import { ATTR_OPTIONS } from "@/lib/hunts/types";
 
 export type AttributeMatchStatus = "hit" | "miss" | "unverified";
 
@@ -72,15 +74,27 @@ function listingValueForAttr(
       return f.color?.toLowerCase();
     case "era":
       return f.era?.toLowerCase();
-    case "case":
-      return f.case?.toLowerCase();
+    case "datecode":
+      return f.datecode?.toLowerCase();
+    case "dialOrig":
+      return f.dialOrig?.toLowerCase();
+    case "plating":
+      return f.plating?.toLowerCase();
+    case "crystal":
+      return f.crystal?.toLowerCase();
+    case "running":
+      return f.running?.toLowerCase();
+    case "complete":
+      return f.complete?.toLowerCase();
     case "mvmt":
       return f.mvmt?.toLowerCase();
-    case "cond":
-      return f.cond?.toLowerCase();
     default:
       return undefined;
   }
+}
+
+function attributeLabel(key: string): string {
+  return ATTR_OPTIONS[key as keyof typeof ATTR_OPTIONS]?.label ?? key;
 }
 
 function listingSearchText(listing: AppListing): string {
@@ -93,9 +107,13 @@ function listingSearchText(listing: AppListing): string {
       f.dial,
       f.color,
       f.era,
-      f.case,
+      f.datecode,
+      f.dialOrig,
+      f.plating,
+      f.crystal,
+      f.running,
+      f.complete,
       f.mvmt,
-      f.cond,
       f.storeFind,
     ]
       .filter(Boolean)
@@ -142,7 +160,7 @@ export function scoreListingAgainstHunt(
 
     specified += 1;
     const listingVal = listingValueForAttr(listing, key);
-    const label = key;
+    const label = attributeLabel(key);
 
     if (key === "collab") {
       const hit = wanted.some((w) => collabPickMatchesListing(w, listing));
@@ -163,6 +181,34 @@ export function scoreListingAgainstHunt(
           label,
           status: "unverified",
           confidence: listing.features.confidence.collab,
+        });
+      } else {
+        matches.push({ key, label, status: "miss" });
+      }
+      continue;
+    }
+
+    if (key === "complete") {
+      const hit = wanted.some((w) =>
+        completenessPickMatchesTitle(w, listing.title)
+      );
+      const resolved = listing.features.complete;
+      if (hit) {
+        hits += 1;
+        matches.push({
+          key,
+          label,
+          status: "hit",
+          confidence: resolved
+            ? (listing.features.confidence.complete ?? "medium")
+            : listing.features.confidence.complete,
+        });
+      } else if (!resolved) {
+        matches.push({
+          key,
+          label,
+          status: "unverified",
+          confidence: listing.features.confidence.complete,
         });
       } else {
         matches.push({ key, label, status: "miss" });

@@ -51,6 +51,22 @@ npm run sync:ebay
 
 Without credentials or snapshot the app runs Chrono24-only. Sync fetches up to **2000** listings (override via `EBAY_SEARCH_LIMIT`).
 
+## Etsy (optional)
+
+Register an app at [etsy.com/developers](https://www.etsy.com/developers) and add to `.env.local`:
+
+```
+ETSY_API_KEY=your_keystring:your_shared_secret
+```
+
+Page loads read the disk snapshot (`data/etsy/vintage_timex.json`) — not live API. Refresh with:
+
+```bash
+npm run sync:etsy
+```
+
+Default search query: `vintage timex watch`. Override with `ETSY_SEARCH_QUERIES` (pipe-separated).
+
 ## Supabase auth (optional)
 
 Sign in with magic-link email to sync hunts, dismissals, and stars across devices.
@@ -83,6 +99,7 @@ Without Supabase, state persists to `data/store/state.json` locally.
 | `npm run build` | Production build |
 | `npm run sync:listings` | Copy Chrono24 scraper output into `data/chrono24/` |
 | `npm run sync:ebay` | Fetch eBay listings and write `data/ebay/vintage_timex.json` |
+| `npm run sync:etsy` | Fetch Etsy listings and write `data/etsy/vintage_timex.json` |
 | `npm run enrich:chrono24` | Enrich Chrono24 snapshot with real image URLs (needs FlareSolverr) |
 
 ## Docs

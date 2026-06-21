@@ -1,18 +1,21 @@
 import { loadChrono24Listings } from "@/lib/chrono24/load-listings";
 import { enrichChrono24ListingsIfNeeded } from "@/lib/chrono24/enrich-images";
 import { fetchEbayListings, hasEbayCredentials } from "@/lib/ebay/client";
+import { fetchEtsyListings, hasEtsyCredentials } from "@/lib/etsy/client";
 import {
   filterVintageListings,
   normalizeChrono24Listing,
   normalizeEbayListing,
+  normalizeEtsyListing,
 } from "./normalize";
 import { enrichAllListings } from "./extract-features";
 import type { AppListing } from "./types";
 
 export interface LoadAllListingsResult {
   listings: AppListing[];
-  sources: { chrono24: number; ebay: number };
+  sources: { chrono24: number; ebay: number; etsy: number };
   ebayEnabled: boolean;
+  etsyEnabled: boolean;
 }
 
 export async function loadAllListings(): Promise<LoadAllListingsResult> {
@@ -35,10 +38,23 @@ export async function loadAllListings(): Promise<LoadAllListingsResult> {
       .filter((l): l is AppListing => l != null);
   }
 
-  const merged = filterVintageListings([...chronoNormalized, ...ebayNormalized]);
+  let etsyNormalized: AppListing[] = [];
+  const etsyEnabled = hasEtsyCredentials();
+
+  if (etsyEnabled) {
+    const etsyRaw = await fetchEtsyListings();
+    etsyNormalized = etsyRaw
+      .map(normalizeEtsyListing)
+      .filter((l): l is AppListing => l != null);
+  }
+
+  const merged = filterVintageListings([
+    ...chronoNormalized,
+    ...ebayNormalized,
+    ...etsyNormalized,
+  ]);
   const enriched = enrichAllListings(merged);
 
-  // Dedupe by URL fallback
   const seen = new Set<string>();
   const deduped: AppListing[] = [];
   for (const listing of enriched) {
@@ -54,7 +70,12 @@ export async function loadAllListings(): Promise<LoadAllListingsResult> {
 
   return {
     listings: deduped,
-    sources: { chrono24: chronoNormalized.length, ebay: ebayNormalized.length },
+    sources: {
+      chrono24: chronoNormalized.length,
+      ebay: ebayNormalized.length,
+      etsy: etsyNormalized.length,
+    },
     ebayEnabled,
+    etsyEnabled,
   };
 }

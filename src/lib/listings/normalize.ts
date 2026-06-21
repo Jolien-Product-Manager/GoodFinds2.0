@@ -2,6 +2,13 @@ import type { Chrono24Listing } from "@/lib/chrono24/schema";
 import { canonicalizeChrono24Url } from "@/lib/chrono24/urls";
 import type { EbayItemSummary } from "@/lib/ebay/schema";
 import { shouldExcludeEbayTitle } from "@/lib/ebay/title-filter";
+import type { EtsyListing } from "@/lib/etsy/schema";
+import {
+  etsyListingImageUrls,
+  etsyListingUrl,
+  etsyPriceValue,
+} from "@/lib/etsy/schema";
+import { shouldExcludeEtsyTitle } from "@/lib/etsy/title-filter";
 import { eraFromYear, matchListingToModel } from "@/lib/models/catalog";
 import { inferListingGender } from "./gender";
 import type { AppListing, ConditionGrade, ExtractedFeatures } from "./types";
@@ -146,6 +153,44 @@ export function normalizeEbayListing(raw: EbayItemSummary): AppListing | null {
     shippingConfirmed: shippingCost != null,
     sellerCountry: raw.itemLocation?.country ?? null,
     listedAt: new Date().toISOString(),
+    gender: inferListingGender(raw.title),
+    features: buildFeatures(raw.title, year, model, condition),
+  };
+}
+
+export function normalizeEtsyListing(raw: EtsyListing): AppListing | null {
+  if (!raw.listing_id || !raw.title) return null;
+  if (shouldExcludeEtsyTitle(raw.title)) return null;
+
+  const priceValue = etsyPriceValue(raw.price);
+  if (priceValue == null) return null;
+
+  const year = parseYearFromTitle(raw.title);
+  const model = matchListingToModel(raw.title);
+  const condition = inferCondition(raw.title);
+  const imageUrls = etsyListingImageUrls(raw);
+  const listedAt = raw.creation_timestamp
+    ? new Date(raw.creation_timestamp * 1000).toISOString()
+    : new Date().toISOString();
+
+  return {
+    id: `etsy-${raw.listing_id}`,
+    source: "etsy",
+    title: raw.title,
+    url: etsyListingUrl(raw.listing_id, raw.url),
+    imageUrl: imageUrls[0] ?? null,
+    imageUrls,
+    priceValue,
+    priceCurrency: raw.price?.currency_code ?? "USD",
+    year,
+    isVintage:
+      raw.is_vintage === true || isVintageListing(raw.title, year),
+    model,
+    condition,
+    shippingCost: null,
+    shippingConfirmed: false,
+    sellerCountry: null,
+    listedAt,
     gender: inferListingGender(raw.title),
     features: buildFeatures(raw.title, year, model, condition),
   };

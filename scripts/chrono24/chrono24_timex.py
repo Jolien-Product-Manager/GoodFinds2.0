@@ -26,7 +26,22 @@ VINTAGE_QUERIES = [
     "Timex mechanical",
     "Timex 1970s",
     "Timex 1960s",
+    "Timex Q",
+    "Timex Submariner",
+    "Timex Day Date",
+    "Timex Waterbury",
+    "Timex diver",
+    "Timex GMT",
+    "Timex Snoopy",
+    "Timex 1980s",
+    "Timex 1950s",
+    "Timex NOS",
+    "Timex military",
+    "Timex Pepsi",
+    "Timex Ironman",
 ]
+
+BRAND_INDEX_URL = "https://www.chrono24.com/timex/index.htm"
 
 DEFAULT_QUERY = "Timex"
 YEAR_RE = re.compile(r"\b(19[2-9]\d|20[0-2]\d)\b")
@@ -132,6 +147,32 @@ def parse_search_html(html: str, max_listings: int) -> list[dict[str, Any]]:
     return listings
 
 
+def fetch_brand_index(
+    session: requests.Session,
+    max_listings: int,
+    use_flaresolverr: bool,
+) -> list[dict[str, Any]]:
+    """Timex brand page — extra listings beyond search queries (page 1 only)."""
+    try:
+        html = fetch_html(BRAND_INDEX_URL, session, use_flaresolverr)
+    except Exception as exc:
+        print(f"  brand index failed: {exc}", file=sys.stderr)
+        return []
+
+    results: list[dict[str, Any]] = []
+    for parsed in parse_search_html(html, max_listings):
+        year = parse_year(parsed["title"])
+        results.append(
+            {
+                **parsed,
+                "year": year,
+                "is_vintage": is_vintage_listing(parsed["title"], year),
+                "source": "chrono24",
+            }
+        )
+    return results
+
+
 def canonicalize_chrono24_url(listing_id: str, url: str | None = None) -> str:
     lid = listing_id.strip()
     if url:
@@ -208,21 +249,21 @@ def flaresolverr_get(url: str, session: requests.Session) -> str:
 
 
 def fetch_html(url: str, session: requests.Session, use_flaresolverr: bool) -> str:
+    curl_error: str | None = None
     try:
         from curl_cffi import requests as curl_requests
 
         resp = curl_requests.get(url, impersonate="chrome120", timeout=30)
         if resp.status_code == 200 and "Just a moment" not in resp.text[:5000]:
             return resp.text
-    except Exception:
-        pass
+        curl_error = f"HTTP {resp.status_code}"
+    except Exception as exc:
+        curl_error = str(exc)
 
     if use_flaresolverr:
         return flaresolverr_get(url, session)
 
-    r = session.get(url, timeout=30)
-    r.raise_for_status()
-    return r.text
+    raise RuntimeError(curl_error or "fetch failed")
 
 
 def fetch_query(
@@ -237,7 +278,8 @@ def fetch_query(
     )
     listings: list[dict[str, Any]] = []
     page = 1
-    while len(listings) < max_listings:
+    max_page = 20 if use_flaresolverr else 1
+    while len(listings) < max_listings and page <= max_page:
         if page == 1:
             url = base_url
         else:
@@ -278,10 +320,20 @@ def fetch_query(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Scrape Chrono24 Timex listings")
-    parser.add_argument("--vintage", action="store_true", help="Use 10 vintage query terms")
+    parser.add_argument("--vintage", action="store_true", help="Use vintage query terms")
     parser.add_argument("--vintage-only", action="store_true", help="Filter to vintage listings")
-    parser.add_argument("--max", type=int, default=100, help="Max listings per query")
+    parser.add_argument("--max", type=int, default=60, help="Max listings per query / brand page")
     parser.add_argument("--out", default="vintage_timex.json", help="Output JSON file")
+    parser.add_argument(
+        "--brand-index",
+        action="store_true",
+        help="Also scrape the Timex brand index page",
+    )
+    parser.add_argument(
+        "--no-brand-index",
+        action="store_true",
+        help="Skip Timex brand index (overrides --brand-index)",
+    )
     parser.add_argument(
         "--no-flaresolverr",
         action="store_true",
@@ -290,6 +342,7 @@ def main() -> None:
     args = parser.parse_args()
 
     queries = VINTAGE_QUERIES if args.vintage else [DEFAULT_QUERY]
+    include_brand = (args.brand_index or args.vintage) and not args.no_brand_index
     session = requests.Session()
     session.headers.update(
         {
@@ -315,6 +368,14 @@ def main() -> None:
             if key:
                 merged[str(key)] = item
         print(f"  got {len(batch)} (total unique: {len(merged)})")
+
+    if include_brand:
+        print("Brand index: Timex")
+        for item in fetch_brand_index(session, args.max, use_flaresolverr):
+            key = item.get("listing_id") or item.get("url")
+            if key:
+                merged[str(key)] = item
+        print(f"  total unique after brand: {len(merged)}")
 
     results = list(merged.values())
     if args.vintage_only:

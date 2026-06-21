@@ -10,8 +10,28 @@ export const NAMED_COLLAB_PARTNERS = ATTR_OPTIONS.collab.options.filter(
   (o) => o !== COLLAB_META_ANY && o !== COLLAB_META_HOUSE
 );
 
-/** Title keywords → canonical partner name. Longer phrases first per partner. */
+/** Title keywords → canonical partner name. More specific partners before broad ones. */
 const COLLAB_KEYWORD_MAP: { partner: string; keywords: string[] }[] = [
+  {
+    partner: "Peanuts",
+    keywords: ["peanuts", "snoopy", "charlie brown", "woodstock"],
+  },
+  {
+    partner: "Mickey Mouse",
+    keywords: ["mickey mouse", "mickey"],
+  },
+  {
+    partner: "Minnie Mouse",
+    keywords: ["minnie mouse", "minnie"],
+  },
+  {
+    partner: "Donald Duck",
+    keywords: ["donald duck", "donald"],
+  },
+  {
+    partner: "Disney",
+    keywords: ["disney", "goofy", "pluto", "daisy duck"],
+  },
   {
     partner: "Keith Haring",
     keywords: ["keith haring", "haring"],
@@ -21,16 +41,16 @@ const COLLAB_KEYWORD_MAP: { partner: string; keywords: string[] }[] = [
     keywords: ["coca-cola", "coca cola", "coke"],
   },
   {
+    partner: "Pac-Man",
+    keywords: ["pac-man", "pacman", "pac man"],
+  },
+  {
+    partner: "NASA",
+    keywords: ["nasa"],
+  },
+  {
     partner: "Todd Snyder",
     keywords: ["todd snyder"],
-  },
-  {
-    partner: "Peanuts",
-    keywords: ["peanuts", "snoopy", "charlie brown", "woodstock"],
-  },
-  {
-    partner: "Disney",
-    keywords: ["disney", "mickey mouse", "mickey", "minnie mouse", "minnie"],
   },
 ];
 

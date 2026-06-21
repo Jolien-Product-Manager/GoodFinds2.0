@@ -1,4 +1,4 @@
-export type ListingSource = "chrono24" | "ebay";
+export type ListingSource = "chrono24" | "ebay" | "etsy";
 
 export type ListingGender = "mens" | "womens" | "unisex" | "unknown";
 
@@ -16,12 +16,19 @@ export interface ExtractedFeatures {
   model?: string;
   year?: number;
   era?: string;
+  datecode?: string;
+  dialOrig?: string;
+  plating?: string;
+  crystal?: string;
+  running?: string;
+  complete?: string;
   dial?: string;
   color?: string;
-  case?: string;
   mvmt?: string;
+  /** @deprecated Use buyer-axis fields (running, complete, plating, …). */
   cond?: ConditionGrade;
   collab?: string;
+  /** @deprecated Migrated to `complete`. */
   storeFind?: string;
   confidence: Partial<
     Record<keyof Omit<ExtractedFeatures, "confidence">, "high" | "medium" | "low">

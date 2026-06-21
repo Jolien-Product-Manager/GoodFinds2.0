@@ -9,7 +9,10 @@
     "start": "next start",
     "lint": "next lint",
     "sync:listings": "node scripts/sync-listings.mjs",
-    "sync:ebay": "tsx scripts/fetch-ebay.ts",
+    "sync:chrono24": "cd scripts/chrono24 && python3 chrono24_timex.py --vintage --vintage-only --max 60 --out vintage_timex.json --no-flaresolverr && cd ../.. && npm run sync:listings",
+    "sync:ebay": "npx tsx scripts/fetch-ebay.ts",
+    "sync:etsy": "npx tsx scripts/fetch-etsy.ts",
+    "check:etsy": "node scripts/check-etsy.mjs",
     "enrich:chrono24": "cd scripts/chrono24 && python3 enrich_images.py --in ../../data/chrono24/vintage_timex.json",
     "commit": "./commit"
   },
@@ -49,6 +52,7 @@
     "eslint-config-next": "^16.2.9",
     "postcss": "^8.5.15",
     "tailwindcss": "^4.3.1",
+    "tsx": "^4.22.4",
     "typescript": "^6.0.3"
   }
 }
