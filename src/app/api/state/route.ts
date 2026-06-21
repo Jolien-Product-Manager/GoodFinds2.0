@@ -5,6 +5,7 @@ import {
 } from "@/lib/persistence/server-store";
 import {
   isPersistedStateEmpty,
+  normalizePersistedState,
   readUserStateFromDb,
   writeUserStateToDb,
 } from "@/lib/persistence/db-store";
@@ -50,6 +51,7 @@ export async function POST(request: Request) {
   }
 
   const userId = await getAuthenticatedUserId();
+  const normalized = normalizePersistedState(body);
 
   if (userId) {
     const supabase = await createSupabaseServerClient();
@@ -57,7 +59,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Database unavailable" }, { status: 503 });
     }
     try {
-      await writeUserStateToDb(supabase, userId, body);
+      await writeUserStateToDb(supabase, userId, normalized);
       return NextResponse.json({ ok: true, storage: "supabase" });
     } catch (err) {
       const message = err instanceof Error ? err.message : "Save failed";
@@ -69,6 +71,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Sign in required" }, { status: 401 });
   }
 
-  writePersistedState(body);
+  writePersistedState(normalized);
   return NextResponse.json({ ok: true, storage: "file" });
 }

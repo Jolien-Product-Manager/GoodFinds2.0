@@ -42,6 +42,18 @@ function appendValues(
   return { picks, customs: target.customs };
 }
 
+function coerceHuntAttribute(attr: HuntAttribute | undefined): HuntAttribute {
+  if (!attr) return { picks: [], customs: [] };
+  return {
+    picks: Array.isArray(attr.picks) ? [...attr.picks] : [],
+    customs: Array.isArray(attr.customs) ? [...attr.customs] : [],
+    ...(attr.required ? { required: true } : {}),
+    ...(Array.isArray(attr.requiredPicks) && attr.requiredPicks.length > 0
+      ? { requiredPicks: [...attr.requiredPicks] }
+      : {}),
+  };
+}
+
 /** Map legacy case/cond sections onto buyer-axis taxonomy. */
 export function migrateLegacyHuntAttributes(
   raw: Record<string, HuntAttribute | undefined> | undefined
@@ -51,28 +63,23 @@ export function migrateLegacyHuntAttributes(
   for (const key of ATTR_KEYS) {
     const attr = raw?.[key];
     if (attr) {
-      merged[key] = {
-        picks: [...attr.picks],
-        customs: [...attr.customs],
-        ...(attr.required ? { required: true } : {}),
-        ...(attr.requiredPicks?.length
-          ? { requiredPicks: [...attr.requiredPicks] }
-          : {}),
-      };
+      merged[key] = coerceHuntAttribute(attr);
     }
   }
 
   const legacyCase = raw?.case;
   if (legacyCase) {
+    const coerced = coerceHuntAttribute(legacyCase);
     merged.traits = appendValues(merged.traits, [
-      ...legacyCase.picks.map((p) => `Case size: ${p}`),
-      ...legacyCase.customs.map((p) => `Case size: ${p}`),
+      ...coerced.picks.map((p) => `Case size: ${p}`),
+      ...coerced.customs.map((p) => `Case size: ${p}`),
     ]);
   }
 
   const legacyCond = raw?.cond;
   if (legacyCond) {
-    for (const value of [...legacyCond.picks, ...legacyCond.customs]) {
+    const coerced = coerceHuntAttribute(legacyCond);
+    for (const value of [...coerced.picks, ...coerced.customs]) {
       const norm = normalizeCustomValue(value);
       if (
         norm.includes("nos") ||

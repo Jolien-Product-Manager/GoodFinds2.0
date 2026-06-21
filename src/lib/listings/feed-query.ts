@@ -13,7 +13,9 @@ import {
   type FeedQueryBody,
 } from "@/lib/listings/feed-api";
 import { getCachedListings, invalidateListingsCache } from "@/lib/listings/listings-index";
-import { DEFAULT_ALLOWED_CONDITIONS } from "@/lib/listings/condition-filter";
+import { DEFAULT_CRITERIA } from "@/lib/criteria";
+import { DEFAULT_ALLOWED_CONDITIONS, normalizeAllowedConditions } from "@/lib/listings/condition-filter";
+import type { CriteriaSettings } from "@/lib/listings/types";
 import {
   alertListings,
   alertSort,
@@ -40,8 +42,34 @@ interface FeedSnapshot {
 const snapshotCache = new Map<string, { snapshot: FeedSnapshot; fetchedAt: number }>();
 const snapshotInFlight = new Map<string, Promise<FeedSnapshot>>();
 
+function normalizeFeedCriteria(raw: CriteriaSettings | undefined): CriteriaSettings {
+  const base = { ...DEFAULT_CRITERIA, ...raw };
+  const allowedConditions = normalizeAllowedConditions(
+    base.allowedConditions,
+    base.excludeForParts
+  );
+  return {
+    ...base,
+    allowedConditions,
+    excludeForParts: !allowedConditions.includes("For parts / project"),
+  };
+}
+
 function normalizeHunts(hunts: Hunt[]): Hunt[] {
-  return hunts.map((hunt) => withInferredHuntCriteria(normalizeHunt(hunt)));
+  const normalized: Hunt[] = [];
+  for (const hunt of hunts ?? []) {
+    try {
+      if (!hunt?.id || !hunt?.name) continue;
+      normalized.push(withInferredHuntCriteria(normalizeHunt(hunt)));
+    } catch (err) {
+      console.warn(
+        "Skipping malformed hunt:",
+        hunt?.id ?? hunt?.name,
+        err instanceof Error ? err.message : err
+      );
+    }
+  }
+  return normalized;
 }
 
 function buildFilterContext(body: FeedQueryBody) {
@@ -52,7 +80,7 @@ function buildFilterContext(body: FeedQueryBody) {
     listingStatus: body.listingStatus ?? {},
     hiddenListings: body.hiddenListings ?? [],
     dislikedModels: body.dislikedModels ?? [],
-    criteria: body.criteria,
+    criteria: normalizeFeedCriteria(body.criteria),
     marketplaceFilter: body.marketplaceFilter,
     feedAttributeFilters: body.feedAttributeFilters,
     hunts,

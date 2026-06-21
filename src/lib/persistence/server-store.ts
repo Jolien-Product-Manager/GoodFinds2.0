@@ -1,11 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import {
-  mergeDefaultPurchasedWatches,
-  normalizePurchasedWatch,
-} from "@/lib/hunts/purchased-watch";
-import type { PurchasedWatch } from "@/lib/hunts/types";
-import { DEFAULT_ALLOWED_CONDITIONS, normalizeAllowedConditions } from "@/lib/listings/condition-filter";
+import { normalizePersistedState } from "@/lib/persistence/normalize-persisted-state";
 import {
   DEFAULT_PERSISTED_STATE,
   type PersistedState,
@@ -24,28 +19,7 @@ export function readPersistedState(): PersistedState {
       return DEFAULT_PERSISTED_STATE;
     }
     const raw = JSON.parse(fs.readFileSync(STORE_PATH, "utf-8"));
-    const merged = { ...DEFAULT_PERSISTED_STATE, ...raw };
-    merged.purchasedWatches = mergeDefaultPurchasedWatches(
-      (merged.purchasedWatches ?? []).map((watch: PurchasedWatch) =>
-        normalizePurchasedWatch(watch)
-      )
-    );
-    merged.globalFilters = {
-      ...DEFAULT_PERSISTED_STATE.globalFilters,
-      ...merged.globalFilters,
-      allowedConditions: normalizeAllowedConditions(
-        merged.globalFilters?.allowedConditions,
-        merged.criteria?.excludeForParts
-      ),
-    };
-    merged.criteria = {
-      ...merged.criteria,
-      allowedConditions: merged.globalFilters.allowedConditions,
-      excludeForParts: !merged.globalFilters.allowedConditions.includes(
-        "For parts / project"
-      ),
-    };
-    return merged;
+    return normalizePersistedState(raw);
   } catch {
     return DEFAULT_PERSISTED_STATE;
   }

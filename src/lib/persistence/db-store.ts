@@ -4,42 +4,9 @@ import {
   type PersistedState,
 } from "@/lib/persistence/types";
 import { isPersistedStateEmpty } from "@/lib/persistence/state-utils";
-import {
-  mergeDefaultPurchasedWatches,
-  normalizePurchasedWatch,
-} from "@/lib/hunts/purchased-watch";
-import type { PurchasedWatch } from "@/lib/hunts/types";
-import { DEFAULT_ALLOWED_CONDITIONS, normalizeAllowedConditions } from "@/lib/listings/condition-filter";
+import { normalizePersistedState } from "@/lib/persistence/normalize-persisted-state";
 
-export { isPersistedStateEmpty };
-
-function mergeWithDefaults(raw: unknown): PersistedState {
-  if (!raw || typeof raw !== "object") {
-    return DEFAULT_PERSISTED_STATE;
-  }
-  const merged = { ...DEFAULT_PERSISTED_STATE, ...(raw as Partial<PersistedState>) };
-  merged.purchasedWatches = mergeDefaultPurchasedWatches(
-    (merged.purchasedWatches ?? []).map((watch) =>
-      normalizePurchasedWatch(watch as PurchasedWatch)
-    )
-  );
-  merged.globalFilters = {
-    ...DEFAULT_PERSISTED_STATE.globalFilters,
-    ...merged.globalFilters,
-    allowedConditions: normalizeAllowedConditions(
-      merged.globalFilters?.allowedConditions,
-      merged.criteria?.excludeForParts
-    ),
-  };
-  merged.criteria = {
-    ...merged.criteria,
-    allowedConditions: merged.globalFilters.allowedConditions,
-    excludeForParts: !merged.globalFilters.allowedConditions.includes(
-      "For parts / project"
-    ),
-  };
-  return merged;
-}
+export { isPersistedStateEmpty, normalizePersistedState };
 
 export async function readUserStateFromDb(
   supabase: SupabaseClient,
@@ -60,7 +27,7 @@ export async function readUserStateFromDb(
     return DEFAULT_PERSISTED_STATE;
   }
 
-  return mergeWithDefaults(data.state);
+  return normalizePersistedState(data.state);
 }
 
 export async function writeUserStateToDb(

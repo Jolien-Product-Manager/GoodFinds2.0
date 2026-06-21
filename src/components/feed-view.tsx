@@ -15,6 +15,7 @@ import type {
 import type { AppListing, AlertScope, MarketplaceFilter } from "@/lib/listings/types";
 import type { HuntMatchResult } from "@/lib/listings/hunt-match";
 import { huntHasActiveCriteria } from "@/lib/listings/hunt-match";
+import { hasActiveFeedAttributeFilters } from "@/lib/listings/feed-attribute-filter";
 import { useCasebackStore, type FeedView } from "@/store/caseback";
 import {
   isAttributeValueSelected,
@@ -79,13 +80,22 @@ function feedContextSuffix(
   return suffix;
 }
 
+async function parseFeedError(res: Response): Promise<string> {
+  try {
+    const data = (await res.json()) as { error?: string };
+    return data.error ?? `Request failed (${res.status})`;
+  } catch {
+    return `Request failed (${res.status})`;
+  }
+}
+
 async function postFeedPage(body: FeedQueryBody) {
   const res = await fetch("/api/feed", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  if (!res.ok) throw new Error("Failed to load feed");
+  if (!res.ok) throw new Error(await parseFeedError(res));
   return res.json() as Promise<{
     items: FeedItem[];
     nextCursor: number | null;
@@ -99,7 +109,7 @@ async function postFeedBootstrap(body: FeedQueryBody) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  if (!res.ok) throw new Error("Failed to load feed");
+  if (!res.ok) throw new Error(await parseFeedError(res));
   return res.json() as Promise<{
     page: {
       items: FeedItem[];
@@ -166,6 +176,7 @@ export function FeedView({ ebayEnabled }: FeedViewProps) {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [counts, setCounts] = useState<FeedCountsResponse>(EMPTY_COUNTS);
+  const [feedLoadError, setFeedLoadError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
   const [selectedListingId, setSelectedListingId] = useState<string | null>(null);
@@ -250,6 +261,7 @@ export function FeedView({ ebayEnabled }: FeedViewProps) {
     setSelectedListingId(null);
     setDetailListing(null);
     setDetailMatch(null);
+    setFeedLoadError(null);
 
     try {
       const { page, counts } = await postFeedBootstrap({
@@ -264,9 +276,11 @@ export function FeedView({ ebayEnabled }: FeedViewProps) {
       setTotal(page.total);
       setNextCursor(page.nextCursor);
       setCounts(counts);
-    } catch {
+    } catch (err) {
       if (generation !== fetchGeneration.current) return;
-      toast.error("Couldn't load listings");
+      const message = err instanceof Error ? err.message : "Couldn't load listings";
+      setFeedLoadError(message);
+      toast.error(message);
       setFeedItems([]);
       setTotal(0);
       setNextCursor(null);
@@ -549,36 +563,79 @@ export function FeedView({ ebayEnabled }: FeedViewProps) {
     restoreAll,
   ]);
 
-  const emptyMessage =
-    feedView === "starred"
-      ? {
-          title: "No saved listings yet",
-          hint: "Save listings from New — unsave or dismiss them here.",
-        }
-      : feedView === "dismissed"
-        ? { title: "Nothing dismissed", hint: "Listings you dismiss will appear here." }
-        : alertScope.startsWith("hunt:")
-          ? {
-              title: "No matches for this hunt",
-              hint: "Nothing unseen matches this hunt — try All hunts or broaden criteria on Hunts.",
-            }
-          : alertScope === "watchlist"
-            ? {
-                title: "No hunt matches yet",
-                hint:
-                  activeHunts.length === 0
-                    ? "Save a hunt on Hunts to populate Hunt Finds."
-                    : "Nothing unseen matches your saved hunts — try All listings or broaden hunt criteria.",
-              }
-            : feedView === "all"
-                ? {
-                    title: "No listings in this view",
-                    hint: "Nothing matches your filters — try clearing filters or refreshing.",
-                  }
-                : {
-                    title: "No listings match",
-                    hint: "Nothing matches this view — try refreshing or widening your scope.",
-                  };
+  const emptyMessage = useMemo(() => {
+    if (feedLoadError) {
+      return {
+        title: "Couldn't load listings",
+        hint: feedLoadError,
+      };
+    }
+
+    if (
+      counts.all === 0 &&
+      (feedView === "new" || feedView === "all")
+    ) {
+      const filterHint = hasActiveFeedAttributeFilters(feedAttributeFilters)
+        ? "Try Clear all in the sidebar to reset attribute filters, or adjust condition filters on Hunt Preferences."
+        : "Try Clear all in the sidebar, or reset condition filters on Hunt Preferences.";
+      return {
+        title: "Your filters are blocking all listings",
+        hint: filterHint,
+      };
+    }
+
+    if (feedView === "starred") {
+      return {
+        title: "No saved listings yet",
+        hint: "Save listings from New — unsave or dismiss them here.",
+      };
+    }
+
+    if (feedView === "dismissed") {
+      return { title: "Nothing dismissed", hint: "Listings you dismiss will appear here." };
+    }
+
+    if (alertScope.startsWith("hunt:")) {
+      return {
+        title: "No matches for this hunt",
+        hint:
+          counts.all > 0
+            ? "Nothing unseen matches this hunt — try All hunts, raise your max total cost on Hunt Preferences, or broaden criteria on Hunts."
+            : "Nothing unseen matches this hunt — try All hunts or broaden criteria on Hunts.",
+      };
+    }
+
+    if (alertScope === "watchlist") {
+      return {
+        title: "No hunt matches yet",
+        hint:
+          activeHunts.length === 0
+            ? "Save a hunt on Hunts to populate Hunt Finds."
+            : counts.all > 0
+              ? "Listings are available, but none match your hunts in this view — try All listings, raise your max total cost on Hunt Preferences, or broaden hunt criteria."
+              : "Nothing unseen matches your saved hunts — try All listings or broaden hunt criteria.",
+      };
+    }
+
+    if (feedView === "all") {
+      return {
+        title: "No listings in this view",
+        hint: "Nothing matches your filters — try clearing filters or refreshing.",
+      };
+    }
+
+    return {
+      title: "No listings match",
+      hint: "Nothing matches this view — try refreshing or widening your scope.",
+    };
+  }, [
+    feedLoadError,
+    counts.all,
+    feedView,
+    alertScope,
+    activeHunts.length,
+    feedAttributeFilters,
+  ]);
 
   const contextSuffix = feedContextSuffix(
     feedView,
