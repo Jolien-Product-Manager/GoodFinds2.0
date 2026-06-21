@@ -1,31 +1,39 @@
 "use client";
 
-import { useCallback, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { AlertListingCard } from "@/components/alert-listing-card";
+import { ListingDetailPanel } from "@/components/listing-detail-panel";
 import { FeedSidebar } from "@/components/feed-sidebar";
+import type {
+  FeedCountsResponse,
+  FeedItem,
+  FeedQueryBody,
+} from "@/lib/listings/feed-api";
 import type { AppListing, AlertScope, MarketplaceFilter } from "@/lib/listings/types";
-import { huntHasActiveCriteria, matchAllHunts } from "@/lib/listings/hunt-match";
-import {
-  alertListings,
-  alertSort,
-  dismissedListings,
-  interestedListings,
-  poolListings,
-  unseenListings,
-} from "@/lib/listings/selectors";
+import type { HuntMatchResult } from "@/lib/listings/hunt-match";
+import { huntHasActiveCriteria } from "@/lib/listings/hunt-match";
 import { useCasebackStore, type FeedView } from "@/store/caseback";
 import {
   isAttributeValueSelected,
   type AttrKey,
 } from "@/lib/hunts/types";
+import { cn } from "@/lib/utils";
 
 interface FeedViewProps {
-  listings: AppListing[];
   ebayEnabled: boolean;
 }
+
+const EMPTY_COUNTS: FeedCountsResponse = {
+  all: 0,
+  new: 0,
+  starred: 0,
+  dismissed: 0,
+  huntMatches: 0,
+  perHunt: {},
+  marketplace: { all: 0, ebay: 0, chrono24: 0, etsy: 0 },
+};
 
 function feedContextSuffix(
   feedView: FeedView,
@@ -66,9 +74,42 @@ function feedContextSuffix(
   return suffix;
 }
 
-export function FeedView({ listings, ebayEnabled }: FeedViewProps) {
-  const router = useRouter();
+async function postFeedPage(body: FeedQueryBody) {
+  const res = await fetch("/api/feed", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error("Failed to load feed");
+  return res.json() as Promise<{
+    items: FeedItem[];
+    nextCursor: number | null;
+    total: number;
+  }>;
+}
 
+async function postFeedCounts(body: FeedQueryBody) {
+  const res = await fetch("/api/feed/counts", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error("Failed to load feed counts");
+  return res.json() as Promise<FeedCountsResponse>;
+}
+
+async function postFeedIds(body: FeedQueryBody) {
+  const res = await fetch("/api/feed/ids", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error("Failed to load feed ids");
+  const data = (await res.json()) as { ids: string[] };
+  return data.ids;
+}
+
+export function FeedView({ ebayEnabled }: FeedViewProps) {
   const seen = useCasebackStore((s) => s.seen);
   const listingStatus = useCasebackStore((s) => s.listingStatus);
   const alertScope = useCasebackStore((s) => s.alertScope);
@@ -76,7 +117,6 @@ export function FeedView({ listings, ebayEnabled }: FeedViewProps) {
   const feedView = useCasebackStore((s) => s.feedView);
   const criteria = useCasebackStore((s) => s.criteria);
   const hunts = useCasebackStore((s) => s.hunts);
-  const globalFilters = useCasebackStore((s) => s.globalFilters);
   const hiddenListings = useCasebackStore((s) => s.hiddenListings);
   const dislikedModels = useCasebackStore((s) => s.dislikedModels);
   const feedAttributeFilters = useCasebackStore((s) => s.feedAttributeFilters);
@@ -94,66 +134,49 @@ export function FeedView({ listings, ebayEnabled }: FeedViewProps) {
   const clearFeedAttributeFilters = useCasebackStore((s) => s.clearFeedAttributeFilters);
   const addAttributeLibraryOption = useCasebackStore((s) => s.addAttributeLibraryOption);
 
-  const ctx = useMemo(
+  const seenSet = useMemo(() => new Set(seen), [seen]);
+
+  const [feedItems, setFeedItems] = useState<FeedItem[]>([]);
+  const [total, setTotal] = useState(0);
+  const [nextCursor, setNextCursor] = useState<number | null>(0);
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [counts, setCounts] = useState<FeedCountsResponse>(EMPTY_COUNTS);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  const [selectedListingId, setSelectedListingId] = useState<string | null>(null);
+  const [detailListing, setDetailListing] = useState<AppListing | null>(null);
+  const [detailMatch, setDetailMatch] = useState<HuntMatchResult | null>(null);
+
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
+  const fetchGeneration = useRef(0);
+  const pendingRefresh = useRef(false);
+
+  const feedQueryBody = useMemo<FeedQueryBody>(
     () => ({
+      feedView,
+      alertScope,
+      marketplaceFilter,
       seen,
       listingStatus,
       hiddenListings,
       dislikedModels,
       criteria,
-      marketplaceFilter,
       feedAttributeFilters,
+      hunts,
     }),
     [
+      feedView,
+      alertScope,
+      marketplaceFilter,
       seen,
       listingStatus,
       hiddenListings,
       dislikedModels,
       criteria,
-      marketplaceFilter,
       feedAttributeFilters,
+      hunts,
     ]
-  );
-
-  const matchResults = useMemo(
-    () => matchAllHunts(listings, hunts, globalFilters),
-    [listings, hunts, globalFilters]
-  );
-
-  const ctxWithMatches = useMemo(
-    () => ({ ...ctx, matchResults, hunts }),
-    [ctx, matchResults, hunts]
-  );
-
-  const listingMode = feedView === "all" ? "all" : "unseen";
-
-  const feedListings = useMemo(
-    () =>
-      alertSort(
-        alertListings(listings, alertScope, ctxWithMatches, { mode: listingMode }),
-        ctxWithMatches
-      ),
-    [listings, alertScope, ctxWithMatches, listingMode]
-  );
-
-  const starred = useMemo(
-    () => interestedListings(listings, ctx),
-    [listings, ctx]
-  );
-
-  const dismissed = useMemo(
-    () => dismissedListings(listings, ctx),
-    [listings, ctx]
-  );
-
-  const unseenAll = useMemo(
-    () => unseenListings(listings, ctx),
-    [listings, ctx]
-  );
-
-  const poolAll = useMemo(
-    () => poolListings(listings, ctx),
-    [listings, ctx]
   );
 
   const activeHunts = useMemo(
@@ -161,43 +184,156 @@ export function FeedView({ listings, ebayEnabled }: FeedViewProps) {
     [hunts]
   );
 
-  const sidebarCounts = useMemo(() => {
-    const perHunt: Record<string, number> = {};
-    for (const hunt of activeHunts) {
-      perHunt[hunt.id] = alertListings(
-        listings,
-        `hunt:${hunt.id}` as AlertScope,
-        ctxWithMatches
-      ).length;
+  const reloadFeed = useCallback(
+    async (options?: { refresh?: boolean }) => {
+      const generation = ++fetchGeneration.current;
+      setLoading(true);
+      setFeedItems([]);
+      setNextCursor(0);
+      setSelectedListingId(null);
+      setDetailListing(null);
+      setDetailMatch(null);
+
+      try {
+        const [page, nextCounts] = await Promise.all([
+          postFeedPage({
+            ...feedQueryBody,
+            cursor: 0,
+            refresh: options?.refresh,
+          }),
+          postFeedCounts({
+            ...feedQueryBody,
+            refresh: options?.refresh,
+          }),
+        ]);
+
+        if (generation !== fetchGeneration.current) return;
+
+        setFeedItems(page.items);
+        setTotal(page.total);
+        setNextCursor(page.nextCursor);
+        setCounts(nextCounts);
+      } catch {
+        if (generation !== fetchGeneration.current) return;
+        toast.error("Couldn't load listings");
+        setFeedItems([]);
+        setTotal(0);
+        setNextCursor(null);
+        setCounts(EMPTY_COUNTS);
+      } finally {
+        if (generation === fetchGeneration.current) {
+          setLoading(false);
+        }
+      }
+    },
+    [feedQueryBody]
+  );
+
+  useEffect(() => {
+    void reloadFeed({ refresh: pendingRefresh.current });
+    pendingRefresh.current = false;
+  }, [feedQueryBody, refreshKey, reloadFeed]);
+
+  const loadMore = useCallback(async () => {
+    if (loading || loadingMore || nextCursor == null) return;
+
+    setLoadingMore(true);
+    const generation = fetchGeneration.current;
+
+    try {
+      const page = await postFeedPage({
+        ...feedQueryBody,
+        cursor: nextCursor,
+      });
+
+      if (generation !== fetchGeneration.current) return;
+
+      setFeedItems((current) => {
+        const seenIds = new Set(current.map((item) => item.listing.id));
+        const merged = [...current];
+        for (const item of page.items) {
+          if (!seenIds.has(item.listing.id)) merged.push(item);
+        }
+        return merged;
+      });
+      setTotal(page.total);
+      setNextCursor(page.nextCursor);
+    } catch {
+      toast.error("Couldn't load more listings");
+    } finally {
+      if (generation === fetchGeneration.current) {
+        setLoadingMore(false);
+      }
+    }
+  }, [feedQueryBody, loading, loadingMore, nextCursor]);
+
+  useEffect(() => {
+    const node = loadMoreRef.current;
+    if (!node || nextCursor == null) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          void loadMore();
+        }
+      },
+      { rootMargin: "240px" }
+    );
+
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [loadMore, nextCursor]);
+
+  useEffect(() => {
+    if (!selectedListingId) {
+      setDetailListing(null);
+      setDetailMatch(null);
+      return;
     }
 
-    const ctxWithoutMarketplace = { ...ctx, marketplaceFilter: "all" as const };
-    const unseenForMarketplace = unseenListings(listings, ctxWithoutMarketplace);
+    let cancelled = false;
 
-    return {
-      all: poolAll.length,
-      new: unseenAll.length,
-      starred: starred.length,
-      dismissed: dismissed.length,
-      huntMatches: alertListings(listings, "watchlist", ctxWithMatches).length,
-      perHunt,
-      marketplace: {
-        all: unseenForMarketplace.length,
-        ebay: unseenForMarketplace.filter((l) => l.source === "ebay").length,
-        chrono24: unseenForMarketplace.filter((l) => l.source === "chrono24").length,
-        etsy: unseenForMarketplace.filter((l) => l.source === "etsy").length,
-      },
+    void fetch(`/api/listings/${encodeURIComponent(selectedListingId)}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ hunts }),
+    })
+      .then(async (res) => {
+        if (!res.ok) throw new Error("detail failed");
+        return res.json() as Promise<{
+          listing: AppListing;
+          match: HuntMatchResult | null;
+        }>;
+      })
+      .then((detail) => {
+        if (cancelled) return;
+        setDetailListing(detail.listing);
+        setDetailMatch(detail.match);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        const fallback = feedItems.find(
+          (item) => item.listing.id === selectedListingId
+        );
+        if (fallback) {
+          setDetailListing(fallback.listing);
+          setDetailMatch(fallback.match);
+        }
+      });
+
+    return () => {
+      cancelled = true;
     };
-  }, [
-    listings,
-    ctx,
-    ctxWithMatches,
-    unseenAll.length,
-    poolAll.length,
-    starred.length,
-    dismissed.length,
-    activeHunts,
-  ]);
+  }, [selectedListingId, hunts, feedItems]);
+
+  useEffect(() => {
+    if (
+      selectedListingId &&
+      !feedItems.some((item) => item.listing.id === selectedListingId)
+    ) {
+      setSelectedListingId(null);
+    }
+  }, [feedItems, selectedListingId]);
 
   const handleAddFeedAttributeFilter = useCallback(
     (key: AttrKey, value: string) => {
@@ -209,9 +345,15 @@ export function FeedView({ listings, ebayEnabled }: FeedViewProps) {
     [addAttributeLibraryOption, feedAttributeFilters, toggleFeedAttributeFilter]
   );
 
+  const removeFeedItem = useCallback((id: string) => {
+    setFeedItems((current) => current.filter((item) => item.listing.id !== id));
+    setTotal((current) => Math.max(0, current - 1));
+  }, []);
+
   const handleDismiss = useCallback(
     (id: string) => {
       dismissListing(id);
+      removeFeedItem(id);
       toast("Dismissed", {
         action: {
           label: "Undo",
@@ -219,7 +361,7 @@ export function FeedView({ listings, ebayEnabled }: FeedViewProps) {
         },
       });
     },
-    [dismissListing, restoreListing]
+    [dismissListing, removeFeedItem, restoreListing]
   );
 
   const handleDismissStarred = useCallback(
@@ -228,6 +370,7 @@ export function FeedView({ listings, ebayEnabled }: FeedViewProps) {
         toggleInterested(id);
       }
       dismissListing(id);
+      removeFeedItem(id);
       toast("Dismissed", {
         action: {
           label: "Undo",
@@ -235,7 +378,7 @@ export function FeedView({ listings, ebayEnabled }: FeedViewProps) {
         },
       });
     },
-    [dismissListing, listingStatus, restoreListing, toggleInterested]
+    [dismissListing, listingStatus, removeFeedItem, restoreListing, toggleInterested]
   );
 
   const handleToggleInterested = useCallback(
@@ -243,6 +386,7 @@ export function FeedView({ listings, ebayEnabled }: FeedViewProps) {
       const wasInterested = listingStatus[id]?.interested ?? false;
       toggleInterested(id);
       if (feedView === "starred" && wasInterested) {
+        removeFeedItem(id);
         toast("Removed from saved", {
           action: {
             label: "Undo",
@@ -251,32 +395,68 @@ export function FeedView({ listings, ebayEnabled }: FeedViewProps) {
         });
       }
     },
-    [feedView, listingStatus, toggleInterested]
+    [feedView, listingStatus, removeFeedItem, toggleInterested]
   );
 
   const handleRefresh = useCallback(() => {
-    router.refresh();
+    pendingRefresh.current = true;
+    setRefreshKey((current) => current + 1);
     toast("Checking for new listings…");
-  }, [router]);
+  }, []);
 
-  const displayListings =
-    feedView === "starred"
-      ? starred
-        : feedView === "dismissed"
-        ? dismissed
-        : feedListings;
+  const selectedIndex = useMemo(
+    () => feedItems.findIndex((item) => item.listing.id === selectedListingId),
+    [feedItems, selectedListingId]
+  );
 
-  const handleDismissAll = useCallback(() => {
-    const ids = displayListings.map((l) => l.id);
-    if (ids.length === 0) return;
-    dismissAllUnseen(ids);
-    toast(`Dismissed ${ids.length.toLocaleString()} listing${ids.length === 1 ? "" : "s"}`, {
-      action: {
-        label: "Undo",
-        onClick: () => restoreAll(ids),
-      },
-    });
-  }, [displayListings, dismissAllUnseen, restoreAll]);
+  const handleSelectListing = useCallback((id: string) => {
+    setSelectedListingId((current) => (current === id ? null : id));
+  }, []);
+
+  const handleCloseDetail = useCallback(() => {
+    setSelectedListingId(null);
+  }, []);
+
+  const handlePreviousListing = useCallback(() => {
+    if (selectedIndex <= 0) return;
+    setSelectedListingId(feedItems[selectedIndex - 1]?.listing.id ?? null);
+  }, [feedItems, selectedIndex]);
+
+  const handleNextListing = useCallback(() => {
+    if (selectedIndex < 0 || selectedIndex >= feedItems.length - 1) return;
+    setSelectedListingId(feedItems[selectedIndex + 1]?.listing.id ?? null);
+  }, [feedItems, selectedIndex]);
+
+  const handleDismissAll = useCallback(async () => {
+    try {
+      const ids = await postFeedIds({
+        ...feedQueryBody,
+        feedView: "new",
+        alertScope,
+        marketplaceFilter,
+      });
+      if (ids.length === 0) return;
+      dismissAllUnseen(ids);
+      setFeedItems([]);
+      setTotal(0);
+      setNextCursor(null);
+      toast(`Dismissed ${ids.length.toLocaleString()} listing${ids.length === 1 ? "" : "s"}`, {
+        action: {
+          label: "Undo",
+          onClick: () => restoreAll(ids),
+        },
+      });
+      void postFeedCounts(feedQueryBody).then(setCounts).catch(() => {});
+    } catch {
+      toast.error("Couldn't dismiss all listings");
+    }
+  }, [
+    alertScope,
+    dismissAllUnseen,
+    feedQueryBody,
+    marketplaceFilter,
+    restoreAll,
+  ]);
 
   const emptyMessage =
     feedView === "starred"
@@ -316,6 +496,8 @@ export function FeedView({ listings, ebayEnabled }: FeedViewProps) {
     activeHunts
   );
 
+  const showDetailPanel = selectedListingId != null && detailListing != null;
+
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4">
@@ -334,14 +516,21 @@ export function FeedView({ listings, ebayEnabled }: FeedViewProps) {
         </p>
       )}
 
-      <div className="grid min-h-0 grid-cols-1 items-start gap-6 md:grid-cols-[minmax(0,1fr)_17.5rem] md:gap-8">
+      <div
+        className={cn(
+          "grid min-h-0 grid-cols-1 items-start gap-6",
+          showDetailPanel
+            ? "xl:grid-cols-[minmax(0,1fr)_22rem_17.5rem]"
+            : "md:grid-cols-[minmax(0,1fr)_17.5rem] md:gap-8"
+        )}
+      >
         <FeedSidebar
           feedView={feedView}
           alertScope={alertScope}
           marketplaceFilter={marketplaceFilter}
           feedAttributeFilters={feedAttributeFilters}
           attributeLibrary={attributeLibrary}
-          counts={sidebarCounts}
+          counts={counts}
           activeHunts={activeHunts}
           onFeedViewChange={setFeedView}
           onScopeChange={setAlertScope}
@@ -349,22 +538,30 @@ export function FeedView({ listings, ebayEnabled }: FeedViewProps) {
           onToggleFeedAttributeFilter={toggleFeedAttributeFilter}
           onAddFeedAttributeFilter={handleAddFeedAttributeFilter}
           onClearFeedAttributeFilters={clearFeedAttributeFilters}
-          className="md:col-start-2 md:row-start-1"
+          className={cn(
+            "md:col-start-2 md:row-start-1",
+            showDetailPanel && "xl:col-start-3"
+          )}
         />
 
-        <div className="min-w-0 space-y-4 md:col-start-1 md:row-start-1">
+        <div
+          className={cn(
+            "relative min-w-0 space-y-4 md:col-start-1 md:row-start-1",
+            showDetailPanel && "xl:pr-0"
+          )}
+        >
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="font-mono-data text-sm text-ink-soft">
               <span className="mr-1.5 inline-block rounded-sm bg-paper px-1.5 py-0.5 font-medium text-ink">
-                {displayListings.length.toLocaleString()}
+                {total.toLocaleString()}
               </span>
               {contextSuffix}
             </p>
-            {feedView === "new" && displayListings.length > 0 && (
+            {feedView === "new" && total > 0 && (
               <Button
                 variant="outline"
                 size="sm"
-                onClick={handleDismissAll}
+                onClick={() => void handleDismissAll()}
                 className="shrink-0 text-ink-soft hover:text-ink"
               >
                 Dismiss all
@@ -372,44 +569,109 @@ export function FeedView({ listings, ebayEnabled }: FeedViewProps) {
             )}
           </div>
 
-          {displayListings.length === 0 ? (
+          {loading ? (
+            <div className="rounded-sm border border-dashed border-line-strong bg-card/50 p-12 text-center">
+              <p className="font-display text-lg text-ink">Loading listings…</p>
+            </div>
+          ) : feedItems.length === 0 ? (
             <div className="rounded-sm border border-dashed border-line-strong bg-card/50 p-12 text-center">
               <p className="font-display text-lg text-ink">{emptyMessage.title}</p>
               <p className="mt-2 text-sm text-ink-soft">{emptyMessage.hint}</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3">
-              {displayListings.map((listing) => (
-                <AlertListingCard
-                  key={listing.id}
-                  compact
-                  listing={listing}
-                  match={matchResults.get(listing.id)}
-                  interested={listingStatus[listing.id]?.interested}
-                  muted={feedView === "dismissed"}
-                  onDismiss={
-                    feedView === "new"
-                      ? () => handleDismiss(listing.id)
-                      : feedView === "all" && !seen.includes(listing.id)
+            <>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-3">
+                {feedItems.map(({ listing, match }) => (
+                  <AlertListingCard
+                    key={listing.id}
+                    compact
+                    listing={listing}
+                    match={match ?? undefined}
+                    interested={listingStatus[listing.id]?.interested}
+                    muted={feedView === "dismissed"}
+                    selected={selectedListingId === listing.id}
+                    onSelect={() => handleSelectListing(listing.id)}
+                    onDismiss={
+                      feedView === "new"
                         ? () => handleDismiss(listing.id)
-                        : feedView === "starred"
-                        ? () => handleDismissStarred(listing.id)
+                        : feedView === "all" && !seenSet.has(listing.id)
+                          ? () => handleDismiss(listing.id)
+                          : feedView === "starred"
+                            ? () => handleDismissStarred(listing.id)
+                            : undefined
+                    }
+                    onRestore={
+                      feedView === "dismissed"
+                        ? () => {
+                            restoreListing(listing.id);
+                            toast("Restored to New");
+                          }
                         : undefined
-                  }
-                  onRestore={
-                    feedView === "dismissed"
-                      ? () => {
-                          restoreListing(listing.id);
-                          toast("Restored to New");
-                        }
-                      : undefined
-                  }
-                  onToggleInterested={() => handleToggleInterested(listing.id)}
-                />
-              ))}
-            </div>
+                    }
+                    onToggleInterested={() => handleToggleInterested(listing.id)}
+                  />
+                ))}
+              </div>
+
+              {nextCursor != null && (
+                <div
+                  ref={loadMoreRef}
+                  className="flex items-center justify-center py-6 text-sm text-ink-soft"
+                >
+                  {loadingMore ? "Loading more…" : "Scroll for more"}
+                </div>
+              )}
+            </>
           )}
         </div>
+
+        {showDetailPanel && detailListing && (
+          <>
+            <button
+              type="button"
+              aria-label="Close listing details"
+              className="fixed inset-0 z-40 bg-ink/40 xl:hidden"
+              onClick={handleCloseDetail}
+            />
+            <ListingDetailPanel
+              listing={detailListing}
+              match={detailMatch ?? undefined}
+              interested={listingStatus[detailListing.id]?.interested}
+              positionLabel={
+                selectedIndex >= 0
+                  ? `${selectedIndex + 1} of ${total.toLocaleString()}`
+                  : undefined
+              }
+              onClose={handleCloseDetail}
+              onPrevious={selectedIndex > 0 ? handlePreviousListing : undefined}
+              onNext={
+                selectedIndex >= 0 && selectedIndex < feedItems.length - 1
+                  ? handleNextListing
+                  : undefined
+              }
+              onToggleInterested={() => handleToggleInterested(detailListing.id)}
+              onDismiss={
+                feedView === "new"
+                  ? () => {
+                      handleDismiss(detailListing.id);
+                      handleCloseDetail();
+                    }
+                  : feedView === "all" && !seenSet.has(detailListing.id)
+                    ? () => {
+                        handleDismiss(detailListing.id);
+                        handleCloseDetail();
+                      }
+                    : feedView === "starred"
+                      ? () => {
+                          handleDismissStarred(detailListing.id);
+                          handleCloseDetail();
+                        }
+                      : undefined
+              }
+              className="fixed inset-y-0 right-0 z-50 w-full max-w-md xl:sticky xl:top-4 xl:col-start-2 xl:row-start-1 xl:z-0 xl:w-auto xl:max-w-none"
+            />
+          </>
+        )}
       </div>
     </div>
   );

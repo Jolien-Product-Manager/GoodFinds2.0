@@ -20,14 +20,40 @@ interface FilterContext {
   feedAttributeFilters?: Partial<Record<AttrKey, HuntAttribute>>;
   matchResults?: Map<string, HuntMatchResult>;
   hunts?: Hunt[];
+  seenSet?: Set<string>;
+  hiddenSet?: Set<string>;
+  dislikedModelSet?: Set<string>;
+}
+
+function isSeen(id: string, ctx: FilterContext): boolean {
+  return ctx.seenSet ? ctx.seenSet.has(id) : ctx.seen.includes(id);
+}
+
+function isHidden(id: string, ctx: FilterContext): boolean {
+  return ctx.hiddenSet ? ctx.hiddenSet.has(id) : ctx.hiddenListings.includes(id);
+}
+
+function isDislikedModel(model: string, ctx: FilterContext): boolean {
+  return ctx.dislikedModelSet
+    ? ctx.dislikedModelSet.has(model)
+    : ctx.dislikedModels.includes(model);
+}
+
+export function withFilterSets(ctx: FilterContext): FilterContext {
+  return {
+    ...ctx,
+    seenSet: ctx.seenSet ?? new Set(ctx.seen),
+    hiddenSet: ctx.hiddenSet ?? new Set(ctx.hiddenListings),
+    dislikedModelSet: ctx.dislikedModelSet ?? new Set(ctx.dislikedModels),
+  };
 }
 
 export function passesListingFilters(
   listing: AppListing,
   ctx: FilterContext
 ): boolean {
-  if (ctx.hiddenListings.includes(listing.id)) return false;
-  if (listing.model && ctx.dislikedModels.includes(listing.model)) return false;
+  if (isHidden(listing.id, ctx)) return false;
+  if (listing.model && isDislikedModel(listing.model, ctx)) return false;
   if (
     ctx.marketplaceFilter &&
     ctx.marketplaceFilter !== "all" &&
@@ -48,7 +74,7 @@ export function unseenListings(
 ): AppListing[] {
   return listings.filter(
     (l) =>
-      !ctx.seen.includes(l.id) &&
+      !isSeen(l.id, ctx) &&
       !ctx.listingStatus[l.id]?.interested &&
       passesListingFilters(l, ctx)
   );
@@ -71,7 +97,7 @@ export function dismissedListings(
 ): AppListing[] {
   return listings.filter(
     (l) =>
-      ctx.seen.includes(l.id) &&
+      isSeen(l.id, ctx) &&
       !ctx.listingStatus[l.id]?.interested &&
       passesListingFilters(l, ctx)
   );

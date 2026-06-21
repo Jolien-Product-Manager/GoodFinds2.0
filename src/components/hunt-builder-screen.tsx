@@ -56,7 +56,6 @@ import {
 } from "@/lib/hunts/summary";
 import {
   applyPurchaseListingMetadata,
-  backfillPurchasedWatchMetadata,
   findListingMetadataForPurchaseUrl,
   type ListingImageRef,
 } from "@/lib/hunts/purchased-watch";
@@ -88,6 +87,18 @@ async function fetchPurchaseListingMetadata(
   }
 }
 
+async function fetchListingIndexMetadata(
+  url: string
+): Promise<ListingImageRef | null> {
+  try {
+    const res = await fetch(`/api/listing-images?url=${encodeURIComponent(url)}`);
+    if (!res.ok) return null;
+    return (await res.json()) as ListingImageRef;
+  } catch {
+    return null;
+  }
+}
+
 function purchaseNeedsMetadataBackfill(watch: PurchasedWatch): boolean {
   return !watch.imageUrl || !watch.title;
 }
@@ -114,7 +125,6 @@ export function HuntBuilderScreen() {
   const [workingCopy, setWorkingCopy] = useState<Hunt | null>(null);
   const [savedFlash, setSavedFlash] = useState(false);
   const [purchaseUrl, setPurchaseUrl] = useState("");
-  const [listingImages, setListingImages] = useState<ListingImageRef[]>([]);
 
   const startNewHunt = () => {
     const d = createDraftHunt();
@@ -307,7 +317,10 @@ export function HuntBuilderScreen() {
     setPurchasedWatches([item, ...purchasedWatches]);
     setPurchaseUrl("");
 
-    const fromFeed = findListingMetadataForPurchaseUrl(url, listingImages);
+    const fromFeedRef = await fetchListingIndexMetadata(url);
+    const fromFeed = fromFeedRef
+      ? findListingMetadataForPurchaseUrl(url, [fromFeedRef])
+      : findListingMetadataForPurchaseUrl(url, []);
     const fromApi = await fetchPurchaseListingMetadata(url);
     const metadata = mergePurchaseListingMetadata(fromFeed, fromApi);
 
@@ -325,26 +338,22 @@ export function HuntBuilderScreen() {
           : p
       )
     );
-  }, [purchaseUrl, purchasedWatches, setPurchasedWatches, listingImages]);
+  }, [purchaseUrl, purchasedWatches, setPurchasedWatches]);
 
   useEffect(() => {
     let cancelled = false;
 
-    async function backfillPurchaseMetadata(images: ListingImageRef[]) {
+    async function backfillPurchaseMetadata() {
       let current = useCasebackStore.getState().purchasedWatches;
       if (current.length === 0) return;
-
-      const fromFeed = backfillPurchasedWatchMetadata(current, images);
-      if (fromFeed !== current) {
-        if (cancelled) return;
-        setPurchasedWatches(fromFeed);
-        current = fromFeed;
-      }
 
       for (const watch of current) {
         if (cancelled || !purchaseNeedsMetadataBackfill(watch)) continue;
 
-        const fromFeedMeta = findListingMetadataForPurchaseUrl(watch.url, images);
+        const fromFeedRef = await fetchListingIndexMetadata(watch.url);
+        const fromFeedMeta = fromFeedRef
+          ? findListingMetadataForPurchaseUrl(watch.url, [fromFeedRef])
+          : findListingMetadataForPurchaseUrl(watch.url, []);
         const fromApi = await fetchPurchaseListingMetadata(watch.url);
         const metadata = mergePurchaseListingMetadata(fromFeedMeta, fromApi);
         const updated = applyPurchaseListingMetadata(watch, metadata);
@@ -367,14 +376,7 @@ export function HuntBuilderScreen() {
       }
     }
 
-    fetch("/api/listing-images")
-      .then((res) => res.json())
-      .then((images: ListingImageRef[]) => {
-        if (cancelled || !Array.isArray(images)) return;
-        setListingImages(images);
-        void backfillPurchaseMetadata(images);
-      })
-      .catch(() => {});
+    void backfillPurchaseMetadata();
 
     return () => {
       cancelled = true;

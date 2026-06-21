@@ -12,9 +12,13 @@ import {
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import type { AppListing, ListingGender } from "@/lib/listings/types";
+import type { AppListing } from "@/lib/listings/types";
 import type { AttributeMatch, HuntMatchResult } from "@/lib/listings/hunt-match";
 import { characteristicDisplayLabel } from "@/lib/listings/hunt-match";
+import {
+  listingDescriptionText,
+  listingDetailRows,
+} from "@/lib/listings/listing-detail";
 import { getListingImageSrcs } from "@/lib/listings/image-url";
 import { getTotalCost } from "@/lib/shipping";
 import { DEFAULT_CRITERIA } from "@/lib/criteria";
@@ -24,69 +28,6 @@ function attributeTagLabel(match: AttributeMatch, listing: AppListing): string {
   const label = characteristicDisplayLabel(match, listing);
   if (match.status === "unverified") return `${label}?`;
   return label;
-}
-
-const GENDER_LABELS: Record<ListingGender, string> = {
-  mens: "Men's",
-  womens: "Women's",
-  unisex: "Unisex",
-  unknown: "",
-};
-
-function listingDetailRows(
-  listing: AppListing
-): { label: string; value: string }[] {
-  const f = listing.features;
-  const rows: { label: string; value: string }[] = [];
-
-  const add = (label: string, value: string | number | null | undefined) => {
-    if (value == null) return;
-    const text = String(value).trim();
-    if (text) rows.push({ label, value: text });
-  };
-
-  add("Model", f.model ?? listing.model);
-  add("Year", f.year ?? listing.year);
-  add("Era", f.era);
-  add("Movement", f.mvmt);
-  add("Dial", f.dial);
-  add("Color", f.color);
-  add("Crystal", f.crystal);
-  add("Plating", f.plating);
-  add("Running", f.running);
-  add("Complete", f.complete);
-  add("Date code", f.datecode);
-  add("Dial originality", f.dialOrig);
-  add("Collaboration", f.collab);
-  add("Complications", f.complications);
-
-  if (listing.isVintage) rows.push({ label: "Vintage", value: "Yes" });
-
-  const genderLabel = GENDER_LABELS[listing.gender];
-  add("Gender", genderLabel || undefined);
-  add("Ships from", listing.sellerCountry);
-
-  if (listing.listedAt) {
-    const listed = new Date(listing.listedAt);
-    if (!Number.isNaN(listed.getTime())) {
-      rows.push({
-        label: "Listed",
-        value: listed.toLocaleDateString(undefined, {
-          month: "short",
-          day: "numeric",
-          year: "numeric",
-        }),
-      });
-    }
-  }
-
-  const priceText =
-    listing.priceCurrency === "USD"
-      ? `$${listing.priceValue.toFixed(2)}`
-      : `${listing.priceValue} ${listing.priceCurrency}`;
-  rows.push({ label: "List price", value: priceText });
-
-  return rows;
 }
 
 function CardFlipButton({
@@ -127,8 +68,7 @@ function ListingDetailsBack({
   onFlipBack: () => void;
 }) {
   const rows = listingDetailRows(listing);
-  const description =
-    listing.description?.trim() || listing.title;
+  const description = listingDescriptionText(listing);
 
   return (
     <div
@@ -377,6 +317,8 @@ interface AlertListingCardProps {
   interested?: boolean;
   muted?: boolean;
   compact?: boolean;
+  selected?: boolean;
+  onSelect?: () => void;
   onDismiss?: () => void;
   onRestore?: () => void;
   onToggleInterested?: () => void;
@@ -388,13 +330,15 @@ export function AlertListingCard({
   interested = false,
   muted = false,
   compact = false,
+  selected = false,
+  onSelect,
   onDismiss,
   onRestore,
   onToggleInterested,
 }: AlertListingCardProps) {
   const [flipped, setFlipped] = useState(false);
+  const useDetailPanel = Boolean(onSelect);
   const costs = getTotalCost(listing, DEFAULT_CRITERIA.postalCode);
-  const conditionLabel = listing.condition;
   const matchScore = match && match.score > 0 ? match.score : null;
   const attributeMatches = match?.attributeMatches ?? [];
   const visibleAttributes = attributeMatches.filter(
@@ -408,11 +352,185 @@ export function AlertListingCard({
 
   return (
     <article
+      role={onSelect ? "button" : undefined}
+      tabIndex={onSelect ? 0 : undefined}
+      onClick={onSelect}
+      onKeyDown={
+        onSelect
+          ? (event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                onSelect();
+              }
+            }
+          : undefined
+      }
       className={cn(
         "overflow-hidden rounded-lg border border-line bg-card shadow-sm",
-        muted && "opacity-60"
+        muted && "opacity-60",
+        onSelect && "cursor-pointer transition-shadow hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-steal",
+        selected && "ring-2 ring-steal/70 ring-offset-2 ring-offset-paper"
       )}
     >
+      {useDetailPanel ? (
+        <div className="flex flex-col">
+          <div className="relative aspect-[4/3] w-full shrink-0 overflow-hidden bg-[#c9b896]/20">
+            <ListingPhotoCarousel listing={listing} />
+
+            <span className="absolute bottom-3 left-3 rounded-full bg-ink px-2.5 py-0.5 text-[11px] font-medium lowercase tracking-wide text-card">
+              {listing.source}
+            </span>
+
+            {matchScore != null && (
+              <span className="absolute right-3 top-3 inline-flex items-center gap-1.5 rounded-full border border-line bg-card/95 px-2.5 py-1 text-[11px] font-medium tabular-nums text-ink shadow-sm">
+                <span className="h-2 w-2 rounded-full bg-brass" />
+                Match Score: {Math.round(matchScore * 10)}
+              </span>
+            )}
+          </div>
+
+          <div className={cn("flex flex-1 flex-col", compact ? "gap-2.5 p-3" : "gap-3 p-4")}>
+            <div className="border-b border-line pb-2.5">
+              <div className="flex items-start justify-between gap-3">
+                <h3
+                  className={cn(
+                    "min-w-0 flex-1 font-display font-semibold leading-snug text-ink",
+                    compact ? "line-clamp-3 text-[15px]" : "line-clamp-4 text-lg"
+                  )}
+                >
+                  {listing.title}
+                </h3>
+                <span
+                  className={cn(
+                    "shrink-0 font-display font-semibold tabular-nums text-ink",
+                    compact ? "text-lg" : "text-xl"
+                  )}
+                >
+                  ${costs.total.toFixed(2)}
+                </span>
+              </div>
+              {metaLine && (
+                <p className={cn("mt-1.5 text-ink-soft", compact ? "text-xs" : "text-sm")}>
+                  {metaLine}
+                </p>
+              )}
+            </div>
+
+            {(showStandaloneAttributeRow ||
+              huntContributions.length > 0 ||
+              onToggleInterested ||
+              onDismiss ||
+              onRestore) && (
+              <div
+                className="mt-auto space-y-2 border-t border-line pt-2"
+                onClick={(event) => event.stopPropagation()}
+                onKeyDown={(event) => event.stopPropagation()}
+              >
+                {showStandaloneAttributeRow && (
+                  <div className="flex flex-wrap justify-end gap-1">
+                    {visibleAttributes.map((m) => (
+                      <AttributeTag key={m.key} match={m} listing={listing} />
+                    ))}
+                  </div>
+                )}
+
+                {huntContributions.length > 0 && (
+                  <div
+                    className={cn(
+                      "space-y-2",
+                      compact ? "text-[11px]" : "text-xs"
+                    )}
+                  >
+                    {huntContributions.map((contribution) => {
+                      const chips =
+                        contribution.attributeMatches.length > 0
+                          ? contribution.attributeMatches
+                          : null;
+                      const fallbackLabels =
+                        chips == null && contribution.matchedOn.length > 0
+                          ? contribution.matchedOn
+                          : null;
+
+                      return (
+                        <div
+                          key={contribution.huntId}
+                          className="flex items-start justify-between gap-2"
+                        >
+                          <p className="min-w-0 shrink-0 font-medium leading-snug text-ink">
+                            {contribution.huntName}
+                          </p>
+                          <HuntContributionChips
+                            contribution={contribution}
+                            listing={listing}
+                            chips={chips}
+                            fallbackLabels={fallbackLabels}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {(onToggleInterested || onDismiss || onRestore) && (
+                  <div className="flex items-center gap-1.5">
+                    {onToggleInterested && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={onToggleInterested}
+                        aria-label={interested ? "Unsave listing" : "Save listing"}
+                        aria-pressed={interested}
+                        className={cn(
+                          "h-8 flex-1 rounded-md border-line-strong bg-card px-2.5 text-xs hover:bg-paper",
+                          interested
+                            ? "text-steal hover:text-steal"
+                            : "text-brass hover:text-steal/85"
+                        )}
+                      >
+                        <Sparkles
+                          className={cn(
+                            "h-3.5 w-3.5 shrink-0",
+                            interested && "fill-steal/20"
+                          )}
+                          strokeWidth={interested ? 2.25 : 1.75}
+                        />
+                        {interested ? "Unsave" : "Save"}
+                      </Button>
+                    )}
+                    {onDismiss && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-8 flex-1 rounded-md border-line-strong bg-card px-2.5 text-xs text-ink-soft hover:bg-paper hover:text-ink"
+                        onClick={onDismiss}
+                        aria-label="Dismiss listing"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                        Dismiss
+                      </Button>
+                    )}
+                    {onRestore && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-8 flex-1 rounded-md border-line-strong bg-card px-2.5 text-xs text-ink hover:bg-paper"
+                        onClick={onRestore}
+                        aria-label="Restore listing"
+                      >
+                        <Check className="h-3.5 w-3.5" />
+                        Restore
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      ) : (
       <div className="[perspective:1000px]">
         <div
           className={cn(
@@ -443,68 +561,30 @@ export function AlertListingCard({
             </div>
 
             <div className={cn("flex flex-1 flex-col", compact ? "gap-2.5 p-3" : "gap-3 p-4")}>
-              <div className="border-b border-line pb-2">
-                <h3
-                  className={cn(
-                    "font-display font-semibold leading-snug text-ink",
-                    compact ? "line-clamp-2 text-[15px]" : "text-lg"
-                  )}
-                >
-                  {listing.title}
-                </h3>
+              <div className="border-b border-line pb-2.5">
+                <div className="flex items-start justify-between gap-3">
+                  <h3
+                    className={cn(
+                      "min-w-0 flex-1 font-display font-semibold leading-snug text-ink",
+                      compact ? "line-clamp-3 text-[15px]" : "line-clamp-4 text-lg"
+                    )}
+                  >
+                    {listing.title}
+                  </h3>
+                  <span
+                    className={cn(
+                      "shrink-0 font-display font-semibold tabular-nums text-ink",
+                      compact ? "text-lg" : "text-xl"
+                    )}
+                  >
+                    ${costs.total.toFixed(2)}
+                  </span>
+                </div>
                 {metaLine && (
-                  <p className={cn("mt-1 text-ink-soft", compact ? "text-xs" : "text-sm")}>
+                  <p className={cn("mt-1.5 text-ink-soft", compact ? "text-xs" : "text-sm")}>
                     {metaLine}
                   </p>
                 )}
-              </div>
-
-              <div className="text-right">
-                <span
-                  className={cn(
-                    "font-display font-semibold tabular-nums text-ink",
-                    compact ? "text-xl" : "text-2xl"
-                  )}
-                >
-                  ${costs.total.toFixed(2)}
-                </span>
-                <p
-                  className={cn(
-                    "mt-0.5 text-ink-soft",
-                    compact ? "text-[11px]" : "text-xs"
-                  )}
-                >
-                  ${costs.item.toFixed(2)} + ${costs.shipping.toFixed(2)} shipping
-                  {!costs.shippingConfirmed && " (est.)"}
-                </p>
-                <div
-                  className={cn(
-                    "mt-1.5 flex items-center justify-end gap-2",
-                    compact ? "text-xs" : "text-sm"
-                  )}
-                >
-                  <span className="text-ink-soft">Condition</span>
-                  <span className="rounded-full bg-brass/12 px-2 py-0.5 text-[10px] font-medium text-ink">
-                    {conditionLabel}
-                  </span>
-                </div>
-              </div>
-
-              <div className="flex justify-end">
-                <Button
-                  type="button"
-                  size="sm"
-                  className={cn(
-                    "h-8 shrink-0 rounded-md bg-ink px-3 text-xs text-card hover:bg-ink/90",
-                    compact ? "text-xs" : "text-sm"
-                  )}
-                  asChild
-                >
-                  <a href={listing.url} target="_blank" rel="noopener noreferrer">
-                    View listing
-                    <ExternalLink className="ml-1.5 h-3 w-3" />
-                  </a>
-                </Button>
               </div>
 
               {showStandaloneAttributeRow && (
@@ -626,6 +706,7 @@ export function AlertListingCard({
           </div>
         </div>
       </div>
+      )}
     </article>
   );
 }

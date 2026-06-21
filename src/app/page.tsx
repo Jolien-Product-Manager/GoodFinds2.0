@@ -1,14 +1,10 @@
 import { FeedView } from "@/components/feed-view";
-import { loadAllListings } from "@/lib/listings/load-all-listings";
+import { hasEbayCredentials } from "@/lib/ebay/client";
 
-export default async function HomePage() {
-  const { listings, ebayEnabled } = await loadAllListings();
-
+export default function HomePage() {
   return (
-    <>
-      <main className="mx-auto max-w-6xl px-4 py-8 lg:max-w-7xl">
-        <FeedView listings={listings} ebayEnabled={ebayEnabled} />
-      </main>
-    </>
+    <main className="mx-auto max-w-6xl px-4 py-8 lg:max-w-7xl">
+      <FeedView ebayEnabled={hasEbayCredentials()} />
+    </main>
   );
 }

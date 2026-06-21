@@ -2,7 +2,7 @@ import { extractChrono24ListingId } from "@/lib/chrono24/urls";
 import { loadChrono24Listings } from "@/lib/chrono24/load-listings";
 import { fetchEbayListingMetadata } from "@/lib/ebay/client";
 import { fetchEtsyListingMetadata } from "@/lib/etsy/client";
-import { loadAllListings } from "@/lib/listings/load-all-listings";
+import { getCachedListings } from "@/lib/listings/listings-index";
 import {
   EMPTY_PURCHASE_LISTING_METADATA,
   stripHtmlText,
@@ -94,7 +94,7 @@ function mergeMetadata(
 export async function resolvePurchaseListingMetadata(
   purchaseUrl: string
 ): Promise<PurchaseListingMetadata> {
-  const { listings } = await loadAllListings();
+  const { listings } = await getCachedListings();
   let metadata = findListingMetadataForPurchaseUrl(purchaseUrl, listings);
 
   const fromChrono = chrono24MetadataForUrl(purchaseUrl);
