@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { AlertListingCard } from "@/components/alert-listing-card";
 import { ListingDetailPanel } from "@/components/listing-detail-panel";
 import { FeedSidebar } from "@/components/feed-sidebar";
+import { HuntQuickFilter } from "@/components/hunt-quick-filter";
 import type {
   FeedCountsResponse,
   FeedItem,
@@ -19,6 +20,7 @@ import {
   isAttributeValueSelected,
   type AttrKey,
 } from "@/lib/hunts/types";
+import { cn } from "@/lib/utils";
 
 interface FeedViewProps {
   ebayEnabled: boolean;
@@ -565,25 +567,47 @@ export function FeedView({ ebayEnabled }: FeedViewProps) {
       )}
 
       <div className="relative min-h-0">
-        <div className="grid min-h-0 grid-cols-1 items-start gap-6 md:grid-cols-[minmax(0,1fr)_17.5rem] md:gap-8">
-          <FeedSidebar
-            feedView={feedView}
-            alertScope={alertScope}
-            marketplaceFilter={marketplaceFilter}
-            feedAttributeFilters={feedAttributeFilters}
-            attributeLibrary={attributeLibrary}
-            counts={counts}
-            activeHunts={activeHunts}
-            onFeedViewChange={setFeedView}
-            onScopeChange={setAlertScope}
-            onMarketplaceChange={setMarketplaceFilter}
-            onToggleFeedAttributeFilter={toggleFeedAttributeFilter}
-            onAddFeedAttributeFilter={handleAddFeedAttributeFilter}
-            onClearFeedAttributeFilters={clearFeedAttributeFilters}
-            className="md:col-start-2 md:row-start-1"
-          />
+        <div
+          className={cn(
+            "grid min-h-0 grid-cols-1 items-start gap-6 md:gap-8",
+            showDetailPanel
+              ? "md:grid-cols-[minmax(0,1fr)_26rem]"
+              : "md:grid-cols-[minmax(0,1fr)_17.5rem]"
+          )}
+        >
+          {!showDetailPanel && (
+            <FeedSidebar
+              feedView={feedView}
+              alertScope={alertScope}
+              marketplaceFilter={marketplaceFilter}
+              feedAttributeFilters={feedAttributeFilters}
+              attributeLibrary={attributeLibrary}
+              counts={counts}
+              onFeedViewChange={setFeedView}
+              onScopeChange={setAlertScope}
+              onMarketplaceChange={setMarketplaceFilter}
+              onToggleFeedAttributeFilter={toggleFeedAttributeFilter}
+              onAddFeedAttributeFilter={handleAddFeedAttributeFilter}
+              onClearFeedAttributeFilters={clearFeedAttributeFilters}
+              className="md:col-start-2 md:row-start-1"
+            />
+          )}
 
-          <div className="relative min-w-0 space-y-4 md:col-start-1 md:row-start-1">
+          <div
+            className={cn(
+              "relative min-w-0 space-y-4 md:col-start-1 md:row-start-1",
+              showDetailPanel && "max-md:mr-[min(100%,24rem)]"
+            )}
+          >
+            {(feedView === "new" || feedView === "all") && (
+              <HuntQuickFilter
+                activeHunts={activeHunts}
+                alertScope={alertScope}
+                counts={counts}
+                onScopeChange={setAlertScope}
+              />
+            )}
+
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="font-mono-data text-sm text-ink-soft">
               <span className="mr-1.5 inline-block rounded-sm bg-paper px-1.5 py-0.5 font-medium text-ink">
@@ -656,18 +680,10 @@ export function FeedView({ ebayEnabled }: FeedViewProps) {
                 </div>
               )}
             </>
-          )}
+            )}
           </div>
-        </div>
 
-        {showDetailPanel && detailListing && (
-          <>
-            <button
-              type="button"
-              aria-label="Close listing details"
-              className="fixed inset-0 z-40 bg-ink/40 md:absolute md:bg-ink/20"
-              onClick={handleCloseDetail}
-            />
+          {showDetailPanel && detailListing && (
             <ListingDetailPanel
               listing={detailListing}
               match={detailMatch ?? undefined}
@@ -703,10 +719,10 @@ export function FeedView({ ebayEnabled }: FeedViewProps) {
                         }
                       : undefined
               }
-              className="fixed inset-y-0 right-0 z-50 w-full max-w-md md:absolute md:top-0 md:h-full md:max-h-none md:w-[26rem] md:max-w-none md:rounded-none md:border-l md:border-line-strong md:shadow-2xl"
+              className="max-md:fixed max-md:inset-y-0 max-md:right-0 max-md:z-30 max-md:w-full max-md:max-w-sm max-md:shadow-sm md:sticky md:top-4 md:col-start-2 md:row-start-1 md:self-start"
             />
-          </>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );

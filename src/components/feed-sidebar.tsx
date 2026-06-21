@@ -1,133 +1,17 @@
 "use client";
 
-import { useState } from "react";
-import Link from "next/link";
-import { ChevronDown, Plus } from "lucide-react";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
-import { HuntHeartsPicker } from "@/components/hunt-hearts";
 import { FeedAttributeFilters } from "@/components/feed-attribute-filters";
+import {
+  FilterSection,
+  FilterTableRow,
+  filterSectionDividerClassName,
+} from "@/components/filter-chip";
 import { hasActiveFeedAttributeFilters } from "@/lib/listings/feed-attribute-filter";
 import type { AlertScope, MarketplaceFilter } from "@/lib/listings/types";
-import type { AttrKey, Hunt, HuntAttribute } from "@/lib/hunts/types";
+import type { AttrKey, HuntAttribute } from "@/lib/hunts/types";
 import type { AttributeLibrary } from "@/lib/persistence/types";
 import type { FeedView } from "@/store/caseback";
 import { cn } from "@/lib/utils";
-
-function formatCount(n: number): string {
-  return n.toLocaleString();
-}
-
-interface SidebarRowProps {
-  label: string;
-  count?: number;
-  selected?: boolean;
-  onClick?: () => void;
-  indent?: boolean;
-  trailing?: React.ReactNode;
-  href?: string;
-}
-
-function SidebarRow({
-  label,
-  count,
-  selected = false,
-  onClick,
-  indent = false,
-  trailing,
-  href,
-}: SidebarRowProps) {
-  const inner = (
-    <>
-      <span
-        className={cn(
-          "h-3.5 w-3.5 shrink-0 rounded-[2px] border",
-          selected ? "border-brass bg-brass/30" : "border-line-strong bg-card"
-        )}
-        aria-hidden
-      />
-      <span className="min-w-0 flex-1 truncate text-sm">{label}</span>
-      {trailing}
-      {count != null && (
-        <span className="font-mono-data text-xs tabular-nums text-ink-soft">
-          {formatCount(count)}
-        </span>
-      )}
-    </>
-  );
-
-  const className = cn(
-    "flex w-full items-center gap-2.5 rounded-sm border px-3 py-2 text-left transition-colors",
-    indent && "ml-3 border-l-2 border-l-line pl-3",
-    selected
-      ? "border-brass bg-brass/15 text-ink"
-      : "border-transparent text-ink-soft hover:border-line hover:bg-card/80 hover:text-ink"
-  );
-
-  if (href) {
-    return (
-      <Link href={href} className={className}>
-        {inner}
-      </Link>
-    );
-  }
-
-  return (
-    <button type="button" onClick={onClick} className={className}>
-      {inner}
-    </button>
-  );
-}
-
-function SidebarCollapsibleSection({
-  label,
-  open,
-  onOpenChange,
-  children,
-  className,
-  onClear,
-  showClear = false,
-}: {
-  label: string;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  children: React.ReactNode;
-  className?: string;
-  onClear?: () => void;
-  showClear?: boolean;
-}) {
-  return (
-    <Collapsible open={open} onOpenChange={onOpenChange} className={className}>
-      <div className="flex items-center justify-between gap-2 px-1">
-        <CollapsibleTrigger className="flex min-w-0 flex-1 items-center justify-between gap-2 rounded-sm py-1.5 text-left text-xs font-medium uppercase tracking-wider text-ink-soft transition-colors hover:text-ink">
-          <span>{label}</span>
-          <ChevronDown
-            className={cn(
-              "h-3.5 w-3.5 shrink-0 transition-transform duration-200",
-              open && "rotate-180"
-            )}
-            aria-hidden
-          />
-        </CollapsibleTrigger>
-        {showClear && onClear && (
-          <button
-            type="button"
-            onClick={onClear}
-            className="shrink-0 text-xs text-brass underline-offset-2 hover:underline"
-          >
-            Clear
-          </button>
-        )}
-      </div>
-      <CollapsibleContent className="space-y-1 pt-1 data-[state=closed]:overflow-hidden data-[state=open]:overflow-visible data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0">
-        {children}
-      </CollapsibleContent>
-    </Collapsible>
-  );
-}
 
 interface FeedSidebarProps {
   feedView: FeedView;
@@ -149,7 +33,6 @@ interface FeedSidebarProps {
       etsy: number;
     };
   };
-  activeHunts: Hunt[];
   onFeedViewChange: (view: FeedView) => void;
   onScopeChange: (scope: AlertScope) => void;
   onMarketplaceChange: (filter: MarketplaceFilter) => void;
@@ -166,7 +49,6 @@ export function FeedSidebar({
   feedAttributeFilters,
   attributeLibrary,
   counts,
-  activeHunts,
   onFeedViewChange,
   onScopeChange,
   onMarketplaceChange,
@@ -182,21 +64,9 @@ export function FeedSidebar({
     marketplaceFilter !== "all" ||
     hasAttributeFilters;
 
-  const [marketplaceOpen, setMarketplaceOpen] = useState(false);
-
   const selectNewWithScope = (scope: AlertScope) => {
     onFeedViewChange("new");
     onScopeChange(scope);
-  };
-
-  const selectAllListings = () => {
-    onFeedViewChange("all");
-    onScopeChange("all");
-  };
-
-  const toggleScope = (scope: AlertScope) => {
-    onFeedViewChange("new");
-    onScopeChange(alertScope === scope ? "all" : scope);
   };
 
   const toggleMarketplace = (filter: MarketplaceFilter) => {
@@ -219,9 +89,9 @@ export function FeedSidebar({
         className
       )}
     >
-      <div className="max-h-none overflow-y-visible overscroll-y-contain rounded-sm border border-line-strong bg-card p-4 pb-8 md:max-h-[calc(100dvh-2rem)] md:overflow-y-auto md:pr-0.5 [scrollbar-gutter:stable]">
+      <div className="max-h-none overflow-y-visible overscroll-y-contain rounded-sm border border-line-strong bg-card p-2.5 pb-4 md:max-h-[calc(100dvh-2rem)] md:overflow-y-auto md:pr-0.5 [scrollbar-gutter:stable]">
         {hasActiveFilter && (
-          <div className="mb-3 flex justify-end px-1">
+          <div className="mb-1.5 flex justify-end px-0.5">
             <button
               type="button"
               onClick={clearFilters}
@@ -232,116 +102,86 @@ export function FeedSidebar({
           </div>
         )}
 
-        <div className="space-y-1">
-          <p className="px-1 text-xs font-medium uppercase tracking-wider text-ink-soft">
-            Views
-          </p>
-          <SidebarRow
-            label="All listings"
-            count={counts.all}
+        <FilterSection label="Views">
+          <FilterTableRow
             selected={feedView === "all"}
-            onClick={selectAllListings}
-          />
-          <SidebarRow
-            label="New listings"
-            count={counts.new}
+            count={counts.all}
+            onClick={() => {
+              onFeedViewChange("all");
+              onScopeChange("all");
+            }}
+          >
+            All listings
+          </FilterTableRow>
+          <FilterTableRow
             selected={feedView === "new"}
+            count={counts.new}
             onClick={() => selectNewWithScope("all")}
-          />
-          <SidebarRow
-            label="Saved"
-            count={counts.starred}
+          >
+            New listings
+          </FilterTableRow>
+          <FilterTableRow
             selected={feedView === "starred"}
+            count={counts.starred}
             onClick={() => onFeedViewChange("starred")}
-          />
-          <SidebarRow
-            label="Dismissed"
-            count={counts.dismissed}
+          >
+            Saved
+          </FilterTableRow>
+          <FilterTableRow
             selected={feedView === "dismissed"}
+            count={counts.dismissed}
             onClick={() => onFeedViewChange("dismissed")}
-          />
-        </div>
+          >
+            Dismissed
+          </FilterTableRow>
+        </FilterSection>
 
         {isBrowsingFeed && (
           <>
-            <div className="space-y-1 border-t border-line pt-4">
-              <div className="flex items-center justify-between gap-2 px-1">
-                <p className="text-xs font-medium uppercase tracking-wider text-ink-soft">
-                  Hunt Finds
-                </p>
-                {hasActiveFilter && (
+            <FilterSection
+              label="Marketplace"
+              className={filterSectionDividerClassName()}
+              action={
+                marketplaceFilter !== "all" ? (
                   <button
                     type="button"
-                    onClick={clearFilters}
+                    onClick={() => onMarketplaceChange("all")}
                     className="text-xs text-brass underline-offset-2 hover:underline"
                   >
                     Clear
                   </button>
-                )}
-              </div>
-              <div className="space-y-1">
-                <SidebarRow
-                  label="All hunts"
-                  count={counts.huntMatches}
-                  selected={alertScope === "watchlist"}
-                  onClick={() => toggleScope("watchlist")}
-                />
-                {activeHunts.map((hunt) => {
-                  const huntScope = `hunt:${hunt.id}` as AlertScope;
-                  return (
-                    <SidebarRow
-                      key={hunt.id}
-                      label={hunt.name}
-                      count={counts.perHunt[hunt.id] ?? 0}
-                      selected={alertScope === huntScope}
-                      trailing={
-                        <HuntHeartsPicker value={hunt.hearts} size="xs" />
-                      }
-                      onClick={() => toggleScope(huntScope)}
-                    />
-                  );
-                })}
-                <SidebarRow
-                  label="New hunt"
-                  href="/hunts"
-                  trailing={<Plus className="h-3 w-3 text-ink-soft" />}
-                />
-              </div>
-            </div>
-
-            <SidebarCollapsibleSection
-              label="Marketplace"
-              open={marketplaceOpen}
-              onOpenChange={setMarketplaceOpen}
-              className="border-t border-line pt-4"
-              showClear={marketplaceFilter !== "all"}
-              onClear={() => onMarketplaceChange("all")}
+                ) : undefined
+              }
             >
-              <SidebarRow
-                label="All marketplaces"
-                count={counts.marketplace.all}
+              <FilterTableRow
                 selected={marketplaceFilter === "all"}
+                count={counts.marketplace.all}
                 onClick={() => onMarketplaceChange("all")}
-              />
-              <SidebarRow
-                label="eBay"
-                count={counts.marketplace.ebay}
+              >
+                All marketplaces
+              </FilterTableRow>
+              <FilterTableRow
                 selected={marketplaceFilter === "ebay"}
+                count={counts.marketplace.ebay}
                 onClick={() => toggleMarketplace("ebay")}
-              />
-              <SidebarRow
-                label="Chrono24"
-                count={counts.marketplace.chrono24}
+              >
+                eBay
+              </FilterTableRow>
+              <FilterTableRow
                 selected={marketplaceFilter === "chrono24"}
+                count={counts.marketplace.chrono24}
                 onClick={() => toggleMarketplace("chrono24")}
-              />
-              <SidebarRow
-                label="Etsy"
-                count={counts.marketplace.etsy}
+              >
+                Chrono24
+              </FilterTableRow>
+              <FilterTableRow
                 selected={marketplaceFilter === "etsy"}
+                count={counts.marketplace.etsy}
                 onClick={() => toggleMarketplace("etsy")}
-              />
-            </SidebarCollapsibleSection>
+              >
+                Etsy
+              </FilterTableRow>
+            </FilterSection>
 
             <FeedAttributeFilters
               filters={feedAttributeFilters}

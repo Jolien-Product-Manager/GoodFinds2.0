@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Search } from "lucide-react";
+import { ChevronDown, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -31,6 +31,11 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { FilterSearchBar, matchesFilterSearch } from "@/components/filter-search-bar";
+import {
+  filterSectionDividerClassName,
+  filterSectionLabelClassName,
+  filterTableRowClassName,
+} from "@/components/filter-chip";
 import { cn } from "@/lib/utils";
 
 interface FeedAttributeFiltersProps {
@@ -254,55 +259,52 @@ function FeedFilterCategory({
   if (sectionSearchActive && filteredOptions.length === 0) return null;
 
   return (
-    <Collapsible open={open} onOpenChange={setOpen} className="border-t border-line/60 pt-2">
-      <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 rounded-sm px-1 py-1 text-left text-[11px] font-medium uppercase tracking-wider text-ink-soft transition-colors hover:text-ink">
-        <span className="truncate">{feedSidebarAttrLabel(attrKey)}</span>
+    <Collapsible open={open} onOpenChange={setOpen} className="space-y-0.5">
+      <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 rounded-sm px-0.5 py-0.5 text-left transition-colors hover:bg-paper/60">
+        <span className="text-xs font-medium text-ink-soft">
+          {feedSidebarAttrLabel(attrKey)}
+        </span>
         <span className="flex shrink-0 items-center gap-1.5">
           {categoryHasSelection(attr) && (
-            <span className="rounded-full bg-brass/15 px-1.5 py-0.5 font-mono-data text-[10px] normal-case tracking-normal text-ink">
+            <span className="rounded-sm border border-brass/30 bg-brass/15 px-1.5 py-0.5 font-mono text-[10px] tabular-nums text-ink">
               {(attr?.picks.length ?? 0) + (attr?.customs.length ?? 0)}
             </span>
           )}
-          <span
+          <ChevronDown
             className={cn(
-              "inline-block h-3 w-3 rotate-0 transition-transform duration-200",
+              "h-3.5 w-3.5 shrink-0 text-ink-soft transition-transform duration-200",
               open && "rotate-180"
             )}
             aria-hidden
-          >
-            ▾
-          </span>
+          />
         </span>
       </CollapsibleTrigger>
-      <CollapsibleContent className="pt-1 data-[state=closed]:overflow-hidden data-[state=open]:overflow-visible">
-        <div className="space-y-0.5 pb-1">
+      <CollapsibleContent className="pt-0.5 data-[state=closed]:overflow-hidden data-[state=open]:overflow-visible">
+        <div className="flex flex-col gap-0.5 pb-1">
           {filteredOptions.length === 0 ? (
-            <p className="px-2 py-1.5 text-xs text-ink-soft">No matches</p>
+            <p className="px-2 py-1 text-xs text-ink-soft">No matches</p>
           ) : (
-            filteredOptions.map((option) => (
-              <button
-                key={option}
-                type="button"
-                onClick={() => onToggle(attrKey, option)}
-                className={cn(
-                  "flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm transition-colors",
-                  isAttributeValueSelected(attr, option)
-                    ? "bg-brass/15 text-ink"
-                    : "text-ink-soft hover:bg-paper hover:text-ink"
-                )}
-              >
-                <span
-                  className={cn(
-                    "h-3 w-3 shrink-0 rounded-[2px] border",
-                    isAttributeValueSelected(attr, option)
-                      ? "border-brass bg-brass/30"
-                      : "border-line-strong bg-card"
-                  )}
-                  aria-hidden
-                />
-                <span className="min-w-0 flex-1 truncate">{option}</span>
-              </button>
-            ))
+            filteredOptions.map((option) => {
+              const selected = isAttributeValueSelected(attr, option);
+              return (
+                <button
+                  key={option}
+                  type="button"
+                  aria-pressed={selected}
+                  onClick={() => onToggle(attrKey, option)}
+                  className={filterTableRowClassName(selected)}
+                >
+                  <span
+                    className={cn(
+                      "h-3 w-3 shrink-0 rounded-[2px] border",
+                      selected ? "border-brass bg-brass/30" : "border-line-strong bg-card"
+                    )}
+                    aria-hidden
+                  />
+                  <span className="min-w-0 flex-1 truncate leading-snug">{option}</span>
+                </button>
+              );
+            })
           )}
         </div>
         {!sectionSearchActive && (
@@ -460,20 +462,18 @@ export function FeedAttributeFilters({
     <Collapsible
       open={sectionOpen}
       onOpenChange={setSectionOpen}
-      className={cn("border-t border-line pt-4", className)}
+      className={cn(filterSectionDividerClassName(), className)}
     >
-      <div className="flex items-center justify-between gap-2 px-1">
-        <CollapsibleTrigger className="flex min-w-0 flex-1 items-center justify-between gap-2 rounded-sm py-1.5 text-left text-xs font-medium uppercase tracking-wider text-ink-soft transition-colors hover:text-ink">
-          <span>Search</span>
-          <span
+      <div className="flex items-center justify-between gap-2 px-0.5">
+        <CollapsibleTrigger className="flex min-w-0 flex-1 items-center justify-between gap-2 py-0.5 text-left transition-colors">
+          <span className={filterSectionLabelClassName()}>Search</span>
+          <ChevronDown
             className={cn(
-              "inline-block h-3.5 w-3.5 shrink-0 rotate-0 transition-transform duration-200",
+              "h-3.5 w-3.5 shrink-0 text-ink-soft transition-transform duration-200",
               sectionOpen && "rotate-180"
             )}
             aria-hidden
-          >
-            ▾
-          </span>
+          />
         </CollapsibleTrigger>
         {hasActiveFilters && onClear && (
           <button
@@ -485,7 +485,7 @@ export function FeedAttributeFilters({
           </button>
         )}
       </div>
-      <CollapsibleContent className="space-y-1 pt-1 data-[state=closed]:overflow-hidden data-[state=open]:overflow-visible data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0">
+      <CollapsibleContent className="space-y-1 pt-1.5 data-[state=closed]:overflow-hidden data-[state=open]:overflow-visible data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0">
         <FilterSearchBar
           value={sectionQuery}
           onChange={setSectionQuery}

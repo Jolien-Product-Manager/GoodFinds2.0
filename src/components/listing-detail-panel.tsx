@@ -55,7 +55,7 @@ function DetailPhotoGallery({ listing }: { listing: AppListing }) {
 
   return (
     <div className="space-y-3">
-      <div className="relative aspect-[4/3] overflow-hidden rounded-sm bg-ink/40">
+      <div className="relative aspect-[4/3] overflow-hidden rounded-sm bg-paper/60">
         {currentSrc && !currentFailed ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -71,7 +71,7 @@ function DetailPhotoGallery({ listing }: { listing: AppListing }) {
             }
           />
         ) : (
-          <div className="flex h-full w-full items-center justify-center text-sm text-card/60">
+          <div className="flex h-full w-full items-center justify-center text-sm text-ink-soft">
             <Square className="mr-2 h-8 w-8 opacity-40" strokeWidth={1.25} />
             Photo unavailable
           </div>
@@ -110,7 +110,7 @@ function DetailPhotoGallery({ listing }: { listing: AppListing }) {
               aria-label={`Show photo ${thumbIndex + 1}`}
               onClick={() => setIndex(thumbIndex)}
               className={cn(
-                "relative h-14 w-14 shrink-0 overflow-hidden rounded-sm border-2 bg-ink/30",
+                "relative h-14 w-14 shrink-0 overflow-hidden rounded-sm border-2 bg-paper/80",
                 thumbIndex === safeIndex ? "border-brass" : "border-transparent opacity-70"
               )}
             >
@@ -172,19 +172,19 @@ export function ListingDetailPanel({
   return (
     <aside
       className={cn(
-        "flex h-full max-h-[100dvh] flex-col overflow-hidden bg-ink text-card shadow-xl md:max-h-[calc(100vh-2rem)] md:rounded-sm md:border md:border-line-strong",
+        "flex h-full max-h-[100dvh] flex-col overflow-hidden border border-line-strong bg-card text-ink shadow-sm md:max-h-[calc(100vh-2rem)] md:rounded-sm",
         className
       )}
       aria-label="Listing details"
     >
-      <div className="flex shrink-0 items-center justify-between gap-2 border-b border-card/10 px-4 py-3">
+      <div className="flex shrink-0 items-center justify-between gap-2 border-b border-line px-4 py-3">
         <div className="flex items-center gap-1">
           <Button
             type="button"
             variant="ghost"
             size="sm"
             onClick={onClose}
-            className="h-8 px-2 text-card/80 hover:bg-card/10 hover:text-card"
+            className="h-8 px-2 text-ink-soft hover:bg-paper hover:text-ink"
           >
             <X className="mr-1 h-4 w-4" />
             Close
@@ -193,7 +193,7 @@ export function ListingDetailPanel({
 
         <div className="flex items-center gap-1">
           {positionLabel ? (
-            <span className="font-mono text-xs tabular-nums text-card/60">
+            <span className="font-mono text-xs tabular-nums text-ink-soft">
               {positionLabel}
             </span>
           ) : null}
@@ -204,7 +204,7 @@ export function ListingDetailPanel({
             disabled={!onPrevious}
             onClick={onPrevious}
             aria-label="Previous listing"
-            className="h-8 w-8 text-card/80 hover:bg-card/10 hover:text-card disabled:opacity-30"
+            className="h-8 w-8 text-ink-soft hover:bg-paper hover:text-ink disabled:opacity-30"
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
@@ -215,7 +215,7 @@ export function ListingDetailPanel({
             disabled={!onNext}
             onClick={onNext}
             aria-label="Next listing"
-            className="h-8 w-8 text-card/80 hover:bg-card/10 hover:text-card disabled:opacity-30"
+            className="h-8 w-8 text-ink-soft hover:bg-paper hover:text-ink disabled:opacity-30"
           >
             <ChevronRight className="h-4 w-4" />
           </Button>
@@ -227,29 +227,29 @@ export function ListingDetailPanel({
 
         <div className="mt-4 space-y-3">
           <div>
-            <h2 className="font-display text-xl font-semibold leading-snug text-card">
+            <h2 className="font-display text-xl font-semibold leading-snug text-ink">
               {listing.title}
             </h2>
-            <p className="mt-1.5 text-sm text-card/65">
+            <p className="mt-1.5 text-sm text-ink-soft">
               {listingSourceLabel(listing.source)}
               {metaLine ? ` · ${metaLine}` : ""}
             </p>
           </div>
 
-          <div className="rounded-sm border border-card/10 bg-card/5 px-3 py-3">
-            <p className="font-display text-3xl font-semibold tabular-nums text-card">
+          <div className="rounded-sm border border-line bg-paper/60 px-3 py-3">
+            <p className="font-display text-3xl font-semibold tabular-nums text-ink">
               ${costs.total.toFixed(2)}
             </p>
-            <p className="mt-1 font-mono text-xs text-card/65">
+            <p className="mt-1 font-mono text-xs text-ink-soft">
               ${costs.item.toFixed(2)} + ${costs.shipping.toFixed(2)} shipping
               {!costs.shippingConfirmed && " (est.)"}
             </p>
             <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
-              <span className="rounded-full bg-card/10 px-2 py-0.5 text-card/80">
+              <span className="rounded-full border border-line bg-card px-2 py-0.5 text-ink-soft">
                 {listing.condition}
               </span>
               {matchQuality != null && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-steal/20 px-2 py-0.5 text-card">
+                <span className="inline-flex items-center gap-1 rounded-full border border-line bg-card px-2 py-0.5 text-ink">
                   <span
                     className={cn(
                       "h-1.5 w-1.5 rounded-full",
@@ -263,16 +263,16 @@ export function ListingDetailPanel({
           </div>
 
           {rows.length > 0 && (
-            <dl className="space-y-2.5 border-t border-card/10 pt-4">
+            <dl className="space-y-2.5 border-t border-line pt-4">
               {rows.slice(0, 8).map(({ label, value }) => (
                 <div
                   key={label}
                   className="grid grid-cols-[minmax(0,34%)_1fr] gap-x-3 gap-y-0.5"
                 >
-                  <dt className="font-mono text-[10px] uppercase tracking-wide text-card/50">
+                  <dt className="font-mono text-[10px] uppercase tracking-wide text-ink-soft">
                     {label}
                   </dt>
-                  <dd className="text-sm text-card/90">{value}</dd>
+                  <dd className="text-sm text-ink">{value}</dd>
                 </div>
               ))}
             </dl>
@@ -280,7 +280,7 @@ export function ListingDetailPanel({
 
           <Button
             type="button"
-            className="h-10 w-full rounded-sm bg-card/15 text-card hover:bg-card/25"
+            className="h-10 w-full rounded-sm border border-line-strong bg-paper text-ink hover:bg-paper/80"
             asChild
           >
             <a href={listing.url} target="_blank" rel="noopener noreferrer">
@@ -290,26 +290,26 @@ export function ListingDetailPanel({
           </Button>
 
           <Collapsible defaultOpen>
-            <CollapsibleTrigger className="flex w-full items-center justify-between border-t border-card/10 py-3 text-left">
-              <span className="inline-flex items-center gap-2 font-mono text-[10px] uppercase tracking-wide text-card/60">
+            <CollapsibleTrigger className="flex w-full items-center justify-between border-t border-line py-3 text-left">
+              <span className="inline-flex items-center gap-2 font-mono text-[10px] uppercase tracking-wide text-ink-soft">
                 <FileText className="h-3.5 w-3.5" />
                 Description
               </span>
-              <ChevronDown className="h-4 w-4 text-card/50" />
+              <ChevronDown className="h-4 w-4 text-ink-soft" />
             </CollapsibleTrigger>
             <CollapsibleContent>
-              <p className="pb-4 text-sm leading-relaxed text-card/75 whitespace-pre-wrap break-words">
+              <p className="pb-4 text-sm leading-relaxed text-ink-soft whitespace-pre-wrap break-words">
                 {description}
               </p>
             </CollapsibleContent>
           </Collapsible>
 
           {match?.whyNote && (
-            <div className="border-t border-card/10 pt-4">
+            <div className="border-t border-line pt-4">
               <p className="font-mono text-[10px] uppercase tracking-wide text-brass">
                 Why it surfaced
               </p>
-              <p className="mt-2 border-l-2 border-brass/60 pl-3 text-sm italic leading-relaxed text-card/75">
+              <p className="mt-2 border-l-2 border-brass/60 pl-3 text-sm italic leading-relaxed text-ink-soft">
                 {match.whyNote}
               </p>
             </div>
@@ -318,13 +318,13 @@ export function ListingDetailPanel({
       </div>
 
       {(onToggleInterested || onDismiss) && (
-        <div className="flex shrink-0 gap-2 border-t border-card/10 p-4">
+        <div className="flex shrink-0 gap-2 border-t border-line p-4">
           {onToggleInterested && (
             <Button
               type="button"
               variant="outline"
               className={cn(
-                "h-9 flex-1 border-card/20 bg-transparent text-card hover:bg-card/10",
+                "h-9 flex-1 border-line-strong bg-card text-ink hover:bg-paper",
                 interested && "border-steal/40 text-steal"
               )}
               onClick={onToggleInterested}
@@ -339,7 +339,7 @@ export function ListingDetailPanel({
             <Button
               type="button"
               variant="outline"
-              className="h-9 flex-1 border-card/20 bg-transparent text-card/80 hover:bg-card/10 hover:text-card"
+              className="h-9 flex-1 border-line-strong bg-card text-ink-soft hover:bg-paper hover:text-ink"
               onClick={onDismiss}
             >
               Dismiss
