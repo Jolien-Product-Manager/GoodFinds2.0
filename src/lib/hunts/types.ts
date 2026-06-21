@@ -228,6 +228,16 @@ const VALID_HUNT_GENDERS = new Set<HuntGender>(
   HUNT_GENDER_OPTIONS.map((o) => o.value)
 );
 
+/** Infer gender from hunt name when unambiguous (fixes mis-saved gender chips). */
+export function inferHuntGenderFromName(name: string): HuntGender | null {
+  const n = normalizeCustomValue(name);
+  const hasWomens = /\b(womens|women|womans|ladies|lady)\b/.test(n);
+  const hasMens = /\b(mens|men|gentlemen|gentleman)\b/.test(n);
+  if (hasWomens && !hasMens) return "womens";
+  if (hasMens && !hasWomens) return "mens";
+  return null;
+}
+
 /** Preset + saved custom options for a hunt attribute section. */
 export function attributeChipOptions(
   key: AttrKey,
@@ -356,12 +366,15 @@ export function normalizeHunt(hunt: Partial<Hunt> & Pick<Hunt, "id" | "name">): 
   }
 
   const now = new Date().toISOString();
+  const genderFromName = inferHuntGenderFromName(hunt.name);
+  const gender =
+    genderFromName ??
+    (hunt.gender && VALID_HUNT_GENDERS.has(hunt.gender) ? hunt.gender : "both");
   return {
     id: hunt.id,
     name: hunt.name,
     saved: hunt.saved ?? false,
-    gender:
-      hunt.gender && VALID_HUNT_GENDERS.has(hunt.gender) ? hunt.gender : "both",
+    gender,
     hearts: resolveHuntHearts(hunt),
     attributes: merged,
     createdAt: hunt.createdAt ?? now,

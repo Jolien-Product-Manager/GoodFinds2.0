@@ -356,6 +356,16 @@ export function HuntBuilderScreen() {
                               >
                                 {tightnessForHunt.label}
                               </Badge>
+                              <Badge
+                                variant="outline"
+                                className="h-5 px-1.5 text-[10px] font-normal text-ink-soft"
+                              >
+                                {
+                                  HUNT_GENDER_OPTIONS.find(
+                                    (o) => o.value === (hunt.gender ?? "both")
+                                  )?.label
+                                }
+                              </Badge>
                             </div>
                             <p className="mt-0.5 truncate text-xs italic leading-snug text-ink-soft">
                               {buildHuntSummary(hunt)}

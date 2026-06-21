@@ -86,20 +86,6 @@ function attributeTagLabel(match: AttributeMatch, listing: AppListing): string {
   return short ?? full;
 }
 
-function matchQualityLabel(match: HuntMatchResult): string {
-  const top = match.huntContributions[0];
-  if (!top) return "";
-  if (
-    top.categoriesPassed === top.totalCategories &&
-    top.totalCategories > 0 &&
-    top.hearts >= 3
-  ) {
-    return "Good match";
-  }
-  if (match.score > 0) return "Match";
-  return "";
-}
-
 function ListingPhotoCarousel({
   listing,
 }: {
@@ -240,7 +226,7 @@ export function AlertListingCard({
 }: AlertListingCardProps) {
   const costs = getTotalCost(listing, DEFAULT_CRITERIA.postalCode);
   const conditionLabel = listing.condition;
-  const matchLabel = match && match.score > 0 ? matchQualityLabel(match) : "";
+  const matchScore = match && match.score > 0 ? match.score : null;
   const attributeMatches = match?.attributeMatches ?? [];
   const visibleAttributes = attributeMatches.filter(
     (m) => m.status === "hit" || m.status === "miss"
@@ -263,16 +249,16 @@ export function AlertListingCard({
           {listing.source}
         </span>
 
-        {matchLabel && (
-          <span className="absolute right-3 top-3 inline-flex items-center gap-1.5 rounded-full border border-line bg-card/95 px-2.5 py-1 text-[11px] font-medium text-ink shadow-sm">
+        {matchScore != null && (
+          <span className="absolute right-3 top-3 inline-flex items-center gap-1.5 rounded-full border border-line bg-card/95 px-2.5 py-1 text-[11px] font-medium tabular-nums text-ink shadow-sm">
             <span className="h-2 w-2 rounded-full bg-brass" />
-            {matchLabel}
+            Match Score: {(matchScore * 10).toFixed(1)}
           </span>
         )}
       </div>
 
       <div className={cn("flex flex-1 flex-col", compact ? "gap-2.5 p-3" : "gap-3 p-4")}>
-        <div>
+        <div className="border-b border-line pb-2">
           <h3
             className={cn(
               "font-display font-semibold leading-snug text-ink",
@@ -285,24 +271,6 @@ export function AlertListingCard({
             <p className={cn("mt-1 text-ink-soft", compact ? "text-xs" : "text-sm")}>
               {metaLine}
             </p>
-          )}
-          {(match?.huntContributions.length ?? 0) > 0 && (
-            <div
-              className={cn(
-                "mt-2 space-y-0.5 border-t border-line pt-2",
-                compact ? "text-[11px]" : "text-xs"
-              )}
-            >
-              {match!.huntContributions.map((contribution) => (
-                <p key={contribution.huntId} className="leading-snug text-ink-soft">
-                  <span className="font-medium text-ink">{contribution.huntName}</span>
-                  {" · "}
-                  {contribution.matchedOn.length > 0
-                    ? contribution.matchedOn.join(", ")
-                    : `${contribution.categoriesPassed}/${contribution.totalCategories} categories`}
-                </p>
-              ))}
-            </div>
           )}
         </div>
 
@@ -324,11 +292,20 @@ export function AlertListingCard({
             ${costs.item.toFixed(2)} + ${costs.shipping.toFixed(2)} shipping
             {!costs.shippingConfirmed && " (est.)"}
           </p>
+        </div>
+
+        <div className="flex items-center justify-between gap-2">
+          <div className={cn("flex items-center gap-2", compact ? "text-xs" : "text-sm")}>
+            <span className="text-ink-soft">Condition</span>
+            <span className="rounded-full bg-brass/12 px-2 py-0.5 text-[10px] font-medium text-ink">
+              {conditionLabel}
+            </span>
+          </div>
           <Button
             type="button"
             size="sm"
             className={cn(
-              "mt-2 h-8 rounded-md bg-ink px-3 text-xs text-card hover:bg-ink/90",
+              "h-8 shrink-0 rounded-md bg-ink px-3 text-xs text-card hover:bg-ink/90",
               compact ? "text-xs" : "text-sm"
             )}
             asChild
@@ -340,13 +317,6 @@ export function AlertListingCard({
           </Button>
         </div>
 
-        <div className={cn("flex items-center gap-2", compact ? "text-xs" : "text-sm")}>
-          <span className="text-ink-soft">Condition</span>
-          <span className="rounded-full bg-brass/12 px-2 py-0.5 text-[10px] font-medium text-ink">
-            {conditionLabel}
-          </span>
-        </div>
-
         {showAttributeRow && (
           <div className="flex flex-wrap justify-end gap-1">
             {visibleAttributes.map((m) => (
@@ -355,58 +325,84 @@ export function AlertListingCard({
           </div>
         )}
 
-        {(onToggleInterested || onDismiss || onRestore) && (
-          <div className="mt-auto flex items-center gap-1.5 border-t border-line pt-2">
-            {onToggleInterested && (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={onToggleInterested}
-                aria-label={interested ? "Unsave listing" : "Save listing"}
-                aria-pressed={interested}
+        {((match?.huntContributions.length ?? 0) > 0 ||
+          onToggleInterested ||
+          onDismiss ||
+          onRestore) && (
+          <div className="mt-auto space-y-2 border-t border-line pt-2">
+            {(match?.huntContributions.length ?? 0) > 0 && (
+              <div
                 className={cn(
-                  "h-8 flex-1 rounded-md border-line-strong bg-card px-2.5 text-xs hover:bg-paper",
-                  interested
-                    ? "text-steal hover:text-steal"
-                    : "text-brass hover:text-steal/85"
+                  "space-y-0.5",
+                  compact ? "text-[11px]" : "text-xs"
                 )}
               >
-                <Sparkles
-                  className={cn(
-                    "h-3.5 w-3.5 shrink-0",
-                    interested && "fill-steal/20"
-                  )}
-                  strokeWidth={interested ? 2.25 : 1.75}
-                />
-                {interested ? "Unsave" : "Save"}
-              </Button>
+                {match!.huntContributions.map((contribution) => (
+                  <p key={contribution.huntId} className="leading-snug text-ink-soft">
+                    <span className="font-medium text-ink">{contribution.huntName}</span>
+                    {" · "}
+                    {contribution.matchedOn.length > 0
+                      ? contribution.matchedOn.join(", ")
+                      : `${contribution.categoriesPassed}/${contribution.totalCategories} categories`}
+                  </p>
+                ))}
+              </div>
             )}
-            {onDismiss && (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-8 flex-1 rounded-md border-line-strong bg-card px-2.5 text-xs text-ink-soft hover:bg-paper hover:text-ink"
-                onClick={onDismiss}
-                aria-label="Dismiss listing"
-              >
-                <X className="h-3.5 w-3.5" />
-                Dismiss
-              </Button>
-            )}
-            {onRestore && (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-8 flex-1 rounded-md border-line-strong bg-card px-2.5 text-xs text-ink hover:bg-paper"
-                onClick={onRestore}
-                aria-label="Restore listing"
-              >
-                <Check className="h-3.5 w-3.5" />
-                Restore
-              </Button>
+
+            {(onToggleInterested || onDismiss || onRestore) && (
+              <div className="flex items-center gap-1.5">
+                {onToggleInterested && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={onToggleInterested}
+                    aria-label={interested ? "Unsave listing" : "Save listing"}
+                    aria-pressed={interested}
+                    className={cn(
+                      "h-8 flex-1 rounded-md border-line-strong bg-card px-2.5 text-xs hover:bg-paper",
+                      interested
+                        ? "text-steal hover:text-steal"
+                        : "text-brass hover:text-steal/85"
+                    )}
+                  >
+                    <Sparkles
+                      className={cn(
+                        "h-3.5 w-3.5 shrink-0",
+                        interested && "fill-steal/20"
+                      )}
+                      strokeWidth={interested ? 2.25 : 1.75}
+                    />
+                    {interested ? "Unsave" : "Save"}
+                  </Button>
+                )}
+                {onDismiss && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8 flex-1 rounded-md border-line-strong bg-card px-2.5 text-xs text-ink-soft hover:bg-paper hover:text-ink"
+                    onClick={onDismiss}
+                    aria-label="Dismiss listing"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                    Dismiss
+                  </Button>
+                )}
+                {onRestore && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8 flex-1 rounded-md border-line-strong bg-card px-2.5 text-xs text-ink hover:bg-paper"
+                    onClick={onRestore}
+                    aria-label="Restore listing"
+                  >
+                    <Check className="h-3.5 w-3.5" />
+                    Restore
+                  </Button>
+                )}
+              </div>
             )}
           </div>
         )}

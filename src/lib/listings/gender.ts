@@ -164,7 +164,7 @@ export function listingMatchesHuntGender(
   if (huntGender === "womens") {
     if (mensHint && !womensHint) return false;
     if (childrensHint && !womensHint) return false;
-    return true;
+    return womensHint;
   }
 
   return true;
