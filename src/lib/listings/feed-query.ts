@@ -1,4 +1,4 @@
-import type { AppListing, AlertScope } from "@/lib/listings/types";
+import type { AppListing } from "@/lib/listings/types";
 import {
   huntHasActiveCriteria,
   matchAllHunts,
@@ -25,6 +25,7 @@ import {
   unseenListings,
   withFilterSets,
 } from "@/lib/listings/selectors";
+import { matchQualityFromResult } from "@/lib/listings/hunt-match";
 import type { Hunt } from "@/lib/hunts/types";
 import { withInferredHuntCriteria } from "@/lib/hunts/domain-terms";
 import { normalizeHunt } from "@/lib/hunts/types";
@@ -84,6 +85,8 @@ function buildFilterContext(body: FeedQueryBody) {
     criteria: normalizeFeedCriteria(body.criteria),
     marketplaceFilter: body.marketplaceFilter,
     feedAttributeFilters: body.feedAttributeFilters,
+    selectedHuntIds: body.selectedHuntIds ?? [],
+    selectedMatchQualities: body.selectedMatchQualities ?? [],
     hunts,
   };
   return withFilterSets(base);
@@ -114,7 +117,7 @@ function displayListingsForView(
   }
 
   return alertSort(
-    alertListings(listings, body.alertScope, ctxWithMatches, {
+    alertListings(listings, ctxWithMatches, {
       mode: listingMode(body.feedView),
     }),
     ctxWithMatches,
@@ -196,6 +199,32 @@ async function getFeedSnapshot(body: FeedQueryBody): Promise<FeedSnapshot> {
   return pending;
 }
 
+function buildMatchQualityCounts(
+  listings: AppListing[],
+  body: FeedQueryBody,
+  ctx: ReturnType<typeof buildFilterContext>,
+  matchResults: Map<string, HuntMatchResult>
+): FeedCountsResponse["matchQuality"] {
+  const ctxWithMatches = {
+    ...ctx,
+    matchResults,
+    selectedHuntIds: body.selectedHuntIds ?? [],
+    selectedMatchQualities: [],
+  };
+  const base = alertListings(listings, ctxWithMatches, {
+    mode: listingMode(body.feedView),
+  });
+
+  const counts = { perfect: 0, close: 0, loose: 0 };
+  for (const listing of base) {
+    const level = matchQualityFromResult(matchResults.get(listing.id)!)?.level;
+    if (level === "perfect") counts.perfect += 1;
+    else if (level === "close") counts.close += 1;
+    else if (level === "loose") counts.loose += 1;
+  }
+  return counts;
+}
+
 function buildFeedCounts(
   body: FeedQueryBody,
   snapshot: FeedSnapshot
@@ -210,8 +239,11 @@ function buildFeedCounts(
   for (const hunt of activeHunts) {
     perHunt[hunt.id] = alertListings(
       listings,
-      `hunt:${hunt.id}` as AlertScope,
-      ctxWithMatches
+      {
+        ...ctxWithMatches,
+        selectedHuntIds: [hunt.id],
+        selectedMatchQualities: [],
+      }
     ).length;
   }
 
@@ -223,8 +255,13 @@ function buildFeedCounts(
     new: unseenListings(listings, ctx).length,
     starred: interestedListings(listings, ctx).length,
     dismissed: dismissedListings(listings, ctx).length,
-    huntMatches: alertListings(listings, "watchlist", ctxWithMatches).length,
+    huntMatches: alertListings(listings, {
+      ...ctxWithMatches,
+      selectedHuntIds: activeHunts.map((hunt) => hunt.id),
+      selectedMatchQualities: [],
+    }).length,
     perHunt,
+    matchQuality: buildMatchQualityCounts(listings, body, ctx, matchResults),
     marketplace: {
       all: unseenForMarketplace.length,
       ebay: unseenForMarketplace.filter((listing) => listing.source === "ebay")

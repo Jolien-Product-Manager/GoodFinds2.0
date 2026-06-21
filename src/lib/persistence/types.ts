@@ -1,8 +1,8 @@
 import type {
   CriteriaSettings,
   ListingStatus,
-  AlertScope,
   MarketplaceFilter,
+  MatchQualityLevel,
 } from "@/lib/listings/types";
 import type { Hunt, GlobalFilters, PurchasedWatch, AttrKey, HuntAttribute } from "@/lib/hunts/types";
 import { emptyHuntAttributes } from "@/lib/hunts/types";
@@ -15,7 +15,8 @@ export interface PersistedState {
   seen: string[];
   dismissed: string[];
   listingStatus: Record<string, ListingStatus>;
-  alertScope: AlertScope;
+  selectedHuntIds: string[];
+  selectedMatchQualities: MatchQualityLevel[];
   marketplaceFilter: MarketplaceFilter;
   feedView: FeedView;
   hiddenListings: string[];
@@ -34,7 +35,8 @@ export const DEFAULT_PERSISTED_STATE: PersistedState = {
   seen: [],
   dismissed: [],
   listingStatus: {},
-  alertScope: "all",
+  selectedHuntIds: [],
+  selectedMatchQualities: [],
   marketplaceFilter: "all",
   feedView: "new",
   hiddenListings: [],

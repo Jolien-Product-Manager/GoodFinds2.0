@@ -13,9 +13,11 @@ import type {
   FeedItem,
   FeedQueryBody,
 } from "@/lib/listings/feed-api";
-import type { AppListing, AlertScope, MarketplaceFilter } from "@/lib/listings/types";
+import type { AppListing, MarketplaceFilter, MatchQualityLevel } from "@/lib/listings/types";
+import { hasHuntFindsFilters } from "@/lib/listings/hunt-finds-filter";
 import type { HuntMatchResult } from "@/lib/listings/hunt-match";
 import { huntHasActiveCriteria } from "@/lib/listings/hunt-match";
+import { hasCustomGlobalFilters } from "@/components/feed-global-filters";
 import { hasActiveFeedAttributeFilters } from "@/lib/listings/feed-attribute-filter";
 import { useCasebackStore, type FeedView } from "@/store/caseback";
 import {
@@ -35,27 +37,50 @@ const EMPTY_COUNTS: FeedCountsResponse = {
   dismissed: 0,
   huntMatches: 0,
   perHunt: {},
+  matchQuality: { perfect: 0, close: 0, loose: 0 },
   marketplace: { all: 0, ebay: 0, chrono24: 0, etsy: 0 },
 };
 
 function feedContextSuffix(
   feedView: FeedView,
-  alertScope: AlertScope,
+  selectedHuntIds: string[],
+  selectedMatchQualities: MatchQualityLevel[],
   marketplaceFilter: MarketplaceFilter,
   activeHunts: { id: string; name: string }[],
   newCount?: number
 ): string {
+  const huntLabel = (() => {
+    if (selectedHuntIds.length === 0) return null;
+    if (
+      activeHunts.length > 0 &&
+      selectedHuntIds.length === activeHunts.length
+    ) {
+      return "matching any of your hunts";
+    }
+    const names = selectedHuntIds
+      .map((id) => activeHunts.find((h) => h.id === id)?.name)
+      .filter((name): name is string => Boolean(name));
+    if (names.length === 1) return `matching ${names[0]}`;
+    if (names.length > 0) return `matching ${names.length} hunts`;
+    return "matching selected hunts";
+  })();
+
+  const qualityLabel = (() => {
+    if (selectedMatchQualities.length === 0) return null;
+    const labels = selectedMatchQualities.map((quality) => {
+      if (quality === "perfect") return "perfect";
+      if (quality === "close") return "good";
+      return "loose";
+    });
+    return `· ${labels.join(" + ")} finds`;
+  })();
+
+  const filterSuffix = [huntLabel, qualityLabel].filter(Boolean).join(" ");
+
   if (feedView === "starred") return "saved";
   if (feedView === "dismissed") return "dismissed";
   if (feedView === "all") {
-    let suffix = "all listings";
-    if (alertScope.startsWith("hunt:")) {
-      const huntId = alertScope.slice(5);
-      const hunt = activeHunts.find((h) => h.id === huntId);
-      suffix = `all · matching ${hunt?.name ?? "this hunt"}`;
-    } else if (alertScope === "watchlist") {
-      suffix = "all · matching any of your hunts";
-    }
+    let suffix = filterSuffix ? `all listings · ${filterSuffix}` : "all listings";
     if (marketplaceFilter === "ebay") suffix += " · eBay";
     else if (marketplaceFilter === "chrono24") suffix += " · Chrono24";
     else if (marketplaceFilter === "etsy") suffix += " · Etsy";
@@ -66,13 +91,7 @@ function feedContextSuffix(
     newCount != null && newCount > 0
       ? `listings · ${newCount.toLocaleString()} new`
       : "listings";
-  if (alertScope.startsWith("hunt:")) {
-    const huntId = alertScope.slice(5);
-    const hunt = activeHunts.find((h) => h.id === huntId);
-    suffix = `${suffix} · matching ${hunt?.name ?? "this hunt"}`;
-  } else if (alertScope === "watchlist") {
-    suffix = `${suffix} · matching any of your hunts`;
-  }
+  if (filterSuffix) suffix += ` · ${filterSuffix}`;
 
   if (marketplaceFilter === "ebay") suffix += " · eBay";
   else if (marketplaceFilter === "chrono24") suffix += " · Chrono24";
@@ -146,7 +165,8 @@ export function FeedView({ ebayEnabled }: FeedViewProps) {
   const seen = useCasebackStore((s) => s.seen);
   const dismissed = useCasebackStore((s) => s.dismissed);
   const listingStatus = useCasebackStore((s) => s.listingStatus);
-  const alertScope = useCasebackStore((s) => s.alertScope);
+  const selectedHuntIds = useCasebackStore((s) => s.selectedHuntIds);
+  const selectedMatchQualities = useCasebackStore((s) => s.selectedMatchQualities);
   const marketplaceFilter = useCasebackStore((s) => s.marketplaceFilter);
   const feedView = useCasebackStore((s) => s.feedView);
   const criteria = useCasebackStore((s) => s.criteria);
@@ -164,7 +184,10 @@ export function FeedView({ ebayEnabled }: FeedViewProps) {
   const markListingSeen = useCasebackStore((s) => s.markListingSeen);
   const restoreAll = useCasebackStore((s) => s.restoreAll);
   const toggleInterested = useCasebackStore((s) => s.toggleInterested);
-  const setAlertScope = useCasebackStore((s) => s.setAlertScope);
+  const toggleSelectedHunt = useCasebackStore((s) => s.toggleSelectedHunt);
+  const toggleAllSelectedHunts = useCasebackStore((s) => s.toggleAllSelectedHunts);
+  const toggleSelectedMatchQuality = useCasebackStore((s) => s.toggleSelectedMatchQuality);
+  const clearHuntFindsFilters = useCasebackStore((s) => s.clearHuntFindsFilters);
   const setMarketplaceFilter = useCasebackStore((s) => s.setMarketplaceFilter);
   const setFeedView = useCasebackStore((s) => s.setFeedView);
   const toggleFeedAttributeFilter = useCasebackStore((s) => s.toggleFeedAttributeFilter);
@@ -195,7 +218,8 @@ export function FeedView({ ebayEnabled }: FeedViewProps) {
   const feedQueryBody = useMemo<FeedQueryBody>(
     () => ({
       feedView,
-      alertScope,
+      selectedHuntIds,
+      selectedMatchQualities,
       marketplaceFilter,
       seen,
       dismissed,
@@ -208,7 +232,8 @@ export function FeedView({ ebayEnabled }: FeedViewProps) {
     }),
     [
       feedView,
-      alertScope,
+      selectedHuntIds,
+      selectedMatchQualities,
       marketplaceFilter,
       seen,
       dismissed,
@@ -228,7 +253,8 @@ export function FeedView({ ebayEnabled }: FeedViewProps) {
     () =>
       JSON.stringify({
         feedView,
-        alertScope,
+        selectedHuntIds,
+        selectedMatchQualities,
         marketplaceFilter,
         hiddenListings,
         dislikedModels,
@@ -240,7 +266,8 @@ export function FeedView({ ebayEnabled }: FeedViewProps) {
       }),
     [
       feedView,
-      alertScope,
+      selectedHuntIds,
+      selectedMatchQualities,
       marketplaceFilter,
       hiddenListings,
       dislikedModels,
@@ -261,10 +288,33 @@ export function FeedView({ ebayEnabled }: FeedViewProps) {
 
   const showAllListings = useCallback(() => {
     setFeedView("new");
-    setAlertScope("all");
+    clearHuntFindsFilters();
     setMarketplaceFilter("all");
     clearFeedAttributeFilters();
-  }, [clearFeedAttributeFilters, setAlertScope, setFeedView, setMarketplaceFilter]);
+    resetGlobalFiltersToSaved();
+  }, [
+    clearFeedAttributeFilters,
+    clearHuntFindsFilters,
+    resetGlobalFiltersToSaved,
+    setFeedView,
+    setMarketplaceFilter,
+  ]);
+
+  const hasActiveFilters = useMemo(
+    () =>
+      hasHuntFindsFilters(selectedHuntIds, selectedMatchQualities) ||
+      marketplaceFilter !== "all" ||
+      hasActiveFeedAttributeFilters(feedAttributeFilters) ||
+      hasCustomGlobalFilters(globalFilters, savedGlobalFilters),
+    [
+      selectedHuntIds,
+      selectedMatchQualities,
+      marketplaceFilter,
+      feedAttributeFilters,
+      globalFilters,
+      savedGlobalFilters,
+    ]
+  );
 
   const reloadFeed = useCallback(async (options?: { refresh?: boolean }) => {
     const generation = ++fetchGeneration.current;
@@ -597,8 +647,6 @@ export function FeedView({ ebayEnabled }: FeedViewProps) {
       const ids = await postFeedIds({
         ...feedQueryBody,
         feedView: "new",
-        alertScope,
-        marketplaceFilter,
         unseenOnly: true,
       });
       if (ids.length === 0) return;
@@ -625,11 +673,9 @@ export function FeedView({ ebayEnabled }: FeedViewProps) {
       toast.error("Couldn't dismiss all listings");
     }
   }, [
-    alertScope,
     dismissAllUnseen,
     feedItems,
     feedQueryBody,
-    marketplaceFilter,
     nextCursor,
     restoreAll,
     total,
@@ -667,7 +713,7 @@ export function FeedView({ ebayEnabled }: FeedViewProps) {
       return { title: "Nothing dismissed", hint: "Listings you dismiss will appear here." };
     }
 
-    if (alertScope.startsWith("hunt:")) {
+    if (selectedHuntIds.length === 1) {
       return {
         title: "No matches for this hunt",
         hint:
@@ -677,7 +723,7 @@ export function FeedView({ ebayEnabled }: FeedViewProps) {
       };
     }
 
-    if (alertScope === "watchlist") {
+    if (selectedHuntIds.length > 0 || selectedMatchQualities.length > 0) {
       let hint =
         activeHunts.length === 0
           ? "Save a hunt on Hunts to populate Hunt Finds."
@@ -709,7 +755,8 @@ export function FeedView({ ebayEnabled }: FeedViewProps) {
     feedLoadError,
     counts.all,
     feedView,
-    alertScope,
+    selectedHuntIds,
+    selectedMatchQualities,
     activeHunts.length,
     feedAttributeFilters,
     womensOnlyHunts,
@@ -717,7 +764,8 @@ export function FeedView({ ebayEnabled }: FeedViewProps) {
 
   const contextSuffix = feedContextSuffix(
     feedView,
-    alertScope,
+    selectedHuntIds,
+    selectedMatchQualities,
     marketplaceFilter,
     activeHunts,
     counts.new
@@ -755,7 +803,8 @@ export function FeedView({ ebayEnabled }: FeedViewProps) {
           {!showDetailPanel && (
             <FeedSidebar
               feedView={feedView}
-              alertScope={alertScope}
+              selectedHuntIds={selectedHuntIds}
+              selectedMatchQualities={selectedMatchQualities}
               marketplaceFilter={marketplaceFilter}
               feedAttributeFilters={feedAttributeFilters}
               globalFilters={globalFilters}
@@ -763,7 +812,7 @@ export function FeedView({ ebayEnabled }: FeedViewProps) {
               attributeLibrary={attributeLibrary}
               counts={counts}
               onFeedViewChange={setFeedView}
-              onScopeChange={setAlertScope}
+              onClearHuntFindsFilters={clearHuntFindsFilters}
               onMarketplaceChange={setMarketplaceFilter}
               onToggleFeedAttributeFilter={toggleFeedAttributeFilter}
               onAddFeedAttributeFilter={handleAddFeedAttributeFilter}
@@ -783,21 +832,27 @@ export function FeedView({ ebayEnabled }: FeedViewProps) {
             {(feedView === "new" || feedView === "all") && (
               <HuntQuickFilter
                 activeHunts={activeHunts}
-                alertScope={alertScope}
+                selectedHuntIds={selectedHuntIds}
+                selectedMatchQualities={selectedMatchQualities}
                 counts={counts}
-                onScopeChange={setAlertScope}
+                onToggleAllHunts={() =>
+                  toggleAllSelectedHunts(activeHunts.map((hunt) => hunt.id))
+                }
+                onToggleHunt={toggleSelectedHunt}
+                onToggleMatchQuality={toggleSelectedMatchQuality}
+                onClearFilters={clearHuntFindsFilters}
               />
             )}
 
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="font-mono-data text-sm text-ink-soft">
+          <div className="flex items-center justify-between gap-3">
+            <p className="min-w-0 flex-1 font-mono-data text-sm text-ink-soft">
               <span className="mr-1.5 inline-block rounded-sm bg-paper px-1.5 py-0.5 font-medium text-ink">
                 {total.toLocaleString()}
               </span>
               {contextSuffix}
               {total === 0 &&
                 counts.all > 0 &&
-                alertScope !== "all" &&
+                hasHuntFindsFilters(selectedHuntIds, selectedMatchQualities) &&
                 (feedView === "new" || feedView === "all") && (
                   <span className="text-ink-soft">
                     {" "}
@@ -805,16 +860,30 @@ export function FeedView({ ebayEnabled }: FeedViewProps) {
                   </span>
                 )}
             </p>
-            {feedView === "new" && counts.new > 0 && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => void handleDismissAll()}
-                className="shrink-0 text-ink-soft hover:text-ink"
-              >
-                Dismiss all
-              </Button>
-            )}
+            <div className="flex shrink-0 items-center gap-2">
+              {feedView === "new" && counts.new > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => void handleDismissAll()}
+                  className="shrink-0 text-ink-soft hover:text-ink"
+                >
+                  Dismiss all
+                </Button>
+              )}
+              {(feedView === "new" || feedView === "all") && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={showAllListings}
+                  disabled={!hasActiveFilters}
+                  className="shrink-0 text-ink-soft hover:text-ink disabled:pointer-events-none disabled:opacity-40"
+                >
+                  Clear all filters
+                </Button>
+              )}
+            </div>
           </div>
 
           {loading ? (
@@ -825,7 +894,8 @@ export function FeedView({ ebayEnabled }: FeedViewProps) {
             <div className="rounded-sm border border-dashed border-line-strong bg-card/50 p-12 text-center">
               <p className="font-display text-lg text-ink">{emptyMessage.title}</p>
               <p className="mt-2 text-sm text-ink-soft">{emptyMessage.hint}</p>
-              {counts.all > 0 && alertScope !== "all" && (
+              {counts.all > 0 &&
+                hasHuntFindsFilters(selectedHuntIds, selectedMatchQualities) && (
                 <div className="mt-5 flex flex-wrap justify-center gap-2">
                   <Button type="button" onClick={showAllListings}>
                     Show all listings

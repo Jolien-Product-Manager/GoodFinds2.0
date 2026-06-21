@@ -12,9 +12,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
-  if (!body?.feedView || !body?.alertScope || !body?.marketplaceFilter) {
+  if (!body?.feedView || !body?.marketplaceFilter) {
     return NextResponse.json({ error: "Missing feed filters" }, { status: 400 });
   }
+
+  body.selectedHuntIds = body.selectedHuntIds ?? [];
+  body.selectedMatchQualities = body.selectedMatchQualities ?? [];
 
   try {
     const ids = await queryFeedIds(body);

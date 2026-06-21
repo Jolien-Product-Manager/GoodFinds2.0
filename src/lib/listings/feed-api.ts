@@ -1,9 +1,9 @@
 import type { FeedView } from "@/store/caseback";
 import type {
-  AlertScope,
   CriteriaSettings,
   ListingStatus,
   MarketplaceFilter,
+  MatchQualityLevel,
   AppListing,
 } from "@/lib/listings/types";
 import type { Hunt, HuntAttribute, AttrKey } from "@/lib/hunts/types";
@@ -16,7 +16,8 @@ export interface FeedQueryBody {
   cursor?: number;
   limit?: number;
   feedView: FeedView;
-  alertScope: AlertScope;
+  selectedHuntIds: string[];
+  selectedMatchQualities: MatchQualityLevel[];
   marketplaceFilter: MarketplaceFilter;
   seen: string[];
   dismissed: string[];
@@ -48,6 +49,11 @@ export interface FeedCountsResponse {
   dismissed: number;
   huntMatches: number;
   perHunt: Record<string, number>;
+  matchQuality: {
+    perfect: number;
+    close: number;
+    loose: number;
+  };
   marketplace: {
     all: number;
     ebay: number;

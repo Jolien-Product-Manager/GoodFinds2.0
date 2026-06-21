@@ -296,9 +296,11 @@ export function HuntBuilderScreen() {
     (id: string) => {
       setHunts(useCasebackStore.getState().hunts.filter((h) => h.id !== id));
 
-      const alertScope = useCasebackStore.getState().alertScope;
-      if (alertScope === `hunt:${id}`) {
-        useCasebackStore.getState().setAlertScope("all");
+      const selectedHuntIds = useCasebackStore.getState().selectedHuntIds;
+      if (selectedHuntIds.includes(id)) {
+        useCasebackStore.setState({
+          selectedHuntIds: selectedHuntIds.filter((huntId) => huntId !== id),
+        });
       }
 
       if (editingId === id) {

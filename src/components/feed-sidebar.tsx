@@ -19,7 +19,8 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { hasActiveFeedAttributeFilters } from "@/lib/listings/feed-attribute-filter";
-import type { AlertScope, MarketplaceFilter } from "@/lib/listings/types";
+import type { MarketplaceFilter, MatchQualityLevel } from "@/lib/listings/types";
+import { hasHuntFindsFilters } from "@/lib/listings/hunt-finds-filter";
 import type { AttrKey, GlobalFilters, HuntAttribute } from "@/lib/hunts/types";
 import type { AttributeLibrary } from "@/lib/persistence/types";
 import type { FeedView } from "@/store/caseback";
@@ -27,7 +28,8 @@ import { cn } from "@/lib/utils";
 
 interface FeedSidebarProps {
   feedView: FeedView;
-  alertScope: AlertScope;
+  selectedHuntIds: string[];
+  selectedMatchQualities: MatchQualityLevel[];
   marketplaceFilter: MarketplaceFilter;
   feedAttributeFilters: Record<AttrKey, HuntAttribute>;
   globalFilters: GlobalFilters;
@@ -48,7 +50,7 @@ interface FeedSidebarProps {
     };
   };
   onFeedViewChange: (view: FeedView) => void;
-  onScopeChange: (scope: AlertScope) => void;
+  onClearHuntFindsFilters: () => void;
   onMarketplaceChange: (filter: MarketplaceFilter) => void;
   onToggleFeedAttributeFilter: (key: AttrKey, value: string) => void;
   onAddFeedAttributeFilter: (key: AttrKey, value: string) => void;
@@ -60,7 +62,8 @@ interface FeedSidebarProps {
 
 export function FeedSidebar({
   feedView,
-  alertScope,
+  selectedHuntIds,
+  selectedMatchQualities,
   marketplaceFilter,
   feedAttributeFilters,
   globalFilters,
@@ -68,7 +71,7 @@ export function FeedSidebar({
   attributeLibrary,
   counts,
   onFeedViewChange,
-  onScopeChange,
+  onClearHuntFindsFilters,
   onMarketplaceChange,
   onToggleFeedAttributeFilter,
   onAddFeedAttributeFilter,
@@ -105,7 +108,8 @@ export function FeedSidebar({
     };
   }, [
     feedView,
-    alertScope,
+    selectedHuntIds,
+    selectedMatchQualities,
     marketplaceFilter,
     feedAttributeFilters,
     globalFilters,
@@ -114,14 +118,14 @@ export function FeedSidebar({
   const hasAttributeFilters = hasActiveFeedAttributeFilters(feedAttributeFilters);
   const hasCustomGlobal = hasCustomGlobalFilters(globalFilters, savedGlobalFilters);
   const hasActiveFilter =
-    alertScope !== "all" ||
+    hasHuntFindsFilters(selectedHuntIds, selectedMatchQualities) ||
     marketplaceFilter !== "all" ||
     hasAttributeFilters ||
     hasCustomGlobal;
 
-  const selectNewWithScope = (scope: AlertScope) => {
+  const selectNewListings = () => {
     onFeedViewChange("new");
-    onScopeChange(scope);
+    onClearHuntFindsFilters();
   };
 
   const toggleMarketplace = (filter: MarketplaceFilter) => {
@@ -132,7 +136,7 @@ export function FeedSidebar({
   };
 
   const clearFilters = () => {
-    selectNewWithScope("all");
+    selectNewListings();
     onMarketplaceChange("all");
     onClearFeedAttributeFilters();
     onResetGlobalFilters();
@@ -171,7 +175,7 @@ export function FeedSidebar({
             feedView !== "new" ? (
               <button
                 type="button"
-                onClick={() => selectNewWithScope("all")}
+                onClick={() => selectNewListings()}
                 className="text-xs text-brass underline-offset-2 hover:underline"
               >
                 Clear
@@ -184,7 +188,7 @@ export function FeedSidebar({
             count={counts.all}
             onClick={() => {
               onFeedViewChange("all");
-              onScopeChange("all");
+              onClearHuntFindsFilters();
             }}
           >
             All listings
@@ -192,7 +196,7 @@ export function FeedSidebar({
           <FilterTableRow
             selected={feedView === "new"}
             count={counts.new}
-            onClick={() => selectNewWithScope("all")}
+            onClick={() => selectNewListings()}
           >
             New listings
           </FilterTableRow>

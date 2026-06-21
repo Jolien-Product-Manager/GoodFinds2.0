@@ -1,11 +1,12 @@
 import { DEFAULT_CRITERIA } from "@/lib/criteria";
 import { DEFAULT_ALLOWED_CONDITIONS, normalizeAllowedConditions } from "@/lib/listings/condition-filter";
 import type {
-  AlertScope,
   CriteriaSettings,
   ListingStatus,
   MarketplaceFilter,
+  MatchQualityLevel,
 } from "@/lib/listings/types";
+import { toggleArrayValue, migrateSelectedHuntIds, migrateSelectedMatchQualities } from "@/lib/listings/hunt-finds-filter";
 import { migrateAttributeLibrary } from "@/lib/hunts/migrate-attributes";
 import { withInferredHuntCriteria } from "@/lib/hunts/domain-terms";
 import {
@@ -63,7 +64,8 @@ interface CasebackState {
   seen: string[];
   dismissed: string[];
   listingStatus: Record<string, ListingStatus>;
-  alertScope: AlertScope;
+  selectedHuntIds: string[];
+  selectedMatchQualities: MatchQualityLevel[];
   marketplaceFilter: MarketplaceFilter;
   feedView: FeedView;
   hiddenListings: string[];
@@ -82,7 +84,11 @@ interface CasebackState {
   toggleInterested: (id: string) => void;
   dismissAllUnseen: (ids: string[]) => void;
   restoreAll: (ids: string[]) => void;
-  setAlertScope: (scope: AlertScope) => void;
+  setSelectedHuntIds: (ids: string[]) => void;
+  toggleSelectedHunt: (huntId: string) => void;
+  toggleAllSelectedHunts: (activeHuntIds: string[]) => void;
+  toggleSelectedMatchQuality: (quality: MatchQualityLevel) => void;
+  clearHuntFindsFilters: () => void;
   setMarketplaceFilter: (filter: MarketplaceFilter) => void;
   setFeedView: (view: FeedView) => void;
   setCriteria: (criteria: Partial<CriteriaSettings>) => void;
@@ -151,7 +157,8 @@ export const useCasebackStore = create<CasebackState>()(
       seen: [],
       dismissed: [],
       listingStatus: {},
-      alertScope: "all",
+      selectedHuntIds: [],
+      selectedMatchQualities: [],
       marketplaceFilter: "all",
       feedView: "new",
       hiddenListings: [],
@@ -205,7 +212,26 @@ export const useCasebackStore = create<CasebackState>()(
           dismissed: s.dismissed.filter((x) => !ids.includes(x)),
         })),
 
-      setAlertScope: (scope) => set({ alertScope: scope }),
+      setSelectedHuntIds: (ids) => set({ selectedHuntIds: ids }),
+      toggleSelectedHunt: (huntId) =>
+        set((s) => ({
+          selectedHuntIds: toggleArrayValue(s.selectedHuntIds, huntId),
+        })),
+      toggleAllSelectedHunts: (activeHuntIds) =>
+        set((s) => {
+          const allSelected =
+            activeHuntIds.length > 0 &&
+            activeHuntIds.every((id) => s.selectedHuntIds.includes(id));
+          return {
+            selectedHuntIds: allSelected ? [] : [...activeHuntIds],
+          };
+        }),
+      toggleSelectedMatchQuality: (quality) =>
+        set((s) => ({
+          selectedMatchQualities: toggleArrayValue(s.selectedMatchQualities, quality),
+        })),
+      clearHuntFindsFilters: () =>
+        set({ selectedHuntIds: [], selectedMatchQualities: [] }),
       setMarketplaceFilter: (filter) => set({ marketplaceFilter: filter }),
       setFeedView: (view) => set({ feedView: view }),
       setCriteria: (criteria) =>
@@ -213,23 +239,20 @@ export const useCasebackStore = create<CasebackState>()(
       setHunts: (hunts) =>
         set({ hunts: hunts.map((h) => withInferredHuntCriteria(normalizeHunt(h))) }),
       archiveHunt: (id) =>
-        set((s) => {
-          const huntScope = `hunt:${id}` as AlertScope;
-          return {
-            hunts: s.hunts.map((h) =>
-              h.id === id
-                ? withInferredHuntCriteria(
-                    normalizeHunt({
-                      ...h,
-                      archived: true,
-                      updatedAt: new Date().toISOString(),
-                    })
-                  )
-                : h
-            ),
-            alertScope: s.alertScope === huntScope ? "all" : s.alertScope,
-          };
-        }),
+        set((s) => ({
+          hunts: s.hunts.map((h) =>
+            h.id === id
+              ? withInferredHuntCriteria(
+                  normalizeHunt({
+                    ...h,
+                    archived: true,
+                    updatedAt: new Date().toISOString(),
+                  })
+                )
+              : h
+          ),
+          selectedHuntIds: s.selectedHuntIds.filter((huntId) => huntId !== id),
+        })),
       unarchiveHunt: (id) =>
         set((s) => ({
           hunts: s.hunts.map((h) =>
@@ -352,9 +375,24 @@ export const useCasebackStore = create<CasebackState>()(
         if (feedView === "interested") {
           state.feedView = "starred";
         }
-        if ((legacy.alertScope as string) === "top") {
-          legacy.alertScope = "all";
+        const legacyScope = (legacy as { alertScope?: string }).alertScope;
+        if ((legacyScope as string) === "top") {
+          (legacy as { alertScope?: string }).alertScope = "all";
         }
+        if (!legacy.selectedHuntIds?.length) {
+          legacy.selectedHuntIds = migrateSelectedHuntIds(legacy.hunts ?? [], {
+            selectedHuntIds: legacy.selectedHuntIds,
+            alertScope: legacyScope as import("@/lib/listings/types").AlertScope | undefined,
+          });
+        }
+        if (!legacy.selectedMatchQualities?.length) {
+          legacy.selectedMatchQualities = migrateSelectedMatchQualities({
+            selectedMatchQualities: legacy.selectedMatchQualities,
+            matchQualityFilter: (legacy as { matchQualityFilter?: string }).matchQualityFilter,
+          });
+        }
+        legacy.selectedHuntIds = legacy.selectedHuntIds ?? [];
+        legacy.selectedMatchQualities = legacy.selectedMatchQualities ?? [];
         const allowedConditions = normalizeAllowedConditions(
           legacy.globalFilters?.allowedConditions,
           legacy.criteria?.excludeForParts

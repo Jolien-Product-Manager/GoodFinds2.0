@@ -236,7 +236,7 @@ export function ListingDetailPanel({
           </div>
 
           <div className="rounded-sm border border-line bg-paper/60 px-2.5 py-2">
-            <div className="flex flex-col items-start gap-0.5">
+            <div className="flex items-center gap-2">
               <p className="font-display text-2xl font-semibold tabular-nums text-ink">
                 ${costs.total.toFixed(2)}
               </p>

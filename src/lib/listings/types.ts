@@ -75,3 +75,8 @@ export interface ListingStatus {
 export type AlertScope = "all" | "watchlist" | `hunt:${string}`;
 
 export type MarketplaceFilter = "all" | ListingSource;
+
+export type MatchQualityLevel = "perfect" | "close" | "loose";
+
+/** @deprecated Legacy single-select; migrated to `selectedMatchQualities`. */
+export type MatchQualityFilter = "all" | MatchQualityLevel;

@@ -1,14 +1,19 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { useCasebackStore, migrateModelHeartsToHunts, type FeedView } from "@/store/caseback";
-import type { PersistedState } from "@/lib/persistence/types";
-import { isPersistedStateEmpty, mergeAttributeLibraries, mergeAttributeHidden } from "@/lib/persistence/state-utils";
-import { normalizeHunt, emptyHuntAttributes, type Hunt, type PurchasedWatch } from "@/lib/hunts/types";
+import type { AlertScope } from "@/lib/listings/types";
+import type { Hunt, PurchasedWatch } from "@/lib/hunts/types";
+import { normalizeHunt, emptyHuntAttributes } from "@/lib/hunts/types";
 import { withInferredHuntCriteria } from "@/lib/hunts/domain-terms";
 import { normalizePurchasedWatch, mergeDefaultPurchasedWatches } from "@/lib/hunts/purchased-watch";
 import { normalizeAllowedConditions } from "@/lib/listings/condition-filter";
-import type { AlertScope } from "@/lib/listings/types";
+import {
+  migrateSelectedHuntIds,
+  migrateSelectedMatchQualities,
+} from "@/lib/listings/hunt-finds-filter";
+import { useCasebackStore, migrateModelHeartsToHunts, type FeedView } from "@/store/caseback";
+import type { PersistedState } from "@/lib/persistence/types";
+import { isPersistedStateEmpty, mergeAttributeLibraries, mergeAttributeHidden } from "@/lib/persistence/state-utils";
 
 function migrateFeedView(raw: string | undefined): FeedView {
   if (raw === "interested" || raw === "starred") return "starred";
@@ -17,20 +22,14 @@ function migrateFeedView(raw: string | undefined): FeedView {
   return "new";
 }
 
-function migrateAlertScope(raw: string | undefined): AlertScope {
-  if (raw === "top") return "all";
-  if (raw === "watchlist" || raw === "all") return raw;
-  if (raw?.startsWith("hunt:")) return raw as AlertScope;
-  return "all";
-}
-
 function pickPersistedState(): PersistedState {
   const s = useCasebackStore.getState();
   return {
     seen: s.seen,
     dismissed: s.dismissed,
     listingStatus: s.listingStatus,
-    alertScope: s.alertScope,
+    selectedHuntIds: s.selectedHuntIds,
+    selectedMatchQualities: s.selectedMatchQualities,
     marketplaceFilter: s.marketplaceFilter,
     feedView: s.feedView,
     hiddenListings: s.hiddenListings,
@@ -47,7 +46,12 @@ function pickPersistedState(): PersistedState {
 }
 
 function applyPersistedState(
-  state: PersistedState & { feedView?: string; modelHearts?: Record<string, number> }
+  state: PersistedState & {
+    feedView?: string;
+    modelHearts?: Record<string, number>;
+    alertScope?: AlertScope;
+    matchQualityFilter?: string;
+  }
 ) {
   const hunts = migrateModelHeartsToHunts(
     (state.hunts ?? []).map((h) => withInferredHuntCriteria(normalizeHunt(h as Hunt))),
@@ -79,7 +83,8 @@ function applyPersistedState(
     seen: hasDismissedField ? (state.seen ?? []) : [],
     dismissed: hasDismissedField ? (state.dismissed ?? []) : (state.seen ?? []),
     listingStatus: state.listingStatus ?? {},
-    alertScope: migrateAlertScope(state.alertScope as string | undefined),
+    selectedHuntIds: migrateSelectedHuntIds(hunts, state),
+    selectedMatchQualities: migrateSelectedMatchQualities(state),
     marketplaceFilter: state.marketplaceFilter ?? "all",
     feedView: migrateFeedView(state.feedView),
     hiddenListings: state.hiddenListings ?? [],

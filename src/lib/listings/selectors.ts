@@ -1,14 +1,17 @@
 import { DEFAULT_CRITERIA } from "@/lib/criteria";
 import type {
   AppListing,
-  AlertScope,
   CriteriaSettings,
   MarketplaceFilter,
+  MatchQualityLevel,
 } from "@/lib/listings/types";
 import type { HuntAttribute, AttrKey, Hunt } from "@/lib/hunts/types";
 import { listingPassesFeedAttributeFilters } from "@/lib/listings/feed-attribute-filter";
 import { passesCriteria } from "@/lib/shipping";
-import type { HuntMatchResult } from "@/lib/listings/hunt-match";
+import {
+  matchQualityFromResult,
+  type HuntMatchResult,
+} from "@/lib/listings/hunt-match";
 
 interface FilterContext {
   seen: string[];
@@ -19,6 +22,8 @@ interface FilterContext {
   criteria?: CriteriaSettings;
   marketplaceFilter?: MarketplaceFilter;
   feedAttributeFilters?: Partial<Record<AttrKey, HuntAttribute>>;
+  selectedHuntIds?: string[];
+  selectedMatchQualities?: MatchQualityLevel[];
   matchResults?: Map<string, HuntMatchResult>;
   hunts?: Hunt[];
   seenSet?: Set<string>;
@@ -120,7 +125,6 @@ export function poolListings(
 
 export function alertListings(
   listings: AppListing[],
-  scope: AlertScope,
   ctx: FilterContext,
   options?: { mode?: "unseen" | "all" }
 ): AppListing[] {
@@ -130,20 +134,30 @@ export function alertListings(
       ? poolListings(listings, ctx)
       : unseenListings(listings, ctx);
 
-  if (scope === "watchlist") {
+  const selectedHuntIds = ctx.selectedHuntIds ?? [];
+  if (selectedHuntIds.length > 0) {
+    const huntSet = new Set(selectedHuntIds);
     base = base.filter((l) => {
       const match = ctx.matchResults?.get(l.id);
-      return match != null && match.matchedHuntIds.length > 0;
+      return match?.matchedHuntIds.some((id) => huntSet.has(id));
     });
-  } else if (scope.startsWith("hunt:")) {
-    const huntId = scope.slice(5);
+  }
+
+  const selectedQualities = ctx.selectedMatchQualities ?? [];
+  if (selectedQualities.length > 0) {
+    const qualitySet = new Set(selectedQualities);
     base = base.filter((l) => {
-      const match = ctx.matchResults?.get(l.id);
-      return match?.matchedHuntIds.includes(huntId);
+      const level = matchQualityFromResult(ctx.matchResults?.get(l.id)!)?.level;
+      return level != null && qualitySet.has(level);
     });
   }
 
   return base;
+}
+
+function isPerfectMatch(match: HuntMatchResult | undefined): boolean {
+  if (!match) return false;
+  return matchQualityFromResult(match)?.level === "perfect";
 }
 
 export function alertSort(
@@ -152,14 +166,18 @@ export function alertSort(
   options?: { unseenFirst?: boolean }
 ): AppListing[] {
   return [...listings].sort((a, b) => {
+    const matchA = ctx.matchResults?.get(a.id);
+    const matchB = ctx.matchResults?.get(b.id);
+    const perfectA = isPerfectMatch(matchA);
+    const perfectB = isPerfectMatch(matchB);
+    if (perfectA !== perfectB) return perfectA ? -1 : 1;
+
     if (options?.unseenFirst) {
       const seenA = isSeen(a.id, ctx);
       const seenB = isSeen(b.id, ctx);
       if (seenA !== seenB) return seenA ? 1 : -1;
     }
 
-    const matchA = ctx.matchResults?.get(a.id);
-    const matchB = ctx.matchResults?.get(b.id);
     const scoreA = matchA?.score ?? 0;
     const scoreB = matchB?.score ?? 0;
     if (scoreB !== scoreA) return scoreB - scoreA;

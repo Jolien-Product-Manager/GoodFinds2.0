@@ -309,35 +309,38 @@ function ListingPhotoArea({
   onRestore?: () => void;
   extraControls?: ReactNode;
 }) {
-  const overlayTop = isNew ? "top-6" : "top-3";
+  const hasLeftControls = Boolean(onToggleInterested || extraControls);
+  const hasRightControls = Boolean(onDismiss || onRestore);
 
   return (
-    <div className="relative aspect-[4/3] w-full shrink-0 overflow-hidden bg-[#c9b896]/20">
-      <ListingPhotoCarousel listing={listing} />
-
-      {onToggleInterested && (
-        <ListingHeartButton
-          interested={interested ?? false}
-          onToggle={onToggleInterested}
-          className={cn("absolute left-3 z-10", overlayTop)}
-        />
+    <div
+      className={cn(
+        "flex shrink-0 items-start gap-2 px-3",
+        isNew ? "pt-6" : "pt-3"
       )}
+    >
+      {hasLeftControls ? (
+        <div className="flex shrink-0 flex-col items-center gap-2">
+          {onToggleInterested && (
+            <ListingHeartButton
+              interested={interested ?? false}
+              onToggle={onToggleInterested}
+            />
+          )}
+          {extraControls}
+        </div>
+      ) : null}
 
-      {onDismiss && (
-        <ListingDismissButton
-          onDismiss={onDismiss}
-          className={cn("absolute right-3 z-10", overlayTop)}
-        />
-      )}
+      <div className="relative min-w-0 flex-1 aspect-[4/3] overflow-hidden rounded-md bg-[#c9b896]/20">
+        <ListingPhotoCarousel listing={listing} />
+      </div>
 
-      {onRestore && (
-        <ListingRestoreButton
-          onRestore={onRestore}
-          className={cn("absolute right-3 z-10", overlayTop)}
-        />
-      )}
-
-      {extraControls}
+      {hasRightControls ? (
+        <div className="flex shrink-0 flex-col items-center gap-2">
+          {onDismiss && <ListingDismissButton onDismiss={onDismiss} />}
+          {onRestore && <ListingRestoreButton onRestore={onRestore} />}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -755,12 +758,12 @@ export function AlertListingCard({
                 <h3
                   className={cn(
                     "min-w-0 font-display font-semibold leading-snug text-ink",
-                    compact ? "line-clamp-4 text-[15px]" : "line-clamp-4 text-lg"
+                    compact ? "line-clamp-4 text-sm" : "line-clamp-4 text-base"
                   )}
                 >
                   {listing.title}
                 </h3>
-                <div className="flex flex-col items-center justify-center gap-0.5 text-center">
+                <div className="flex shrink-0 items-center justify-end gap-1.5">
                   <span
                     className={cn(
                       "font-display font-semibold tabular-nums text-ink",
@@ -820,11 +823,6 @@ export function AlertListingCard({
                 <CardFlipButton
                   flipped={false}
                   onToggle={() => setFlipped(true)}
-                  className={cn(
-                    "absolute",
-                    isNew ? "top-6" : "top-3",
-                    onToggleInterested ? "left-12" : "left-3"
-                  )}
                 />
               }
             />
@@ -835,12 +833,12 @@ export function AlertListingCard({
                   <h3
                     className={cn(
                       "min-w-0 font-display font-semibold leading-snug text-ink",
-                      compact ? "line-clamp-4 text-[15px]" : "line-clamp-4 text-lg"
+                      compact ? "line-clamp-4 text-sm" : "line-clamp-4 text-base"
                     )}
                   >
                     {listing.title}
                   </h3>
-                  <div className="flex flex-col items-center justify-center gap-0.5 text-center">
+                  <div className="flex shrink-0 items-center justify-end gap-1.5">
                     <span
                       className={cn(
                         "font-display font-semibold tabular-nums text-ink",
