@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 
 const NAV_LINKS = [
   { href: "/", label: "Listings" },
-  { href: "/hunts", label: "Hunts" },
+  { href: "/hunts", label: "Hunt Preferences" },
 ] as const;
 
 export function Masthead() {
