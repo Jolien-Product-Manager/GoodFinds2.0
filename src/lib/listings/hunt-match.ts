@@ -543,7 +543,7 @@ export function matchListingForHunts(
   listing: AppListing,
   hunts: Hunt[]
 ): HuntMatchResult {
-  const activeHunts = hunts.filter((h) => h.saved);
+  const activeHunts = hunts.filter((h) => h.saved && !h.archived);
 
   if (activeHunts.length === 0) {
     return {

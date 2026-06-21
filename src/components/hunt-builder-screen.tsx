@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  Archive,
+  ArchiveRestore,
   ChevronDown,
   Crosshair,
   Pencil,
@@ -51,6 +53,7 @@ import {
   huntTightness,
   partitionHuntFilterPills,
   sortSavedHunts,
+  sortArchivedHunts,
   simulateListingParse,
   type HuntFilterPill,
 } from "@/lib/hunts/summary";
@@ -108,6 +111,8 @@ export function HuntBuilderScreen() {
   const globalFilters = useCasebackStore((s) => s.globalFilters);
   const purchasedWatches = useCasebackStore((s) => s.purchasedWatches);
   const setHunts = useCasebackStore((s) => s.setHunts);
+  const archiveHunt = useCasebackStore((s) => s.archiveHunt);
+  const unarchiveHunt = useCasebackStore((s) => s.unarchiveHunt);
   const setGlobalFilters = useCasebackStore((s) => s.setGlobalFilters);
   const setPurchasedWatches = useCasebackStore((s) => s.setPurchasedWatches);
   const attributeLibrary = useCasebackStore((s) => s.attributeLibrary ?? {});
@@ -294,6 +299,19 @@ export function HuntBuilderScreen() {
     toast("Hunt deleted");
   };
 
+  const handleArchive = (hunt: Hunt) => {
+    archiveHunt(hunt.id);
+    if (editingId === hunt.id) {
+      handleCollapse();
+    }
+    toast("Hunt archived");
+  };
+
+  const handleUnarchive = (hunt: Hunt) => {
+    unarchiveHunt(hunt.id);
+    toast("Hunt restored");
+  };
+
   const handleCollapse = () => {
     setEditingId(null);
     setDraft(null);
@@ -386,7 +404,9 @@ export function HuntBuilderScreen() {
   const editorOpen = workingCopy != null;
   const tightness = workingCopy ? huntTightness(workingCopy) : null;
   const savedHunts = useMemo(() => sortSavedHunts(hunts), [hunts]);
+  const archivedHunts = useMemo(() => sortArchivedHunts(hunts), [hunts]);
   const savedHuntCount = savedHunts.length;
+  const [archivedOpen, setArchivedOpen] = useState(false);
 
   return (
     <>
@@ -442,6 +462,7 @@ export function HuntBuilderScreen() {
             editingId={editingId}
             editorOpen={editorOpen}
             onEdit={openEdit}
+            onArchive={handleArchive}
             action={
               <Button variant="outline" size="sm" className="h-8 shrink-0" onClick={startNewHunt}>
                 <Plus className="mr-1 h-3 w-3" />
@@ -455,6 +476,43 @@ export function HuntBuilderScreen() {
               savedHuntCount === 0 ? "No saved hunts yet." : undefined
             }
           />
+
+          {archivedHunts.length > 0 ? (
+            <Collapsible open={archivedOpen} onOpenChange={setArchivedOpen}>
+              <CollapsibleTrigger asChild>
+                <button
+                  type="button"
+                  className="flex w-full items-center gap-2 rounded-sm border border-line-strong bg-card px-3 py-2 text-left transition-colors hover:border-brass/40 hover:bg-brass/5"
+                >
+                  <ChevronDown
+                    className={cn(
+                      "h-4 w-4 shrink-0 text-ink-soft transition-transform",
+                      archivedOpen && "rotate-180"
+                    )}
+                  />
+                  <span className="font-display text-sm font-medium text-ink">
+                    Archived hunts
+                  </span>
+                  <span className="ml-auto text-xs text-ink-soft">
+                    {archivedHunts.length}
+                  </span>
+                </button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="overflow-hidden pt-2 data-[state=closed]:animate-out data-[state=open]:animate-in">
+                <ul className="space-y-1.5">
+                  {archivedHunts.map((hunt) => (
+                    <SavedHuntCard
+                      key={hunt.id}
+                      hunt={hunt}
+                      isActive={editingId === hunt.id && editorOpen}
+                      onEdit={() => openEdit(hunt)}
+                      onUnarchive={() => handleUnarchive(hunt)}
+                    />
+                  ))}
+                </ul>
+              </CollapsibleContent>
+            </Collapsible>
+          ) : null}
         </section>
 
         <GlobalFiltersSection
@@ -520,6 +578,7 @@ function HuntListGroup({
   editingId,
   editorOpen,
   onEdit,
+  onArchive,
   action,
   emptyMessage,
 }: {
@@ -529,6 +588,7 @@ function HuntListGroup({
   editingId: string | null;
   editorOpen: boolean;
   onEdit: (hunt: Hunt) => void;
+  onArchive?: (hunt: Hunt) => void;
   action?: React.ReactNode;
   emptyMessage?: string;
 }) {
@@ -552,6 +612,7 @@ function HuntListGroup({
               hunt={hunt}
               isActive={editingId === hunt.id && editorOpen}
               onEdit={() => onEdit(hunt)}
+              onArchive={onArchive ? () => onArchive(hunt) : undefined}
             />
           ))}
         </ul>
@@ -564,53 +625,85 @@ function SavedHuntCard({
   hunt,
   isActive,
   onEdit,
+  onArchive,
+  onUnarchive,
 }: {
   hunt: Hunt;
   isActive: boolean;
   onEdit: () => void;
+  onArchive?: () => void;
+  onUnarchive?: () => void;
 }) {
   const tightnessForHunt = huntTightness(hunt);
 
   return (
     <li>
-      <button
-        type="button"
-        onClick={onEdit}
+      <div
         className={cn(
-          "w-full rounded-sm border bg-card px-3 py-2 text-left transition-colors hover:border-brass/50 hover:bg-brass/5",
+          "flex items-center gap-2 rounded-sm border bg-card px-3 py-2 transition-colors",
           isActive
             ? "border-brass bg-brass/10 ring-1 ring-brass/30"
-            : "border-line-strong"
+            : "border-line-strong hover:border-brass/50 hover:bg-brass/5"
         )}
       >
-        <div className="flex items-center justify-between gap-2">
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-              <h3 className="font-display text-base font-medium leading-tight text-ink">
-                {hunt.name}
-              </h3>
-              <HuntHeartsPicker value={hunt.hearts} size="xs" />
-              <Badge
-                variant="outline"
-                className={cn(
-                  "h-5 px-1.5 text-[10px] font-normal",
-                  tightnessForHunt.level === "specific" &&
-                    "border-steal text-steal"
-                )}
-              >
-                {tightnessForHunt.label}
-              </Badge>
-            </div>
-            <p className="mt-0.5 truncate text-xs italic leading-snug text-ink-soft">
-              {buildHuntSummary(hunt, { omitGender: true })}
-            </p>
+        <button
+          type="button"
+          onClick={onEdit}
+          className="min-w-0 flex-1 text-left"
+        >
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+            <h3 className="font-display text-base font-medium leading-tight text-ink">
+              {hunt.name}
+            </h3>
+            <HuntHeartsPicker value={hunt.hearts} size="xs" />
+            <Badge
+              variant="outline"
+              className={cn(
+                "h-5 px-1.5 text-[10px] font-normal",
+                tightnessForHunt.level === "specific" &&
+                  "border-steal text-steal"
+              )}
+            >
+              {tightnessForHunt.label}
+            </Badge>
           </div>
-          <span className="flex shrink-0 items-center gap-1 text-[11px] text-ink-soft">
+          <p className="mt-0.5 truncate text-xs italic leading-snug text-ink-soft">
+            {buildHuntSummary(hunt, { omitGender: true })}
+          </p>
+        </button>
+        <div className="flex shrink-0 items-center gap-1">
+          {onArchive ? (
+            <button
+              type="button"
+              onClick={onArchive}
+              className="inline-flex items-center gap-1 rounded-sm px-1.5 py-1 text-[11px] text-ink-soft transition-colors hover:bg-paper hover:text-ink"
+              aria-label={`Archive ${hunt.name}`}
+            >
+              <Archive className="h-3 w-3" />
+              Archive
+            </button>
+          ) : null}
+          {onUnarchive ? (
+            <button
+              type="button"
+              onClick={onUnarchive}
+              className="inline-flex items-center gap-1 rounded-sm px-1.5 py-1 text-[11px] text-ink-soft transition-colors hover:bg-paper hover:text-ink"
+              aria-label={`Restore ${hunt.name}`}
+            >
+              <ArchiveRestore className="h-3 w-3" />
+              Restore
+            </button>
+          ) : null}
+          <button
+            type="button"
+            onClick={onEdit}
+            className="inline-flex items-center gap-1 rounded-sm px-1.5 py-1 text-[11px] text-ink-soft transition-colors hover:bg-paper hover:text-ink"
+          >
             <Pencil className="h-3 w-3" />
             Edit
-          </span>
+          </button>
         </div>
-      </button>
+      </div>
     </li>
   );
 }
@@ -778,7 +871,7 @@ function HuntEditorPanel({
       </h2>
 
       {/* Search + add */}
-      <div className="relative">
+      <div>
         <div className="flex items-center gap-2">
           <div className="relative min-w-0 flex-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-soft" />
@@ -1159,19 +1252,29 @@ function FilterPriorityPopover({
 }) {
   if (!open) return null;
 
+  const [category, value] = label.includes(" · ")
+    ? (label.split(" · ", 2) as [string, string])
+    : [null, label];
+
   return (
     <div
-      className="absolute right-0 top-full z-50 mt-1.5 w-[min(100%,18rem)] rounded-sm border border-line-strong bg-card p-3 shadow-lg"
+      className="mt-2 rounded-sm border border-line-strong bg-paper/40 px-3 py-2.5"
       role="dialog"
-      aria-label="Choose filter priority"
+      aria-labelledby="priority-chooser-title"
     >
-      <p className="text-sm font-medium text-ink">{label}</p>
-      <p className="mt-0.5 text-xs text-ink-soft">Must have or nice to have?</p>
-      <div className="mt-3 grid grid-cols-2 gap-2">
+      <p id="priority-chooser-title" className="text-sm text-ink">
+        <span className="font-medium">{value}</span>
+        {category && (
+          <span className="text-ink-soft"> · {category.toLowerCase()}</span>
+        )}
+        <span className="text-ink-soft"> — must have or nice to have?</span>
+      </p>
+
+      <div className="mt-2 flex flex-wrap items-center gap-1.5">
         <Button
           type="button"
           size="sm"
-          className="h-9 rounded-sm bg-must text-card hover:bg-must/90"
+          className="h-7 rounded-sm px-2.5 text-xs bg-must text-card hover:bg-must/90"
           onClick={() => onSelect(true)}
         >
           Must have
@@ -1180,19 +1283,19 @@ function FilterPriorityPopover({
           type="button"
           variant="outline"
           size="sm"
-          className="h-9 rounded-sm"
+          className="h-7 rounded-sm px-2.5 text-xs"
           onClick={() => onSelect(false)}
         >
           Nice to have
         </Button>
+        <button
+          type="button"
+          className="px-1 text-xs text-ink-soft underline-offset-2 hover:text-ink hover:underline"
+          onClick={onClose}
+        >
+          Cancel
+        </button>
       </div>
-      <button
-        type="button"
-        className="mt-2 text-xs text-ink-soft underline-offset-2 hover:text-ink hover:underline"
-        onClick={onClose}
-      >
-        Cancel
-      </button>
     </div>
   );
 }
@@ -1204,6 +1307,7 @@ function CategorySearchRow({
   onAdd,
   canAdd,
   showPriorityPicker = true,
+  categoryLabel,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -1211,6 +1315,7 @@ function CategorySearchRow({
   onAdd: (mustHave: boolean) => void;
   canAdd: boolean;
   showPriorityPicker?: boolean;
+  categoryLabel?: string;
 }) {
   const [pickerOpen, setPickerOpen] = useState(false);
 
@@ -1229,7 +1334,7 @@ function CategorySearchRow({
   };
 
   return (
-    <div className="relative">
+    <div>
       <div className="flex items-center gap-2">
         <div className="relative min-w-0 flex-1">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink-soft" />
@@ -1261,7 +1366,11 @@ function CategorySearchRow({
       {showPriorityPicker && (
         <FilterPriorityPopover
           open={pickerOpen}
-          label={value.trim()}
+          label={
+            categoryLabel && value.trim()
+              ? `${categoryLabel} · ${value.trim()}`
+              : value.trim()
+          }
           onSelect={confirmAdd}
           onClose={() => setPickerOpen(false)}
         />
@@ -1330,6 +1439,7 @@ function AttributeChipGrid({
         value={query}
         onChange={setQuery}
         placeholder={`Search ${ATTR_OPTIONS[attrKey].label.toLowerCase()} —`}
+        categoryLabel={ATTR_OPTIONS[attrKey].label}
         onAdd={addFromCategorySearch}
         canAdd={Boolean(query.trim())}
       />

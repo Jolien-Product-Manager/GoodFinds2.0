@@ -133,8 +133,16 @@ export function compareSavedHunts(a: Hunt, b: Hunt): number {
   return (b.hearts ?? 0) - (a.hearts ?? 0);
 }
 
+export function isActiveSavedHunt(hunt: Hunt): boolean {
+  return hunt.saved && !hunt.archived;
+}
+
 export function sortSavedHunts(hunts: Hunt[]): Hunt[] {
-  return hunts.filter((h) => h.saved).sort(compareSavedHunts);
+  return hunts.filter(isActiveSavedHunt).sort(compareSavedHunts);
+}
+
+export function sortArchivedHunts(hunts: Hunt[]): Hunt[] {
+  return hunts.filter((h) => h.saved && h.archived).sort(compareSavedHunts);
 }
 
 export type HuntListCategory = "specific" | "taste";
@@ -148,7 +156,7 @@ export function partitionSavedHunts(hunts: Hunt[]): {
   specific: Hunt[];
   taste: Hunt[];
 } {
-  const saved = hunts.filter((h) => h.saved);
+  const saved = hunts.filter(isActiveSavedHunt);
   return {
     specific: saved.filter((h) => huntListCategory(h) === "specific"),
     taste: saved.filter((h) => huntListCategory(h) === "taste"),

@@ -13,6 +13,7 @@ export type AttributeLibrary = Partial<Record<AttrKey, string[]>>;
 
 export interface PersistedState {
   seen: string[];
+  dismissed: string[];
   listingStatus: Record<string, ListingStatus>;
   alertScope: AlertScope;
   marketplaceFilter: MarketplaceFilter;
@@ -30,6 +31,7 @@ export interface PersistedState {
 
 export const DEFAULT_PERSISTED_STATE: PersistedState = {
   seen: [],
+  dismissed: [],
   listingStatus: {},
   alertScope: "all",
   marketplaceFilter: "all",

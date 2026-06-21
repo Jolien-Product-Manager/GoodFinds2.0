@@ -48,6 +48,7 @@ function buildFilterContext(body: FeedQueryBody) {
   const hunts = normalizeHunts(body.hunts ?? []);
   const base = {
     seen: body.seen ?? [],
+    dismissed: body.dismissed ?? [],
     listingStatus: body.listingStatus ?? {},
     hiddenListings: body.hiddenListings ?? [],
     dislikedModels: body.dislikedModels ?? [],
@@ -59,8 +60,12 @@ function buildFilterContext(body: FeedQueryBody) {
   return withFilterSets(base);
 }
 
-function listingMode(feedView: FeedQueryBody["feedView"]): "unseen" | "all" {
-  return feedView === "all" ? "all" : "unseen";
+function listingMode(_feedView: FeedQueryBody["feedView"]): "unseen" | "all" {
+  return "all";
+}
+
+function sortUnseenFirst(feedView: FeedQueryBody["feedView"]): boolean {
+  return feedView === "new";
 }
 
 function displayListingsForView(
@@ -83,12 +88,14 @@ function displayListingsForView(
     alertListings(listings, body.alertScope, ctxWithMatches, {
       mode: listingMode(body.feedView),
     }),
-    ctxWithMatches
+    ctxWithMatches,
+    { unseenFirst: sortUnseenFirst(body.feedView) }
   );
 }
 
 function getSnapshotCacheKey(body: FeedQueryBody): string {
-  const { cursor, limit, refresh, listingStatus, feedView, ...rest } = body;
+  const { cursor, limit, refresh, listingStatus, feedView, unseenOnly, ...rest } =
+    body;
   const statusPart =
     feedView === "starred" || feedView === "dismissed" ? listingStatus : null;
   return JSON.stringify({ ...rest, feedView, listingStatus: statusPart });
@@ -159,7 +166,7 @@ function buildFeedCounts(
   const { listings, ctx, matchResults } = snapshot;
   const ctxWithMatches = { ...ctx, matchResults, hunts: ctx.hunts };
   const activeHunts = (ctx.hunts ?? []).filter(
-    (hunt) => hunt.saved && huntHasActiveCriteria(hunt)
+    (hunt) => hunt.saved && !hunt.archived && huntHasActiveCriteria(hunt)
   );
 
   const perHunt: Record<string, number> = {};
@@ -254,5 +261,9 @@ export async function queryListingDetail(id: string, hunts: Hunt[]) {
 
 export async function queryFeedIds(body: FeedQueryBody): Promise<string[]> {
   const snapshot = await getFeedSnapshot(body);
-  return snapshot.display.map((listing) => listing.id);
+  const ctx = snapshot.ctx;
+  const listings = body.unseenOnly
+    ? snapshot.display.filter((listing) => !ctx.seenSet?.has(listing.id))
+    : snapshot.display;
+  return listings.map((listing) => listing.id);
 }

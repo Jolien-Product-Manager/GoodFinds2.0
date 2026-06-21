@@ -44,6 +44,8 @@ export interface Hunt {
   id: string;
   name: string;
   saved: boolean;
+  /** Archived hunts stay saved but are hidden from the feed and active hunt list. */
+  archived?: boolean;
   gender: HuntGender;
   /** When gender is set: true = must-have gate; false = soft preference. Legacy hunts default to must-have. */
   genderRequired?: boolean;
@@ -534,6 +536,7 @@ export function normalizeHunt(hunt: Partial<Hunt> & Pick<Hunt, "id" | "name">): 
     id: hunt.id,
     name: hunt.name,
     saved: hunt.saved ?? false,
+    archived: hunt.archived ?? false,
     gender,
     genderRequired:
       gender === "both" ? undefined : hunt.genderRequired,

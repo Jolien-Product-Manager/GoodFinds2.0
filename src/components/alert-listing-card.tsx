@@ -353,6 +353,7 @@ interface AlertListingCardProps {
   listing: AppListing;
   match?: HuntMatchResult;
   interested?: boolean;
+  isNew?: boolean;
   muted?: boolean;
   compact?: boolean;
   selected?: boolean;
@@ -366,6 +367,7 @@ export function AlertListingCard({
   listing,
   match,
   interested = false,
+  isNew = false,
   muted = false,
   compact = false,
   selected = false,
@@ -425,6 +427,12 @@ export function AlertListingCard({
             <span className="absolute bottom-3 left-3 rounded-full bg-ink px-2.5 py-0.5 text-[11px] font-medium lowercase tracking-wide text-card">
               {listing.source}
             </span>
+
+            {isNew && (
+              <span className="absolute bottom-3 right-3 rounded-sm bg-ok px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-card">
+                New
+              </span>
+            )}
 
             {matchQuality != null && (
               <span className="absolute right-3 top-3 inline-flex items-center gap-1.5 rounded-full border border-line bg-card/95 px-2.5 py-1 text-[11px] font-medium text-ink shadow-sm">

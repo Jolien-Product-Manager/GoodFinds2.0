@@ -12,6 +12,7 @@ import type { HuntMatchResult } from "@/lib/listings/hunt-match";
 
 interface FilterContext {
   seen: string[];
+  dismissed: string[];
   listingStatus: Record<string, { interested?: boolean }>;
   hiddenListings: string[];
   dislikedModels: string[];
@@ -21,12 +22,19 @@ interface FilterContext {
   matchResults?: Map<string, HuntMatchResult>;
   hunts?: Hunt[];
   seenSet?: Set<string>;
+  dismissedSet?: Set<string>;
   hiddenSet?: Set<string>;
   dislikedModelSet?: Set<string>;
 }
 
 function isSeen(id: string, ctx: FilterContext): boolean {
   return ctx.seenSet ? ctx.seenSet.has(id) : ctx.seen.includes(id);
+}
+
+function isDismissed(id: string, ctx: FilterContext): boolean {
+  return ctx.dismissedSet
+    ? ctx.dismissedSet.has(id)
+    : (ctx.dismissed ?? []).includes(id);
 }
 
 function isHidden(id: string, ctx: FilterContext): boolean {
@@ -43,9 +51,14 @@ export function withFilterSets(ctx: FilterContext): FilterContext {
   return {
     ...ctx,
     seenSet: ctx.seenSet ?? new Set(ctx.seen),
+    dismissedSet: ctx.dismissedSet ?? new Set(ctx.dismissed ?? []),
     hiddenSet: ctx.hiddenSet ?? new Set(ctx.hiddenListings),
     dislikedModelSet: ctx.dislikedModelSet ?? new Set(ctx.dislikedModels),
   };
+}
+
+function passesActiveFeed(listing: AppListing, ctx: FilterContext): boolean {
+  return !isDismissed(listing.id, ctx) && passesListingFilters(listing, ctx);
 }
 
 export function passesListingFilters(
@@ -72,9 +85,7 @@ export function unseenListings(
   listings: AppListing[],
   ctx: FilterContext
 ): AppListing[] {
-  return listings.filter(
-    (l) => !isSeen(l.id, ctx) && passesListingFilters(l, ctx)
-  );
+  return listings.filter((l) => !isSeen(l.id, ctx) && passesActiveFeed(l, ctx));
 }
 
 export function interestedListings(
@@ -94,7 +105,7 @@ export function dismissedListings(
 ): AppListing[] {
   return listings.filter(
     (l) =>
-      isSeen(l.id, ctx) &&
+      isDismissed(l.id, ctx) &&
       !ctx.listingStatus[l.id]?.interested &&
       passesListingFilters(l, ctx)
   );
@@ -104,7 +115,7 @@ export function poolListings(
   listings: AppListing[],
   ctx: FilterContext
 ): AppListing[] {
-  return listings.filter((l) => passesListingFilters(l, ctx));
+  return listings.filter((l) => passesActiveFeed(l, ctx));
 }
 
 export function alertListings(
@@ -137,9 +148,16 @@ export function alertListings(
 
 export function alertSort(
   listings: AppListing[],
-  ctx: FilterContext
+  ctx: FilterContext,
+  options?: { unseenFirst?: boolean }
 ): AppListing[] {
   return [...listings].sort((a, b) => {
+    if (options?.unseenFirst) {
+      const seenA = isSeen(a.id, ctx);
+      const seenB = isSeen(b.id, ctx);
+      if (seenA !== seenB) return seenA ? 1 : -1;
+    }
+
     const matchA = ctx.matchResults?.get(a.id);
     const matchB = ctx.matchResults?.get(b.id);
     const scoreA = matchA?.score ?? 0;

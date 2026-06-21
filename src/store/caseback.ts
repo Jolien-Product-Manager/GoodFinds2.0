@@ -31,6 +31,7 @@ export type FeedView = "new" | "all" | "starred" | "dismissed";
 
 interface CasebackState {
   seen: string[];
+  dismissed: string[];
   listingStatus: Record<string, ListingStatus>;
   alertScope: AlertScope;
   marketplaceFilter: MarketplaceFilter;
@@ -46,6 +47,7 @@ interface CasebackState {
   feedAttributeFilters: Record<AttrKey, HuntAttribute>;
   dismissListing: (id: string) => void;
   restoreListing: (id: string) => void;
+  markListingSeen: (id: string) => void;
   toggleInterested: (id: string) => void;
   dismissAllUnseen: (ids: string[]) => void;
   restoreAll: (ids: string[]) => void;
@@ -54,6 +56,8 @@ interface CasebackState {
   setFeedView: (view: FeedView) => void;
   setCriteria: (criteria: Partial<CriteriaSettings>) => void;
   setHunts: (hunts: Hunt[]) => void;
+  archiveHunt: (id: string) => void;
+  unarchiveHunt: (id: string) => void;
   setGlobalFilters: (filters: Partial<GlobalFilters>) => void;
   setPurchasedWatches: (watches: PurchasedWatch[]) => void;
   addAttributeLibraryOption: (key: AttrKey, value: string) => void;
@@ -112,6 +116,7 @@ export const useCasebackStore = create<CasebackState>()(
   persist(
     (set) => ({
       seen: [],
+      dismissed: [],
       listingStatus: {},
       alertScope: "all",
       marketplaceFilter: "all",
@@ -133,11 +138,21 @@ export const useCasebackStore = create<CasebackState>()(
 
       dismissListing: (id) =>
         set((s) => ({
+          dismissed: s.dismissed.includes(id)
+            ? s.dismissed
+            : [...s.dismissed, id],
           seen: s.seen.includes(id) ? s.seen : [...s.seen, id],
         })),
 
       restoreListing: (id) =>
-        set((s) => ({ seen: s.seen.filter((x) => x !== id) })),
+        set((s) => ({
+          dismissed: s.dismissed.filter((x) => x !== id),
+        })),
+
+      markListingSeen: (id) =>
+        set((s) => ({
+          seen: s.seen.includes(id) ? s.seen : [...s.seen, id],
+        })),
 
       toggleInterested: (id) =>
         set((s) => {
@@ -152,12 +167,13 @@ export const useCasebackStore = create<CasebackState>()(
 
       dismissAllUnseen: (ids) =>
         set((s) => ({
+          dismissed: [...new Set([...s.dismissed, ...ids])],
           seen: [...new Set([...s.seen, ...ids])],
         })),
 
       restoreAll: (ids) =>
         set((s) => ({
-          seen: s.seen.filter((x) => !ids.includes(x)),
+          dismissed: s.dismissed.filter((x) => !ids.includes(x)),
         })),
 
       setAlertScope: (scope) => set({ alertScope: scope }),
@@ -167,6 +183,38 @@ export const useCasebackStore = create<CasebackState>()(
         set((s) => ({ criteria: { ...s.criteria, ...criteria } })),
       setHunts: (hunts) =>
         set({ hunts: hunts.map((h) => withInferredHuntCriteria(normalizeHunt(h))) }),
+      archiveHunt: (id) =>
+        set((s) => {
+          const huntScope = `hunt:${id}` as AlertScope;
+          return {
+            hunts: s.hunts.map((h) =>
+              h.id === id
+                ? withInferredHuntCriteria(
+                    normalizeHunt({
+                      ...h,
+                      archived: true,
+                      updatedAt: new Date().toISOString(),
+                    })
+                  )
+                : h
+            ),
+            alertScope: s.alertScope === huntScope ? "all" : s.alertScope,
+          };
+        }),
+      unarchiveHunt: (id) =>
+        set((s) => ({
+          hunts: s.hunts.map((h) =>
+            h.id === id
+              ? withInferredHuntCriteria(
+                  normalizeHunt({
+                    ...h,
+                    archived: false,
+                    updatedAt: new Date().toISOString(),
+                  })
+                )
+              : h
+          ),
+        })),
       setGlobalFilters: (filters) =>
         set((s) => {
           const next = { ...s.globalFilters, ...filters };
@@ -248,12 +296,17 @@ export const useCasebackStore = create<CasebackState>()(
         set({ feedAttributeFilters: emptyHuntAttributes() }),
     }),
     {
-      name: "caseback-state-v7",
+      name: "caseback-state-v8",
       onRehydrateStorage: () => (state) => {
         if (!state) return;
         const legacy = state as CasebackState & {
           modelHearts?: Record<string, number>;
+          dismissed?: string[];
         };
+        if (legacy.dismissed == null) {
+          legacy.dismissed = [...(legacy.seen ?? [])];
+          legacy.seen = [];
+        }
         legacy.hunts = migrateModelHeartsToHunts(
           (legacy.hunts ?? []).map((h) => withInferredHuntCriteria(normalizeHunt(h))),
           legacy.modelHearts

@@ -40,7 +40,8 @@ function feedContextSuffix(
   feedView: FeedView,
   alertScope: AlertScope,
   marketplaceFilter: MarketplaceFilter,
-  activeHunts: { id: string; name: string }[]
+  activeHunts: { id: string; name: string }[],
+  newCount?: number
 ): string {
   if (feedView === "starred") return "saved";
   if (feedView === "dismissed") return "dismissed";
@@ -59,13 +60,16 @@ function feedContextSuffix(
     return suffix;
   }
 
-  let suffix = "new listings";
+  let suffix =
+    newCount != null && newCount > 0
+      ? `listings · ${newCount.toLocaleString()} new`
+      : "listings";
   if (alertScope.startsWith("hunt:")) {
     const huntId = alertScope.slice(5);
     const hunt = activeHunts.find((h) => h.id === huntId);
-    suffix = `new listings · matching ${hunt?.name ?? "this hunt"}`;
+    suffix = `${suffix} · matching ${hunt?.name ?? "this hunt"}`;
   } else if (alertScope === "watchlist") {
-    suffix = "new listings · matching any of your hunts";
+    suffix = `${suffix} · matching any of your hunts`;
   }
 
   if (marketplaceFilter === "ebay") suffix += " · eBay";
@@ -129,6 +133,7 @@ async function postFeedIds(body: FeedQueryBody) {
 
 export function FeedView({ ebayEnabled }: FeedViewProps) {
   const seen = useCasebackStore((s) => s.seen);
+  const dismissed = useCasebackStore((s) => s.dismissed);
   const listingStatus = useCasebackStore((s) => s.listingStatus);
   const alertScope = useCasebackStore((s) => s.alertScope);
   const marketplaceFilter = useCasebackStore((s) => s.marketplaceFilter);
@@ -143,6 +148,7 @@ export function FeedView({ ebayEnabled }: FeedViewProps) {
   const dismissListing = useCasebackStore((s) => s.dismissListing);
   const dismissAllUnseen = useCasebackStore((s) => s.dismissAllUnseen);
   const restoreListing = useCasebackStore((s) => s.restoreListing);
+  const markListingSeen = useCasebackStore((s) => s.markListingSeen);
   const restoreAll = useCasebackStore((s) => s.restoreAll);
   const toggleInterested = useCasebackStore((s) => s.toggleInterested);
   const setAlertScope = useCasebackStore((s) => s.setAlertScope);
@@ -176,6 +182,7 @@ export function FeedView({ ebayEnabled }: FeedViewProps) {
       alertScope,
       marketplaceFilter,
       seen,
+      dismissed,
       listingStatus,
       hiddenListings,
       dislikedModels,
@@ -188,6 +195,7 @@ export function FeedView({ ebayEnabled }: FeedViewProps) {
       alertScope,
       marketplaceFilter,
       seen,
+      dismissed,
       listingStatus,
       hiddenListings,
       dislikedModels,
@@ -206,7 +214,7 @@ export function FeedView({ ebayEnabled }: FeedViewProps) {
         feedView,
         alertScope,
         marketplaceFilter,
-        seen,
+        dismissed,
         hiddenListings,
         dislikedModels,
         criteria,
@@ -219,7 +227,7 @@ export function FeedView({ ebayEnabled }: FeedViewProps) {
       feedView,
       alertScope,
       marketplaceFilter,
-      seen,
+      dismissed,
       hiddenListings,
       dislikedModels,
       criteria,
@@ -230,7 +238,7 @@ export function FeedView({ ebayEnabled }: FeedViewProps) {
   );
 
   const activeHunts = useMemo(
-    () => hunts.filter((h) => h.saved && huntHasActiveCriteria(h)),
+    () => hunts.filter((h) => h.saved && !h.archived && huntHasActiveCriteria(h)),
     [hunts]
   );
 
@@ -395,16 +403,31 @@ export function FeedView({ ebayEnabled }: FeedViewProps) {
 
   const handleDismiss = useCallback(
     (id: string) => {
+      const wasUnseen = !seenSet.has(id);
       dismissListing(id);
       removeFeedItem(id);
+      setCounts((current) => ({
+        ...current,
+        dismissed: current.dismissed + 1,
+        new: wasUnseen ? Math.max(0, current.new - 1) : current.new,
+        all: Math.max(0, current.all - 1),
+      }));
       toast("Dismissed", {
         action: {
           label: "Undo",
-          onClick: () => restoreListing(id),
+          onClick: () => {
+            restoreListing(id);
+            setCounts((current) => ({
+              ...current,
+              dismissed: Math.max(0, current.dismissed - 1),
+              new: wasUnseen ? current.new + 1 : current.new,
+              all: current.all + 1,
+            }));
+          },
         },
       });
     },
-    [dismissListing, removeFeedItem, restoreListing]
+    [dismissListing, removeFeedItem, restoreListing, seenSet]
   );
 
   const handleDismissStarred = useCallback(
@@ -426,6 +449,13 @@ export function FeedView({ ebayEnabled }: FeedViewProps) {
 
   const handleToggleInterested = useCallback(
     (id: string) => {
+      if (!seenSet.has(id)) {
+        markListingSeen(id);
+        setCounts((current) => ({
+          ...current,
+          new: Math.max(0, current.new - 1),
+        }));
+      }
       const wasInterested = listingStatus[id]?.interested ?? false;
       toggleInterested(id);
       if (feedView === "starred" && wasInterested) {
@@ -445,7 +475,7 @@ export function FeedView({ ebayEnabled }: FeedViewProps) {
         }));
       }
     },
-    [feedView, listingStatus, removeFeedItem, toggleInterested]
+    [feedView, listingStatus, markListingSeen, removeFeedItem, seenSet, toggleInterested]
   );
 
   const handleRefresh = useCallback(() => {
@@ -459,9 +489,19 @@ export function FeedView({ ebayEnabled }: FeedViewProps) {
     [feedItems, selectedListingId]
   );
 
-  const handleSelectListing = useCallback((id: string) => {
-    setSelectedListingId((current) => (current === id ? null : id));
-  }, []);
+  const handleSelectListing = useCallback(
+    (id: string) => {
+      if (!seenSet.has(id)) {
+        markListingSeen(id);
+        setCounts((current) => ({
+          ...current,
+          new: Math.max(0, current.new - 1),
+        }));
+      }
+      setSelectedListingId((current) => (current === id ? null : id));
+    },
+    [markListingSeen, seenSet]
+  );
 
   const handleCloseDetail = useCallback(() => {
     setSelectedListingId(null);
@@ -484,6 +524,7 @@ export function FeedView({ ebayEnabled }: FeedViewProps) {
         feedView: "new",
         alertScope,
         marketplaceFilter,
+        unseenOnly: true,
       });
       if (ids.length === 0) return;
       dismissAllUnseen(ids);
@@ -535,15 +576,16 @@ export function FeedView({ ebayEnabled }: FeedViewProps) {
                     hint: "Nothing matches your filters — try clearing filters or refreshing.",
                   }
                 : {
-                    title: "You're all caught up",
-                    hint: "Nothing new in this view — try refreshing or widening your scope.",
+                    title: "No listings match",
+                    hint: "Nothing matches this view — try refreshing or widening your scope.",
                   };
 
   const contextSuffix = feedContextSuffix(
     feedView,
     alertScope,
     marketplaceFilter,
-    activeHunts
+    activeHunts,
+    counts.new
   );
 
   const showDetailPanel = selectedListingId != null && detailListing != null;
@@ -615,7 +657,7 @@ export function FeedView({ ebayEnabled }: FeedViewProps) {
               </span>
               {contextSuffix}
             </p>
-            {feedView === "new" && total > 0 && (
+            {feedView === "new" && counts.new > 0 && (
               <Button
                 variant="outline"
                 size="sm"
@@ -646,23 +688,25 @@ export function FeedView({ ebayEnabled }: FeedViewProps) {
                     listing={listing}
                     match={match ?? undefined}
                     interested={listingStatus[listing.id]?.interested}
+                    isNew={
+                      (feedView === "new" || feedView === "all") &&
+                      !seenSet.has(listing.id)
+                    }
                     muted={feedView === "dismissed"}
                     selected={selectedListingId === listing.id}
                     onSelect={() => handleSelectListing(listing.id)}
                     onDismiss={
-                      feedView === "new"
+                      feedView === "new" || feedView === "all"
                         ? () => handleDismiss(listing.id)
-                        : feedView === "all" && !seenSet.has(listing.id)
-                          ? () => handleDismiss(listing.id)
-                          : feedView === "starred"
-                            ? () => handleDismissStarred(listing.id)
-                            : undefined
+                        : feedView === "starred"
+                          ? () => handleDismissStarred(listing.id)
+                          : undefined
                     }
                     onRestore={
                       feedView === "dismissed"
                         ? () => {
                             restoreListing(listing.id);
-                            toast("Restored to New");
+                            toast("Restored to feed");
                           }
                         : undefined
                     }
@@ -702,22 +746,17 @@ export function FeedView({ ebayEnabled }: FeedViewProps) {
               }
               onToggleInterested={() => handleToggleInterested(detailListing.id)}
               onDismiss={
-                feedView === "new"
+                feedView === "new" || feedView === "all"
                   ? () => {
                       handleDismiss(detailListing.id);
                       handleCloseDetail();
                     }
-                  : feedView === "all" && !seenSet.has(detailListing.id)
+                  : feedView === "starred"
                     ? () => {
-                        handleDismiss(detailListing.id);
+                        handleDismissStarred(detailListing.id);
                         handleCloseDetail();
                       }
-                    : feedView === "starred"
-                      ? () => {
-                          handleDismissStarred(detailListing.id);
-                          handleCloseDetail();
-                        }
-                      : undefined
+                    : undefined
               }
               className="max-md:fixed max-md:inset-y-0 max-md:right-0 max-md:z-30 max-md:w-full max-md:max-w-sm max-md:shadow-sm md:sticky md:top-4 md:col-start-2 md:row-start-1 md:self-start"
             />

@@ -19,6 +19,7 @@ export interface FeedQueryBody {
   alertScope: AlertScope;
   marketplaceFilter: MarketplaceFilter;
   seen: string[];
+  dismissed: string[];
   listingStatus: Record<string, ListingStatus>;
   hiddenListings: string[];
   dislikedModels: string[];
@@ -26,6 +27,7 @@ export interface FeedQueryBody {
   feedAttributeFilters: Partial<Record<AttrKey, HuntAttribute>>;
   hunts: Hunt[];
   refresh?: boolean;
+  unseenOnly?: boolean;
 }
 
 export interface FeedItem {

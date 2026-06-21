@@ -28,6 +28,7 @@ function pickPersistedState(): PersistedState {
   const s = useCasebackStore.getState();
   return {
     seen: s.seen,
+    dismissed: s.dismissed,
     listingStatus: s.listingStatus,
     alertScope: s.alertScope,
     marketplaceFilter: s.marketplaceFilter,
@@ -64,8 +65,10 @@ function applyPersistedState(
     allowedConditions: globalFilters.allowedConditions,
     excludeForParts: !globalFilters.allowedConditions.includes("For parts / project"),
   };
+  const hasDismissedField = state.dismissed != null;
   useCasebackStore.setState({
-    seen: state.seen ?? [],
+    seen: hasDismissedField ? (state.seen ?? []) : [],
+    dismissed: hasDismissedField ? (state.dismissed ?? []) : (state.seen ?? []),
     listingStatus: state.listingStatus ?? {},
     alertScope: migrateAlertScope(state.alertScope as string | undefined),
     marketplaceFilter: state.marketplaceFilter ?? "all",
