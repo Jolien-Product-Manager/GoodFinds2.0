@@ -13,7 +13,6 @@ import {
 import { Button } from "@/components/ui/button";
 import type { AppListing } from "@/lib/listings/types";
 import type { AttributeMatch, HuntMatchResult } from "@/lib/listings/hunt-match";
-import { formatHuntContributionBadge } from "@/lib/listings/hunt-match";
 import { ATTR_OPTIONS, type AttrKey } from "@/lib/hunts/types";
 import { getListingImageSrcs } from "@/lib/listings/image-url";
 import { getTotalCost } from "@/lib/shipping";
@@ -224,7 +223,6 @@ interface AlertListingCardProps {
   interested?: boolean;
   muted?: boolean;
   compact?: boolean;
-  showHuntMatchTags?: boolean;
   onDismiss?: () => void;
   onRestore?: () => void;
   onToggleInterested?: () => void;
@@ -236,7 +234,6 @@ export function AlertListingCard({
   interested = false,
   muted = false,
   compact = false,
-  showHuntMatchTags = false,
   onDismiss,
   onRestore,
   onToggleInterested,
@@ -272,19 +269,6 @@ export function AlertListingCard({
             {matchLabel}
           </span>
         )}
-
-        {showHuntMatchTags && (match?.huntContributions.length ?? 0) > 0 && (
-          <div className="absolute bottom-2 left-2 right-2 flex flex-wrap gap-1">
-            {match!.huntContributions.map((contribution) => (
-              <span
-                key={contribution.huntId}
-                className="rounded-full bg-ink/75 px-2 py-0.5 text-[10px] text-card"
-              >
-                {formatHuntContributionBadge(contribution)}
-              </span>
-            ))}
-          </div>
-        )}
       </div>
 
       <div className={cn("flex flex-1 flex-col", compact ? "gap-2.5 p-3" : "gap-3 p-4")}>
@@ -301,6 +285,24 @@ export function AlertListingCard({
             <p className={cn("mt-1 text-ink-soft", compact ? "text-xs" : "text-sm")}>
               {metaLine}
             </p>
+          )}
+          {(match?.huntContributions.length ?? 0) > 0 && (
+            <div
+              className={cn(
+                "mt-2 space-y-0.5 border-t border-line pt-2",
+                compact ? "text-[11px]" : "text-xs"
+              )}
+            >
+              {match!.huntContributions.map((contribution) => (
+                <p key={contribution.huntId} className="leading-snug text-ink-soft">
+                  <span className="font-medium text-ink">{contribution.huntName}</span>
+                  {" · "}
+                  {contribution.matchedOn.length > 0
+                    ? contribution.matchedOn.join(", ")
+                    : `${contribution.categoriesPassed}/${contribution.totalCategories} categories`}
+                </p>
+              ))}
+            </div>
           )}
         </div>
 

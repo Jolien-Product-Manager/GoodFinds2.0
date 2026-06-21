@@ -196,9 +196,6 @@ export function FeedView({ listings, ebayEnabled }: FeedViewProps) {
     activeHunts,
   ]);
 
-  const isHuntFindsScope =
-    alertScope === "watchlist" || alertScope.startsWith("hunt:");
-
   const handleDismiss = useCallback(
     (id: string) => {
       dismissListing(id);
@@ -380,9 +377,6 @@ export function FeedView({ listings, ebayEnabled }: FeedViewProps) {
                   match={matchResults.get(listing.id)}
                   interested={listingStatus[listing.id]?.interested}
                   muted={feedView === "dismissed"}
-                  showHuntMatchTags={
-                    (feedView === "new" || feedView === "all") && isHuntFindsScope
-                  }
                   onDismiss={
                     feedView === "new"
                       ? () => handleDismiss(listing.id)

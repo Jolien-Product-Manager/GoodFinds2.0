@@ -1,10 +1,15 @@
 import type { AppListing } from "@/lib/listings/types";
-import type { Hunt, HuntHearts } from "@/lib/hunts/types";
+import type { Hunt, HuntHearts, HuntGender } from "@/lib/hunts/types";
 import type { GlobalFilters } from "@/lib/hunts/types";
-import { normalizeCustomValue } from "@/lib/hunts/types";
+import { normalizeCustomValue, HUNT_GENDER_OPTIONS } from "@/lib/hunts/types";
 import { collabPickMatchesListing, resolveListingCollab } from "@/lib/listings/collab";
 import { completenessPickMatchesTitle } from "@/lib/listings/infer-buyer-axes";
-import { listingMatchesHuntGender } from "@/lib/listings/gender";
+import {
+  genderSearchText,
+  hasMensSignals,
+  hasWomensSignals,
+  listingMatchesHuntGender,
+} from "@/lib/listings/gender";
 import { ATTR_OPTIONS } from "@/lib/hunts/types";
 
 export type AttributeMatchStatus = "hit" | "miss" | "unverified";
@@ -31,6 +36,8 @@ export interface HuntScoreContribution {
   totalCategories: number;
   hearts: HuntHearts;
   pointsContributed: number;
+  /** Human-readable attributes/signals that passed for this hunt. */
+  matchedOn: string[];
 }
 
 export interface HuntMatchResult {
@@ -41,6 +48,81 @@ export interface HuntMatchResult {
   attributeMatches: AttributeMatch[];
   whyNote: string;
   huntContributions: HuntScoreContribution[];
+}
+
+function huntGenderLabel(gender: HuntGender): string {
+  return HUNT_GENDER_OPTIONS.find((o) => o.value === gender)?.label ?? gender;
+}
+
+function listingFeatureForMatch(
+  listing: AppListing,
+  key: string
+): string | undefined {
+  const f = listing.features;
+  switch (key) {
+    case "model":
+      return f.model ?? listing.model ?? undefined;
+    case "collab":
+      return f.collab;
+    case "dial":
+      return f.dial;
+    case "color":
+      return f.color;
+    case "era":
+      return f.era;
+    case "datecode":
+      return f.datecode;
+    case "dialOrig":
+      return f.dialOrig;
+    case "plating":
+      return f.plating;
+    case "crystal":
+      return f.crystal;
+    case "running":
+      return f.running;
+    case "complete":
+      return f.complete;
+    case "mvmt":
+      return f.mvmt;
+    default:
+      return undefined;
+  }
+}
+
+function attributeMatchLabel(match: AttributeMatch, listing: AppListing): string {
+  const optionLabel =
+    ATTR_OPTIONS[match.key as keyof typeof ATTR_OPTIONS]?.label ?? match.label;
+  if (match.key === "traits") return match.label;
+  if (match.status === "hit") {
+    const value = listingFeatureForMatch(listing, match.key);
+    return value ? `${optionLabel}: ${value}` : optionLabel;
+  }
+  return optionLabel;
+}
+
+function genderMatchedLabels(hunt: Hunt, listing: AppListing): string[] {
+  const combined = genderSearchText(listing.title, listing.description);
+  const labels: string[] = [];
+  if (hasWomensSignals(combined)) labels.push("Ladies/women's");
+  if (hasMensSignals(combined)) labels.push("Men's");
+  if (labels.length === 0 && hunt.gender !== "both") {
+    labels.push(huntGenderLabel(hunt.gender));
+  }
+  return labels;
+}
+
+function matchedOnLabels(
+  hunt: Hunt,
+  listing: AppListing,
+  matches: AttributeMatch[],
+  isGenderOnly: boolean
+): string[] {
+  const attributeHits = matches
+    .filter((m) => m.status === "hit")
+    .map((m) => attributeMatchLabel(m, listing));
+  if (attributeHits.length > 0) return attributeHits;
+  if (isGenderOnly) return genderMatchedLabels(hunt, listing);
+  return [];
 }
 
 function effectiveValues(hunt: Hunt, key: keyof Hunt["attributes"]): string[] {
@@ -252,6 +334,7 @@ export function scoreListingAgainstHunt(
   categoriesPassed: number;
   totalCategories: number;
   hearts: HuntHearts;
+  matchedOn: string[];
 } {
   const hearts = hunt.hearts ?? 2;
 
@@ -268,6 +351,7 @@ export function scoreListingAgainstHunt(
       categoriesPassed: 0,
       totalCategories: 0,
       hearts,
+      matchedOn: [],
     };
   }
 
@@ -302,19 +386,26 @@ export function scoreListingAgainstHunt(
       categoriesPassed,
       totalCategories,
       hearts,
+      matchedOn: [],
     };
   }
 
   const multiplier = HEARTS_SCORE_MULTIPLIER[hearts];
-  const pointsContributed = categoriesPassed * multiplier;
+  const isGenderOnly = totalCategories === 0;
+  // Gender-only hunt: gate passed, no attribute chips — still counts as a match.
+  const finalCategoriesPassed = isGenderOnly ? 1 : categoriesPassed;
+  const finalTotalCategories = isGenderOnly ? 1 : totalCategories;
+  const pointsContributed = finalCategoriesPassed * multiplier;
+  const matchedOn = matchedOnLabels(hunt, listing, matches, isGenderOnly);
 
   return {
     pointsContributed,
     matches,
     excluded: false,
-    categoriesPassed,
-    totalCategories,
+    categoriesPassed: finalCategoriesPassed,
+    totalCategories: finalTotalCategories,
     hearts,
+    matchedOn,
   };
 }
 
@@ -356,6 +447,7 @@ export function matchAllHunts(
         categoriesPassed,
         totalCategories,
         hearts,
+        matchedOn,
       } = scoreListingAgainstHunt(listing, hunt);
 
       if (excluded || pointsContributed <= 0) continue;
@@ -368,6 +460,7 @@ export function matchAllHunts(
         totalCategories,
         hearts,
         pointsContributed,
+        matchedOn,
       });
 
       if (pointsContributed > bestContribution) {
@@ -403,4 +496,14 @@ export function matchAllHunts(
 
 export function formatHuntContributionBadge(contribution: HuntScoreContribution): string {
   return `${contribution.huntName} — ${contribution.categoriesPassed}/${contribution.totalCategories} (${contribution.hearts} hearts)`;
+}
+
+export function formatHuntContributionLine(
+  contribution: HuntScoreContribution
+): string {
+  const matched =
+    contribution.matchedOn.length > 0
+      ? contribution.matchedOn.join(", ")
+      : `${contribution.categoriesPassed}/${contribution.totalCategories} categories`;
+  return `${contribution.huntName} — ${matched}`;
 }

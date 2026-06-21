@@ -18,6 +18,8 @@ Gender is evaluated **before** category scoring. A gender mismatch excludes the 
 
 Categories with no accepted values on the hunt are ignored (not counted in totals).
 
+**Gender-only hunts** (women's/men's with no attribute chips): when the gender gate passes, the hunt contributes as **1/1 categories** × hearts multiplier — so they still appear under Hunt matches in the feed.
+
 ---
 
 ## Per-hunt scoring

@@ -36,13 +36,21 @@ const MENS_PATTERNS = [
 
 const CASE_SIZE_MM = /\b(\d{1,2})\s*mm\b/gi;
 
+/** Normalize curly quotes so title/description gender keywords match reliably. */
+export function normalizeGenderText(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[\u2018\u2019\u201B]/g, "'")
+    .replace(/[\u201C\u201D]/g, '"');
+}
+
 export function hasWomensSignals(text: string): boolean {
-  const lower = text.toLowerCase();
+  const lower = normalizeGenderText(text);
   return WOMENS_PATTERNS.some((re) => re.test(lower));
 }
 
 export function hasMensSignals(text: string): boolean {
-  const lower = text.toLowerCase();
+  const lower = normalizeGenderText(text);
   return MENS_PATTERNS.some((re) => re.test(lower));
 }
 
@@ -148,14 +156,14 @@ export function listingMatchesHuntGender(
   }
 
   if (huntGender === "mens") {
-    if (childrensHint && !mensHint) return false;
-    if (womensHint && !mensHint) return false;
+    if (womensHint) return false;
+    if (childrensHint) return false;
     return true;
   }
 
   if (huntGender === "womens") {
-    if (childrensHint && !womensHint) return false;
     if (mensHint && !womensHint) return false;
+    if (childrensHint && !womensHint) return false;
     return true;
   }
 
