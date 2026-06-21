@@ -226,7 +226,6 @@ export function FeedView({ ebayEnabled }: FeedViewProps) {
         feedView,
         alertScope,
         marketplaceFilter,
-        dismissed,
         hiddenListings,
         dislikedModels,
         criteria,
@@ -239,7 +238,6 @@ export function FeedView({ ebayEnabled }: FeedViewProps) {
       feedView,
       alertScope,
       marketplaceFilter,
-      dismissed,
       hiddenListings,
       dislikedModels,
       criteria,
@@ -426,9 +424,21 @@ export function FeedView({ ebayEnabled }: FeedViewProps) {
     setTotal((current) => Math.max(0, current - 1));
   }, []);
 
+  const reinsertFeedItem = useCallback((item: FeedItem, index: number) => {
+    setFeedItems((current) => {
+      if (current.some((entry) => entry.listing.id === item.listing.id)) return current;
+      const next = [...current];
+      next.splice(Math.min(index, next.length), 0, item);
+      return next;
+    });
+    setTotal((current) => current + 1);
+  }, []);
+
   const handleDismiss = useCallback(
     (id: string) => {
       const wasUnseen = !seenSet.has(id);
+      const removedIndex = feedItems.findIndex((item) => item.listing.id === id);
+      const removedItem = removedIndex >= 0 ? feedItems[removedIndex] : null;
       dismissListing(id);
       removeFeedItem(id);
       setCounts((current) => ({
@@ -442,6 +452,9 @@ export function FeedView({ ebayEnabled }: FeedViewProps) {
           label: "Undo",
           onClick: () => {
             restoreListing(id);
+            if (removedItem) {
+              reinsertFeedItem(removedItem, removedIndex);
+            }
             setCounts((current) => ({
               ...current,
               dismissed: Math.max(0, current.dismissed - 1),
@@ -452,12 +465,15 @@ export function FeedView({ ebayEnabled }: FeedViewProps) {
         },
       });
     },
-    [dismissListing, removeFeedItem, restoreListing, seenSet]
+    [dismissListing, feedItems, reinsertFeedItem, removeFeedItem, restoreListing, seenSet]
   );
 
   const handleDismissStarred = useCallback(
     (id: string) => {
-      if (listingStatus[id]?.interested) {
+      const wasInterested = listingStatus[id]?.interested ?? false;
+      const removedIndex = feedItems.findIndex((item) => item.listing.id === id);
+      const removedItem = removedIndex >= 0 ? feedItems[removedIndex] : null;
+      if (wasInterested) {
         toggleInterested(id);
       }
       dismissListing(id);
@@ -465,11 +481,41 @@ export function FeedView({ ebayEnabled }: FeedViewProps) {
       toast("Dismissed", {
         action: {
           label: "Undo",
-          onClick: () => restoreListing(id),
+          onClick: () => {
+            restoreListing(id);
+            if (removedItem) {
+              reinsertFeedItem(removedItem, removedIndex);
+            }
+            if (wasInterested) {
+              toggleInterested(id);
+            }
+          },
         },
       });
     },
-    [dismissListing, listingStatus, removeFeedItem, restoreListing, toggleInterested]
+    [
+      dismissListing,
+      feedItems,
+      listingStatus,
+      reinsertFeedItem,
+      removeFeedItem,
+      restoreListing,
+      toggleInterested,
+    ]
+  );
+
+  const handleRestore = useCallback(
+    (id: string) => {
+      restoreListing(id);
+      removeFeedItem(id);
+      setCounts((current) => ({
+        ...current,
+        dismissed: Math.max(0, current.dismissed - 1),
+        all: current.all + 1,
+      }));
+      toast("Restored to feed");
+    },
+    [removeFeedItem, restoreListing]
   );
 
   const handleToggleInterested = useCallback(
@@ -552,6 +598,9 @@ export function FeedView({ ebayEnabled }: FeedViewProps) {
         unseenOnly: true,
       });
       if (ids.length === 0) return;
+      const previousItems = feedItems;
+      const previousTotal = total;
+      const previousCursor = nextCursor;
       dismissAllUnseen(ids);
       setFeedItems([]);
       setTotal(0);
@@ -559,7 +608,12 @@ export function FeedView({ ebayEnabled }: FeedViewProps) {
       toast(`Dismissed ${ids.length.toLocaleString()} listing${ids.length === 1 ? "" : "s"}`, {
         action: {
           label: "Undo",
-          onClick: () => restoreAll(ids),
+          onClick: () => {
+            restoreAll(ids);
+            setFeedItems(previousItems);
+            setTotal(previousTotal);
+            setNextCursor(previousCursor);
+          },
         },
       });
       void postFeedCounts(feedQueryBodyRef.current).then(setCounts).catch(() => {});
@@ -569,9 +623,12 @@ export function FeedView({ ebayEnabled }: FeedViewProps) {
   }, [
     alertScope,
     dismissAllUnseen,
+    feedItems,
     feedQueryBody,
     marketplaceFilter,
+    nextCursor,
     restoreAll,
+    total,
   ]);
 
   const emptyMessage = useMemo(() => {
@@ -804,10 +861,7 @@ export function FeedView({ ebayEnabled }: FeedViewProps) {
                     }
                     onRestore={
                       feedView === "dismissed"
-                        ? () => {
-                            restoreListing(listing.id);
-                            toast("Restored to feed");
-                          }
+                        ? () => handleRestore(listing.id)
                         : undefined
                     }
                     onToggleInterested={() => handleToggleInterested(listing.id)}
