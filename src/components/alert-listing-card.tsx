@@ -449,7 +449,7 @@ export function AlertListingCard({
               <CardFlipButton
                 flipped={false}
                 onToggle={() => setFlipped(true)}
-                className="absolute bottom-3 right-3"
+                className="absolute left-3 top-3"
               />
             </div>
 
