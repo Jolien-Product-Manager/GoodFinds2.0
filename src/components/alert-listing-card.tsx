@@ -13,7 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import type { AppListing } from "@/lib/listings/types";
 import type { AttributeMatch, HuntMatchResult } from "@/lib/listings/hunt-match";
-import { FEED_SCORE_MAX } from "@/lib/listings/hunt-match";
+import { formatHuntContributionBadge } from "@/lib/listings/hunt-match";
 import { ATTR_OPTIONS, type AttrKey } from "@/lib/hunts/types";
 import { getListingImageSrcs } from "@/lib/listings/image-url";
 import { getTotalCost } from "@/lib/shipping";
@@ -87,9 +87,17 @@ function attributeTagLabel(match: AttributeMatch, listing: AppListing): string {
   return short ?? full;
 }
 
-function matchQualityLabel(score: number): string {
-  if (score >= FEED_SCORE_MAX * 0.5) return "Good match";
-  if (score > 0) return "Match";
+function matchQualityLabel(match: HuntMatchResult): string {
+  const top = match.huntContributions[0];
+  if (!top) return "";
+  if (
+    top.categoriesPassed === top.totalCategories &&
+    top.totalCategories > 0 &&
+    top.hearts >= 3
+  ) {
+    return "Good match";
+  }
+  if (match.score > 0) return "Match";
   return "";
 }
 
@@ -235,7 +243,7 @@ export function AlertListingCard({
 }: AlertListingCardProps) {
   const costs = getTotalCost(listing, DEFAULT_CRITERIA.postalCode);
   const conditionLabel = listing.condition;
-  const matchLabel = match && match.score > 0 ? matchQualityLabel(match.score) : "";
+  const matchLabel = match && match.score > 0 ? matchQualityLabel(match) : "";
   const attributeMatches = match?.attributeMatches ?? [];
   const visibleAttributes = attributeMatches.filter(
     (m) => m.status === "hit" || m.status === "miss"
@@ -265,14 +273,14 @@ export function AlertListingCard({
           </span>
         )}
 
-        {showHuntMatchTags && (match?.matchedHuntNames.length ?? 0) > 0 && (
+        {showHuntMatchTags && (match?.huntContributions.length ?? 0) > 0 && (
           <div className="absolute bottom-2 left-2 right-2 flex flex-wrap gap-1">
-            {match!.matchedHuntNames.map((name) => (
+            {match!.huntContributions.map((contribution) => (
               <span
-                key={name}
+                key={contribution.huntId}
                 className="rounded-full bg-ink/75 px-2 py-0.5 text-[10px] text-card"
               >
-                {name}
+                {formatHuntContributionBadge(contribution)}
               </span>
             ))}
           </div>

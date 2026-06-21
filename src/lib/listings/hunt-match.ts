@@ -1,8 +1,7 @@
 import type { AppListing } from "@/lib/listings/types";
-import type { Hunt } from "@/lib/hunts/types";
+import type { Hunt, HuntHearts } from "@/lib/hunts/types";
 import type { GlobalFilters } from "@/lib/hunts/types";
 import { normalizeCustomValue } from "@/lib/hunts/types";
-import { specificityMultiplier, huntTightness } from "@/lib/hunts/summary";
 import { collabPickMatchesListing, resolveListingCollab } from "@/lib/listings/collab";
 import { completenessPickMatchesTitle } from "@/lib/listings/infer-buyer-axes";
 import { listingMatchesHuntGender } from "@/lib/listings/gender";
@@ -17,27 +16,32 @@ export interface AttributeMatch {
   confidence?: "high" | "medium" | "low";
 }
 
-export interface ScoreBreakdown {
-  completeness: number;
-  specificity: number;
-  hearts: number;
-  hits: number;
-  specified: number;
-  specificityLabel: string;
-  bestHuntName: string;
+/** Hearts → score multiplier (retune here without changing call sites). */
+export const HEARTS_SCORE_MULTIPLIER: Record<HuntHearts, number> = {
+  1: 0.25,
+  2: 0.5,
+  3: 0.75,
+  4: 1.0,
+};
+
+export interface HuntScoreContribution {
+  huntId: string;
+  huntName: string;
+  categoriesPassed: number;
+  totalCategories: number;
+  hearts: HuntHearts;
+  pointsContributed: number;
 }
 
 export interface HuntMatchResult {
+  /** Sum of per-hunt contributions; used for feed sort only (no fixed ceiling). */
   score: number;
   matchedHuntIds: string[];
   matchedHuntNames: string[];
   attributeMatches: AttributeMatch[];
   whyNote: string;
-  scoreBreakdown?: ScoreBreakdown;
+  huntContributions: HuntScoreContribution[];
 }
-
-/** Maximum per-hunt score: C(1) × S(2) × H(4). */
-export const FEED_SCORE_MAX = 8;
 
 function effectiveValues(hunt: Hunt, key: keyof Hunt["attributes"]): string[] {
   const attr = hunt.attributes[key];
@@ -121,35 +125,151 @@ function listingSearchText(listing: AppListing): string {
   );
 }
 
-export function scoreListingAgainstHunt(
+function categoryPasses(
   listing: AppListing,
-  hunt: Hunt
-): {
-  score: number;
-  matches: AttributeMatch[];
-  excluded: boolean;
-  breakdown: Omit<ScoreBreakdown, "bestHuntName">;
-} {
-  if (!listingMatchesHuntGender(listing.gender, hunt.gender ?? "both", listing.title)) {
+  key: keyof Hunt["attributes"],
+  wanted: string[]
+): { passed: boolean; match: AttributeMatch } {
+  const label = attributeLabel(key);
+  const listingVal = listingValueForAttr(listing, key);
+
+  if (key === "collab") {
+    const hit = wanted.some((w) => collabPickMatchesListing(w, listing));
+    const inferred = resolveListingCollab(listing);
+    if (hit) {
+      return {
+        passed: true,
+        match: {
+          key,
+          label,
+          status: "hit",
+          confidence: inferred
+            ? (listing.features.confidence.collab ?? "medium")
+            : listing.features.confidence.collab,
+        },
+      };
+    }
+    if (!inferred && wanted.every((w) => normalizeCustomValue(w) !== "any collab")) {
+      return {
+        passed: false,
+        match: {
+          key,
+          label,
+          status: "unverified",
+          confidence: listing.features.confidence.collab,
+        },
+      };
+    }
+    return { passed: false, match: { key, label, status: "miss" } };
+  }
+
+  if (key === "complete") {
+    const hit = wanted.some((w) => completenessPickMatchesTitle(w, listing.title));
+    const resolved = listing.features.complete;
+    if (hit) {
+      return {
+        passed: true,
+        match: {
+          key,
+          label,
+          status: "hit",
+          confidence: resolved
+            ? (listing.features.confidence.complete ?? "medium")
+            : listing.features.confidence.complete,
+        },
+      };
+    }
+    if (!resolved) {
+      return {
+        passed: false,
+        match: {
+          key,
+          label,
+          status: "unverified",
+          confidence: listing.features.confidence.complete,
+        },
+      };
+    }
+    return { passed: false, match: { key, label, status: "miss" } };
+  }
+
+  if (key === "traits") {
+    const haystack = listingSearchText(listing);
+    const matched = wanted.find((w) => w.length > 0 && haystack.includes(w));
+    if (matched) {
+      return {
+        passed: true,
+        match: { key, label: matched, status: "hit", confidence: "medium" },
+      };
+    }
     return {
-      score: 0,
-      matches: [],
-      excluded: true,
-      breakdown: {
-        completeness: 0,
-        specificity: 0,
-        hearts: hunt.hearts ?? 2,
-        hits: 0,
-        specified: 0,
-        specificityLabel: huntTightness(hunt).label,
+      passed: false,
+      match: { key, label: wanted[0] ?? key, status: "miss" },
+    };
+  }
+
+  if (!listingVal) {
+    return {
+      passed: false,
+      match: {
+        key,
+        label,
+        status: "unverified",
+        confidence:
+          listing.features.confidence[key as keyof typeof listing.features.confidence],
       },
     };
   }
 
+  const normalizedListing = normalizeCustomValue(listingVal);
+  const hit = wanted.some(
+    (w) => normalizedListing.includes(w) || w.includes(normalizedListing)
+  );
+
+  if (hit) {
+    return {
+      passed: true,
+      match: {
+        key,
+        label,
+        status: "hit",
+        confidence:
+          listing.features.confidence[key as keyof typeof listing.features.confidence],
+      },
+    };
+  }
+
+  return { passed: false, match: { key, label, status: "miss" } };
+}
+
+export function scoreListingAgainstHunt(
+  listing: AppListing,
+  hunt: Hunt
+): {
+  pointsContributed: number;
+  matches: AttributeMatch[];
+  excluded: boolean;
+  categoriesPassed: number;
+  totalCategories: number;
+  hearts: HuntHearts;
+} {
+  const hearts = hunt.hearts ?? 2;
+
+  if (!listingMatchesHuntGender(listing.gender, hunt.gender ?? "both", listing.title)) {
+    return {
+      pointsContributed: 0,
+      matches: [],
+      excluded: true,
+      categoriesPassed: 0,
+      totalCategories: 0,
+      hearts,
+    };
+  }
+
   const matches: AttributeMatch[] = [];
-  let specified = 0;
-  let hits = 0;
-  let excluded = false;
+  let categoriesPassed = 0;
+  let totalCategories = 0;
+  let requiredFailed = false;
 
   for (const [key, meta] of Object.entries(hunt.attributes) as [
     keyof Hunt["attributes"],
@@ -158,121 +278,38 @@ export function scoreListingAgainstHunt(
     const wanted = effectiveValues(hunt, key);
     if (wanted.length === 0) continue;
 
-    specified += 1;
-    const listingVal = listingValueForAttr(listing, key);
-    const label = attributeLabel(key);
+    totalCategories += 1;
+    const { passed, match } = categoryPasses(listing, key, wanted);
+    matches.push(match);
 
-    if (key === "collab") {
-      const hit = wanted.some((w) => collabPickMatchesListing(w, listing));
-      const inferred = resolveListingCollab(listing);
-      if (hit) {
-        hits += 1;
-        matches.push({
-          key,
-          label,
-          status: "hit",
-          confidence: inferred
-            ? (listing.features.confidence.collab ?? "medium")
-            : listing.features.confidence.collab,
-        });
-      } else if (!inferred && wanted.every((w) => normalizeCustomValue(w) !== "any collab")) {
-        matches.push({
-          key,
-          label,
-          status: "unverified",
-          confidence: listing.features.confidence.collab,
-        });
-      } else {
-        matches.push({ key, label, status: "miss" });
-      }
-      continue;
-    }
-
-    if (key === "complete") {
-      const hit = wanted.some((w) =>
-        completenessPickMatchesTitle(w, listing.title)
-      );
-      const resolved = listing.features.complete;
-      if (hit) {
-        hits += 1;
-        matches.push({
-          key,
-          label,
-          status: "hit",
-          confidence: resolved
-            ? (listing.features.confidence.complete ?? "medium")
-            : listing.features.confidence.complete,
-        });
-      } else if (!resolved) {
-        matches.push({
-          key,
-          label,
-          status: "unverified",
-          confidence: listing.features.confidence.complete,
-        });
-      } else {
-        matches.push({ key, label, status: "miss" });
-      }
-      continue;
-    }
-
-    if (key === "traits") {
-      const haystack = listingSearchText(listing);
-      const matched = wanted.find((w) => w.length > 0 && haystack.includes(w));
-      if (matched) {
-        hits += 1;
-        matches.push({ key, label: matched, status: "hit", confidence: "medium" });
-      } else {
-        matches.push({ key, label: wanted[0] ?? key, status: "miss" });
-      }
-      continue;
-    }
-
-    if (!listingVal) {
-      matches.push({
-        key,
-        label,
-        status: "unverified",
-        confidence: listing.features.confidence[key as keyof typeof listing.features.confidence],
-      });
-      continue;
-    }
-
-    const normalizedListing = normalizeCustomValue(listingVal);
-    const hit = wanted.some(
-      (w) => normalizedListing.includes(w) || w.includes(normalizedListing)
-    );
-
-    if (hit) {
-      hits += 1;
-      matches.push({
-        key,
-        label,
-        status: "hit",
-        confidence: listing.features.confidence[key as keyof typeof listing.features.confidence],
-      });
-    } else {
-      matches.push({ key, label, status: "miss" });
-      // dealbreaker would exclude — simplified: any miss reduces score, not exclude in phase 4 base
+    if (passed) {
+      categoriesPassed += 1;
+    } else if (meta.required) {
+      requiredFailed = true;
     }
   }
 
-  const C = specified === 0 ? 1.0 : hits / specified;
-  const S = specificityMultiplier(hunt);
-  const H = hunt.hearts ?? 2;
-  const score = C * S * H;
+  if (requiredFailed) {
+    return {
+      pointsContributed: 0,
+      matches,
+      excluded: false,
+      categoriesPassed,
+      totalCategories,
+      hearts,
+    };
+  }
+
+  const multiplier = HEARTS_SCORE_MULTIPLIER[hearts];
+  const pointsContributed = categoriesPassed * multiplier;
+
   return {
-    score,
+    pointsContributed,
     matches,
-    excluded,
-    breakdown: {
-      completeness: C,
-      specificity: S,
-      hearts: H,
-      hits,
-      specified,
-      specificityLabel: huntTightness(hunt).label,
-    },
+    excluded: false,
+    categoriesPassed,
+    totalCategories,
+    hearts,
   };
 }
 
@@ -287,40 +324,57 @@ export function matchAllHunts(
   for (const listing of listings) {
     if (activeHunts.length === 0) {
       results.set(listing.id, {
-        score: 0.3,
+        score: 0,
         matchedHuntIds: [],
         matchedHuntNames: [],
         attributeMatches: [],
         whyNote: listing.model
           ? `${listing.model} — vintage Timex in your scan pool`
           : "Vintage Timex listing in your scan pool",
+        huntContributions: [],
       });
       continue;
     }
 
-    let bestScore = 0;
+    let listingScore = 0;
+    const huntContributions: HuntScoreContribution[] = [];
     let bestMatches: AttributeMatch[] = [];
-    let bestBreakdown: ScoreBreakdown | undefined;
-    const matchedIds: string[] = [];
-    const matchedNames: string[] = [];
+    let bestContribution = 0;
 
     for (const hunt of activeHunts) {
       if (!huntHasActiveCriteria(hunt)) continue;
-      const { score, matches, excluded, breakdown } = scoreListingAgainstHunt(
-        listing,
-        hunt
-      );
-      if (excluded) continue;
-      if (score > 0) {
-        matchedIds.push(hunt.id);
-        matchedNames.push(hunt.name);
-      }
-      if (score > bestScore) {
-        bestScore = score;
+
+      const {
+        pointsContributed,
+        matches,
+        excluded,
+        categoriesPassed,
+        totalCategories,
+        hearts,
+      } = scoreListingAgainstHunt(listing, hunt);
+
+      if (excluded || pointsContributed <= 0) continue;
+
+      listingScore += pointsContributed;
+      huntContributions.push({
+        huntId: hunt.id,
+        huntName: hunt.name,
+        categoriesPassed,
+        totalCategories,
+        hearts,
+        pointsContributed,
+      });
+
+      if (pointsContributed > bestContribution) {
+        bestContribution = pointsContributed;
         bestMatches = matches;
-        bestBreakdown = { ...breakdown, bestHuntName: hunt.name };
       }
     }
+
+    huntContributions.sort((a, b) => b.pointsContributed - a.pointsContributed);
+
+    const matchedIds = huntContributions.map((c) => c.huntId);
+    const matchedNames = huntContributions.map((c) => c.huntName);
 
     const whyNote =
       matchedNames.length > 0
@@ -330,14 +384,18 @@ export function matchAllHunts(
           : "Unverified model — still worth a look";
 
     results.set(listing.id, {
-      score: bestScore,
+      score: listingScore,
       matchedHuntIds: matchedIds,
       matchedHuntNames: matchedNames,
       attributeMatches: bestMatches,
       whyNote,
-      scoreBreakdown: bestBreakdown,
+      huntContributions,
     });
   }
 
   return results;
+}
+
+export function formatHuntContributionBadge(contribution: HuntScoreContribution): string {
+  return `${contribution.huntName} — ${contribution.categoriesPassed}/${contribution.totalCategories} (${contribution.hearts} hearts)`;
 }

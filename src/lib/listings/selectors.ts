@@ -10,8 +10,8 @@ import { listingPassesFeedAttributeFilters } from "@/lib/listings/feed-attribute
 import { passesCriteria } from "@/lib/shipping";
 import type { HuntMatchResult } from "@/lib/listings/hunt-match";
 
-/** Strong-match threshold for `top` scope (0–8 scale). */
-export const TOP_MATCH_SCORE_THRESHOLD = 4.0;
+/** Strong-match threshold on additive listing score (see listing-match-scoring.md). */
+export const TOP_MATCH_SCORE_THRESHOLD = 3.0;
 
 interface FilterContext {
   seen: string[];

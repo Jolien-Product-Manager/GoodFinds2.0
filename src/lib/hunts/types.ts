@@ -19,6 +19,8 @@ export type AttrKey =
 export interface HuntAttribute {
   picks: string[];
   customs: string[];
+  /** When true, the listing must match this category or the hunt scores 0. */
+  required?: boolean;
 }
 
 export type HuntGender =
