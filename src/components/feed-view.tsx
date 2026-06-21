@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -252,6 +253,16 @@ export function FeedView({ ebayEnabled }: FeedViewProps) {
     () => hunts.filter((h) => h.saved && !h.archived && huntHasActiveCriteria(h)),
     [hunts]
   );
+
+  const womensOnlyHunts =
+    activeHunts.length > 0 && activeHunts.every((h) => h.gender === "womens");
+
+  const showAllListings = useCallback(() => {
+    setFeedView("new");
+    setAlertScope("all");
+    setMarketplaceFilter("all");
+    clearFeedAttributeFilters();
+  }, [clearFeedAttributeFilters, setAlertScope, setFeedView, setMarketplaceFilter]);
 
   const reloadFeed = useCallback(async (options?: { refresh?: boolean }) => {
     const generation = ++fetchGeneration.current;
@@ -606,14 +617,19 @@ export function FeedView({ ebayEnabled }: FeedViewProps) {
     }
 
     if (alertScope === "watchlist") {
+      let hint =
+        activeHunts.length === 0
+          ? "Save a hunt on Hunts to populate Hunt Finds."
+          : counts.all > 0
+            ? "Listings are available, but none match your hunts in this view — try Show all listings below, raise your max total cost on Hunt Preferences, or broaden hunt criteria."
+            : "Nothing unseen matches your saved hunts — try All listings or broaden hunt criteria.";
+      if (womensOnlyHunts && counts.all > 0) {
+        hint +=
+          " Your hunts are set to Women's only — most vintage Timex listings read as men's or unisex, so try Both or Men's on Hunts.";
+      }
       return {
         title: "No hunt matches yet",
-        hint:
-          activeHunts.length === 0
-            ? "Save a hunt on Hunts to populate Hunt Finds."
-            : counts.all > 0
-              ? "Listings are available, but none match your hunts in this view — try All listings, raise your max total cost on Hunt Preferences, or broaden hunt criteria."
-              : "Nothing unseen matches your saved hunts — try All listings or broaden hunt criteria.",
+        hint,
       };
     }
 
@@ -635,6 +651,7 @@ export function FeedView({ ebayEnabled }: FeedViewProps) {
     alertScope,
     activeHunts.length,
     feedAttributeFilters,
+    womensOnlyHunts,
   ]);
 
   const contextSuffix = feedContextSuffix(
@@ -713,6 +730,15 @@ export function FeedView({ ebayEnabled }: FeedViewProps) {
                 {total.toLocaleString()}
               </span>
               {contextSuffix}
+              {total === 0 &&
+                counts.all > 0 &&
+                alertScope !== "all" &&
+                (feedView === "new" || feedView === "all") && (
+                  <span className="text-ink-soft">
+                    {" "}
+                    · {counts.all.toLocaleString()} pass your filters
+                  </span>
+                )}
             </p>
             {feedView === "new" && counts.new > 0 && (
               <Button
@@ -734,6 +760,23 @@ export function FeedView({ ebayEnabled }: FeedViewProps) {
             <div className="rounded-sm border border-dashed border-line-strong bg-card/50 p-12 text-center">
               <p className="font-display text-lg text-ink">{emptyMessage.title}</p>
               <p className="mt-2 text-sm text-ink-soft">{emptyMessage.hint}</p>
+              {counts.all > 0 && alertScope !== "all" && (
+                <div className="mt-5 flex flex-wrap justify-center gap-2">
+                  <Button type="button" onClick={showAllListings}>
+                    Show all listings
+                  </Button>
+                  <Button type="button" variant="outline" asChild>
+                    <Link href="/hunts">Edit hunts</Link>
+                  </Button>
+                </div>
+              )}
+              {counts.all === 0 && (feedView === "new" || feedView === "all") && (
+                <div className="mt-5">
+                  <Button type="button" variant="outline" onClick={showAllListings}>
+                    Clear filters and show all
+                  </Button>
+                </div>
+              )}
             </div>
           ) : (
             <>
