@@ -2,6 +2,7 @@ import type { AppListing } from "./types";
 import type { AttrKey, HuntAttribute } from "@/lib/hunts/types";
 import { FEED_FILTER_ATTR_KEYS, normalizeCustomValue } from "@/lib/hunts/types";
 import { collabPickMatchesListing } from "@/lib/listings/collab";
+import { complicationPickMatchesListing } from "@/lib/listings/complications";
 import { completenessPickMatchesTitle } from "@/lib/listings/infer-buyer-axes";
 
 function filterValues(attr: HuntAttribute | undefined): string[] {
@@ -16,6 +17,8 @@ function listingValueForAttr(listing: AppListing, key: string): string | undefin
       return f.model?.toLowerCase() ?? listing.model?.toLowerCase();
     case "collab":
       return f.collab?.toLowerCase();
+    case "complications":
+      return f.complications?.toLowerCase();
     case "dial":
       return f.dial?.toLowerCase();
     case "color":
@@ -48,6 +51,7 @@ function listingSearchText(listing: AppListing): string {
       listing.title,
       f.model,
       f.collab,
+      f.complications,
       f.dial,
       f.color,
       f.era,
@@ -73,6 +77,14 @@ function listingMatchesAttributePick(
 
   if (key === "collab") {
     return collabPickMatchesListing(wantedRaw, listing);
+  }
+
+  if (key === "complications") {
+    return complicationPickMatchesListing(
+      wantedRaw,
+      listing.title,
+      listing.description
+    );
   }
 
   if (key === "complete") {

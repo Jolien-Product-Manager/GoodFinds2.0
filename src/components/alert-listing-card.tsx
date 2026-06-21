@@ -20,6 +20,7 @@ import { DEFAULT_CRITERIA } from "@/lib/criteria";
 import { cn } from "@/lib/utils";
 
 const ATTR_SHORT: Partial<Record<AttrKey, string>> = {
+  complications: "Complication",
   model: "Model",
   era: "Era",
   datecode: "Code",
@@ -42,6 +43,8 @@ function listingFeatureValue(listing: AppListing, key: string): string | undefin
       return f.model ?? listing.model ?? undefined;
     case "collab":
       return f.collab;
+    case "complications":
+      return f.complications;
     case "dial":
       return f.dial;
     case "color":

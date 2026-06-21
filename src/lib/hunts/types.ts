@@ -2,6 +2,8 @@ import { TIMEX_MODELS } from "@/lib/models/catalog";
 import { migrateLegacyHuntAttributes } from "@/lib/hunts/migrate-attributes";
 
 export type AttrKey =
+  | "complications"
+  | "collab"
   | "model"
   | "era"
   | "datecode"
@@ -10,7 +12,6 @@ export type AttrKey =
   | "crystal"
   | "running"
   | "complete"
-  | "collab"
   | "dial"
   | "color"
   | "mvmt"
@@ -21,6 +22,8 @@ export interface HuntAttribute {
   customs: string[];
   /** When true, the listing must match this category or the hunt scores 0. */
   required?: boolean;
+  /** Individual picks that must match; toggled via double-click on tiles. */
+  requiredPicks?: string[];
 }
 
 export type HuntGender =
@@ -41,8 +44,10 @@ export interface Hunt {
   name: string;
   saved: boolean;
   gender: HuntGender;
-  /** 1–4 hearts: urgency / how badly you're looking for this hunt. */
-  hearts: HuntHearts;
+  /** When gender is set: true = must-have gate; false = soft preference. Legacy hunts default to must-have. */
+  genderRequired?: boolean;
+  /** 1–4 hearts: urgency / how badly you're looking for this hunt. Null until user chooses. */
+  hearts: HuntHearts | null;
   attributes: Record<AttrKey, HuntAttribute>;
   createdAt: string;
   updatedAt: string;
@@ -63,6 +68,12 @@ export interface PurchasedWatch {
   imageUrl: string | null;
 }
 
+/** Shown near the top of the hunt builder (after gender). */
+export const PRIORITY_ATTR_KEYS = [
+  "complications",
+  "collab",
+] as const satisfies readonly AttrKey[];
+
 export const BUYER_AXIS_KEYS = [
   "model",
   "era",
@@ -75,7 +86,6 @@ export const BUYER_AXIS_KEYS = [
 ] as const satisfies readonly AttrKey[];
 
 export const TASTE_ATTR_KEYS = [
-  "collab",
   "dial",
   "color",
   "mvmt",
@@ -86,6 +96,45 @@ export const ATTR_OPTIONS: Record<
   AttrKey,
   { label: string; options: string[] }
 > = {
+  complications: {
+    label: "Complications",
+    options: [
+      "Date",
+      "Day-date (day + date)",
+      "Day of week",
+      "Sweep seconds",
+      "Sub-seconds",
+      "24-hour indicator",
+      "Calendar (full)",
+      "Chronograph (stopwatch)",
+      "Tachymeter scale",
+      "Rotating dive bezel",
+      "GMT / dual time",
+      "Alarm",
+      "Moon phase",
+      "Power reserve indicator",
+      "Indiglo night-light",
+      "World time",
+      "Pointer date",
+    ],
+  },
+  collab: {
+    label: "Collaboration",
+    options: [
+      "Any collab",
+      "Peanuts",
+      "Mickey Mouse",
+      "Minnie Mouse",
+      "Donald Duck",
+      "Disney",
+      "Keith Haring",
+      "Coca-Cola",
+      "Pac-Man",
+      "NASA",
+      "Todd Snyder",
+      "House brand only",
+    ],
+  },
   model: {
     label: "Model / family",
     options: [...TIMEX_MODELS].sort((a, b) => a.localeCompare(b)),
@@ -167,23 +216,6 @@ export const ATTR_OPTIONS: Record<
       "Tags attached",
     ],
   },
-  collab: {
-    label: "Collaboration",
-    options: [
-      "Any collab",
-      "Peanuts",
-      "Mickey Mouse",
-      "Minnie Mouse",
-      "Donald Duck",
-      "Disney",
-      "Keith Haring",
-      "Coca-Cola",
-      "Pac-Man",
-      "NASA",
-      "Todd Snyder",
-      "House brand only",
-    ],
-  },
   dial: {
     label: "Dial pattern",
     options: ["Crosshair", "Dot-dash", "Plain 2/3-hand", "Numerals", "Day/date"],
@@ -202,7 +234,11 @@ export const ATTR_OPTIONS: Record<
   },
 };
 
-export const ATTR_KEYS = [...BUYER_AXIS_KEYS, ...TASTE_ATTR_KEYS] as AttrKey[];
+export const ATTR_KEYS = [
+  ...PRIORITY_ATTR_KEYS,
+  ...BUYER_AXIS_KEYS,
+  ...TASTE_ATTR_KEYS,
+] as AttrKey[];
 
 /** Preset attribute rows in the hunt builder (excludes free-form traits). */
 export const PRESET_ATTR_KEYS = ATTR_KEYS.filter((k) => k !== "traits") as Exclude<
@@ -276,6 +312,66 @@ export function isAttributeValueSelected(
   );
 }
 
+export function isRequiredPick(
+  attr: HuntAttribute | undefined,
+  value: string
+): boolean {
+  if (!attr) return false;
+  const norm = normalizeCustomValue(value);
+  if (attr.requiredPicks?.some((v) => normalizeCustomValue(v) === norm)) {
+    return true;
+  }
+  return attr.required === true && isAttributeValueSelected(attr, value);
+}
+
+function addRequiredPick(attr: HuntAttribute, value: string): HuntAttribute {
+  const norm = normalizeCustomValue(value);
+  const existing = attr.requiredPicks ?? [];
+  if (existing.some((v) => normalizeCustomValue(v) === norm)) return attr;
+  return {
+    ...attr,
+    requiredPicks: [...existing, value],
+    required: undefined,
+  };
+}
+
+function removeRequiredPick(attr: HuntAttribute, value: string): HuntAttribute {
+  const norm = normalizeCustomValue(value);
+  const next = attr.requiredPicks?.filter((v) => normalizeCustomValue(v) !== norm);
+  return {
+    ...attr,
+    requiredPicks: next?.length ? next : undefined,
+  };
+}
+
+/** Mark a pick as must-have without toggling require off. */
+export function markPickRequired(
+  attr: HuntAttribute,
+  value: string
+): HuntAttribute {
+  const withPick = isAttributeValueSelected(attr, value)
+    ? attr
+    : toggleAttributePick(attr, value);
+  return addRequiredPick(withPick, value);
+}
+
+/** Double-click tiles: select + require, or toggle require on/off. */
+export function toggleAttributeRequiredPick(
+  attr: HuntAttribute,
+  value: string
+): HuntAttribute {
+  const selected = isAttributeValueSelected(attr, value);
+  const required = isRequiredPick(attr, value);
+
+  if (!selected) {
+    return addRequiredPick(toggleAttributePick(attr, value), value);
+  }
+  if (required) {
+    return removeRequiredPick(attr, value);
+  }
+  return addRequiredPick(attr, value);
+}
+
 export function toggleAttributePick(
   attr: HuntAttribute,
   value: string
@@ -285,14 +381,27 @@ export function toggleAttributePick(
     (v) => normalizeCustomValue(v) === norm
   );
   if (selected) {
-    return {
+    const next = {
       picks: attr.picks.filter((v) => normalizeCustomValue(v) !== norm),
       customs: attr.customs.filter((v) => normalizeCustomValue(v) !== norm),
+    };
+    const nextRequiredPicks = attr.requiredPicks?.filter(
+      (v) => normalizeCustomValue(v) !== norm
+    );
+    if (next.picks.length === 0 && next.customs.length === 0) {
+      return { picks: [], customs: [] };
+    }
+    return {
+      ...next,
+      required: attr.required,
+      requiredPicks: nextRequiredPicks?.length ? nextRequiredPicks : undefined,
     };
   }
   return {
     picks: [...attr.picks, value],
     customs: attr.customs.filter((v) => normalizeCustomValue(v) !== norm),
+    required: attr.required,
+    requiredPicks: attr.requiredPicks,
   };
 }
 
@@ -315,12 +424,41 @@ function consolidateAttributeValues(
   return { picks: merged, customs: [] };
 }
 
+function consolidateRequiredPicks(
+  key: AttrKey,
+  requiredPicks: string[],
+  picks: string[]
+): string[] {
+  const pickNorms = new Set(picks.map((p) => normalizeCustomValue(p)));
+  const presetByNorm = new Map(
+    ATTR_OPTIONS[key].options.map((p) => [normalizeCustomValue(p), p])
+  );
+  const seen = new Set<string>();
+  const merged: string[] = [];
+  for (const raw of requiredPicks) {
+    const norm = normalizeCustomValue(raw);
+    if (!norm || !pickNorms.has(norm) || seen.has(norm)) continue;
+    seen.add(norm);
+    merged.push(presetByNorm.get(norm) ?? raw);
+  }
+  return merged;
+}
+
 export function emptyHuntAttributes(): Record<AttrKey, HuntAttribute> {
   const attrs = {} as Record<AttrKey, HuntAttribute>;
   for (const k of ATTR_KEYS) {
     attrs[k] = { picks: [], customs: [] };
   }
   return attrs;
+}
+
+/** Gender is a must-have gate (legacy hunts with gender set default to true). */
+export function isGenderRequired(hunt: Hunt): boolean {
+  const gender = hunt.gender ?? "both";
+  if (gender === "both") return false;
+  if (hunt.genderRequired === false) return false;
+  if (hunt.genderRequired === true) return true;
+  return true;
 }
 
 export function createDraftHunt(): Hunt {
@@ -330,7 +468,7 @@ export function createDraftHunt(): Hunt {
     name: "Untitled hunt",
     saved: false,
     gender: "both",
-    hearts: 2,
+    hearts: null,
     attributes: emptyHuntAttributes(),
     createdAt: now,
     updatedAt: now,
@@ -358,11 +496,16 @@ export function normalizeHunt(hunt: Partial<Hunt> & Pick<Hunt, "id" | "name">): 
   }
 
   for (const k of ATTR_KEYS) {
-    merged[k] = consolidateAttributeValues(
-      k,
-      merged[k].picks,
-      merged[k].customs
-    );
+    const prev = merged[k];
+    merged[k] = consolidateAttributeValues(k, prev.picks, prev.customs);
+    if (prev.required) merged[k].required = true;
+    if (prev.requiredPicks?.length) {
+      merged[k].requiredPicks = consolidateRequiredPicks(
+        k,
+        prev.requiredPicks,
+        merged[k].picks
+      );
+    }
   }
 
   const now = new Date().toISOString();
@@ -375,6 +518,8 @@ export function normalizeHunt(hunt: Partial<Hunt> & Pick<Hunt, "id" | "name">): 
     name: hunt.name,
     saved: hunt.saved ?? false,
     gender,
+    genderRequired:
+      gender === "both" ? undefined : hunt.genderRequired,
     hearts: resolveHuntHearts(hunt),
     attributes: merged,
     createdAt: hunt.createdAt ?? now,
@@ -388,13 +533,18 @@ export function normalizeCustomValue(value: string): string {
 
 function resolveHuntHearts(
   hunt: Partial<Hunt> & { priority?: number }
-): HuntHearts {
+): HuntHearts | null {
   const raw = hunt.hearts ?? hunt.priority;
   return clampHuntHearts(raw);
 }
 
-function clampHuntHearts(value: unknown): HuntHearts {
+function clampHuntHearts(value: unknown): HuntHearts | null {
+  if (value == null) return null;
   const n = typeof value === "number" ? value : Number(value);
-  if (!Number.isFinite(n)) return 2;
+  if (!Number.isFinite(n)) return null;
   return Math.min(4, Math.max(1, Math.round(n))) as HuntHearts;
+}
+
+export function isHuntHearts(value: unknown): value is HuntHearts {
+  return clampHuntHearts(value) != null;
 }

@@ -1,5 +1,6 @@
 import {
   ATTR_KEYS,
+  ATTR_OPTIONS,
   emptyHuntAttributes,
   normalizeCustomValue,
   type AttrKey,
@@ -7,6 +8,22 @@ import {
 } from "./types";
 
 const LEGACY_KEYS = ["case", "cond"] as const;
+
+let traitToComplicationCache: Map<string, string> | null = null;
+
+function getTraitToComplicationMap(): Map<string, string> {
+  if (traitToComplicationCache) return traitToComplicationCache;
+  traitToComplicationCache = new Map(
+    ATTR_OPTIONS.complications.options.flatMap((option) => {
+      const norm = normalizeCustomValue(option);
+      const base = normalizeCustomValue(option.replace(/\s*\([^)]*\)\s*$/, ""));
+      const entries: [string, string][] = [[norm, option]];
+      if (base && base !== norm) entries.push([base, option]);
+      return entries;
+    })
+  );
+  return traitToComplicationCache;
+}
 
 function appendValues(
   target: HuntAttribute,
@@ -37,6 +54,10 @@ export function migrateLegacyHuntAttributes(
       merged[key] = {
         picks: [...attr.picks],
         customs: [...attr.customs],
+        ...(attr.required ? { required: true } : {}),
+        ...(attr.requiredPicks?.length
+          ? { requiredPicks: [...attr.requiredPicks] }
+          : {}),
       };
     }
   }
@@ -68,6 +89,8 @@ export function migrateLegacyHuntAttributes(
       }
     }
   }
+
+  migrateTraitComplications(merged);
 
   return merged;
 }
@@ -101,4 +124,25 @@ export function migrateAttributeLibrary(
   }
 
   return next;
+}
+
+function migrateTraitComplications(merged: Record<AttrKey, HuntAttribute>): void {
+  const traits = merged.traits;
+  if (!traits) return;
+
+  const remainingPicks: string[] = [];
+  const remainingCustoms: string[] = [];
+
+  for (const value of [...traits.picks, ...traits.customs]) {
+    const mapped = getTraitToComplicationMap().get(normalizeCustomValue(value));
+    if (mapped) {
+      merged.complications = appendValues(merged.complications, [mapped]);
+    } else if (traits.picks.includes(value)) {
+      remainingPicks.push(value);
+    } else {
+      remainingCustoms.push(value);
+    }
+  }
+
+  merged.traits = { picks: remainingPicks, customs: remainingCustoms };
 }

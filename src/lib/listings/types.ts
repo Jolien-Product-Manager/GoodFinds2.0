@@ -28,6 +28,7 @@ export interface ExtractedFeatures {
   /** @deprecated Use buyer-axis fields (running, complete, plating, …). */
   cond?: ConditionGrade;
   collab?: string;
+  complications?: string;
   /** @deprecated Migrated to `complete`. */
   storeFind?: string;
   confidence: Partial<

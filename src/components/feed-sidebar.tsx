@@ -285,7 +285,7 @@ export function FeedSidebar({
                           selected={alertScope === huntScope}
                           indent
                           trailing={
-                            <HuntHeartsPicker value={hunt.hearts ?? 2} size="xs" />
+                            <HuntHeartsPicker value={hunt.hearts} size="xs" />
                           }
                           onClick={() => toggleScope(huntScope)}
                         />

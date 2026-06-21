@@ -31,6 +31,8 @@
   --color-brass: #97681e;
   --color-steal: #7e2b23;
   --color-ok: #4f6043;
+  /** Must-have hunt filters — sage green, warmer than `ok` but easy on the eyes */
+  --color-must: #4a8260;
   --color-line: rgba(42, 33, 24, 0.14);
   --color-line-strong: rgba(42, 33, 24, 0.28);
 

@@ -1,8 +1,9 @@
 import type { AppListing } from "@/lib/listings/types";
 import type { Hunt, HuntHearts, HuntGender } from "@/lib/hunts/types";
 import type { GlobalFilters } from "@/lib/hunts/types";
-import { normalizeCustomValue, HUNT_GENDER_OPTIONS } from "@/lib/hunts/types";
+import { normalizeCustomValue, HUNT_GENDER_OPTIONS, isGenderRequired } from "@/lib/hunts/types";
 import { collabPickMatchesListing, resolveListingCollab } from "@/lib/listings/collab";
+import { complicationPickMatchesListing } from "@/lib/listings/complications";
 import { completenessPickMatchesTitle } from "@/lib/listings/infer-buyer-axes";
 import {
   genderSearchText,
@@ -64,6 +65,8 @@ function listingFeatureForMatch(
       return f.model ?? listing.model ?? undefined;
     case "collab":
       return f.collab;
+    case "complications":
+      return f.complications;
     case "dial":
       return f.dial;
     case "color":
@@ -159,6 +162,8 @@ function listingValueForAttr(
       return f.model?.toLowerCase();
     case "collab":
       return f.collab?.toLowerCase();
+    case "complications":
+      return f.complications?.toLowerCase();
     case "dial":
       return f.dial?.toLowerCase();
     case "color":
@@ -195,6 +200,7 @@ function listingSearchText(listing: AppListing): string {
       listing.title,
       f.model,
       f.collab,
+      f.complications,
       f.dial,
       f.color,
       f.era,
@@ -244,6 +250,27 @@ function categoryPasses(
           label,
           status: "unverified",
           confidence: listing.features.confidence.collab,
+        },
+      };
+    }
+    return { passed: false, match: { key, label, status: "miss" } };
+  }
+
+  if (key === "complications") {
+    const hit = wanted.some((w) =>
+      complicationPickMatchesListing(w, listing.title, listing.description)
+    );
+    if (hit) {
+      const matched = wanted.find((w) =>
+        complicationPickMatchesListing(w, listing.title, listing.description)
+      );
+      return {
+        passed: true,
+        match: {
+          key,
+          label: matched ?? label,
+          status: "hit",
+          confidence: "medium",
         },
       };
     }
@@ -342,13 +369,15 @@ export function scoreListingAgainstHunt(
   matchedOn: string[];
 } {
   const hearts = hunt.hearts ?? 2;
-
-  if (!listingMatchesHuntGender(
+  const gender = hunt.gender ?? "both";
+  const genderMatches = listingMatchesHuntGender(
     listing.gender,
-    hunt.gender ?? "both",
+    gender,
     listing.title,
     listing.description
-  )) {
+  );
+
+  if (gender !== "both" && isGenderRequired(hunt) && !genderMatches) {
     return {
       pointsContributed: 0,
       matches: [],
@@ -365,6 +394,11 @@ export function scoreListingAgainstHunt(
   let totalCategories = 0;
   let requiredFailed = false;
 
+  if (gender !== "both" && hunt.genderRequired === false) {
+    totalCategories += 1;
+    if (genderMatches) categoriesPassed += 1;
+  }
+
   for (const [key, meta] of Object.entries(hunt.attributes) as [
     keyof Hunt["attributes"],
     Hunt["attributes"][keyof Hunt["attributes"]],
@@ -378,8 +412,13 @@ export function scoreListingAgainstHunt(
 
     if (passed) {
       categoriesPassed += 1;
-    } else if (meta.required) {
+    } else if (meta.required && !meta.requiredPicks?.length) {
       requiredFailed = true;
+    }
+
+    for (const pick of meta.requiredPicks ?? []) {
+      const { passed: pickPassed } = categoryPasses(listing, key, [pick]);
+      if (!pickPassed) requiredFailed = true;
     }
   }
 

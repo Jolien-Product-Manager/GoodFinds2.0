@@ -1,7 +1,13 @@
-import type { Hunt, AttrKey } from "./types";
-import { ATTR_OPTIONS } from "./types";
+import type { Hunt, AttrKey, HuntGender } from "./types";
+import {
+  HUNT_GENDER_OPTIONS,
+  isGenderRequired,
+  isRequiredPick,
+} from "./types";
 
 const SUMMARY_ORDER: AttrKey[] = [
+  "complications",
+  "collab",
   "model",
   "era",
   "datecode",
@@ -10,7 +16,6 @@ const SUMMARY_ORDER: AttrKey[] = [
   "crystal",
   "running",
   "complete",
-  "collab",
   "dial",
   "color",
   "mvmt",
@@ -43,16 +48,21 @@ export function specificityMultiplier(hunt: Hunt): number {
   }
 }
 
-export function buildHuntSummary(hunt: Hunt): string {
+export function buildHuntSummary(
+  hunt: Hunt,
+  options?: { omitGender?: boolean }
+): string {
   const parts: string[] = [];
 
-  if (hunt.gender === "mens") parts.push("Men's");
-  else if (hunt.gender === "womens") parts.push("Women's");
-  else if (hunt.gender === "unisex") parts.push("Unisex");
-  else if (hunt.gender === "childrens") parts.push("Children's");
-  else if (hunt.gender === "boys") parts.push("Boys");
-  else if (hunt.gender === "girls") parts.push("Girls");
-  else if (hunt.gender === "unisex_children") parts.push("Unisex children's");
+  if (!options?.omitGender) {
+    if (hunt.gender === "mens") parts.push("Men's");
+    else if (hunt.gender === "womens") parts.push("Women's");
+    else if (hunt.gender === "unisex") parts.push("Unisex");
+    else if (hunt.gender === "childrens") parts.push("Children's");
+    else if (hunt.gender === "boys") parts.push("Boys");
+    else if (hunt.gender === "girls") parts.push("Girls");
+    else if (hunt.gender === "unisex_children") parts.push("Unisex children's");
+  }
 
   for (const key of SUMMARY_ORDER) {
     const values = attributeValues(hunt, key);
@@ -76,8 +86,8 @@ export function buildHuntSummary(hunt: Hunt): string {
     sentence = sentence === "Any vintage Timex" ? "Any vintage Timex" : `${sentence} Timex`;
   }
 
-  const hearts = hunt.hearts ?? 2;
-  sentence += ` · ${hearts}♥`;
+  const hearts = hunt.hearts;
+  if (hearts != null) sentence += ` · ${hearts}♥`;
 
   return sentence;
 }
@@ -86,14 +96,137 @@ export function huntTightness(hunt: Hunt): {
   label: string;
   level: "wide" | "loose" | "focused" | "specific";
 } {
-  const count = Object.keys(hunt.attributes).filter(
-    (k) => attributeValues(hunt, k as AttrKey).length > 0
-  ).length;
+  const count = huntAttributeFilterCount(hunt);
 
   if (count === 0) return { label: "Wide open", level: "wide" };
   if (count === 1) return { label: "Loose", level: "loose" };
   if (count <= 3) return { label: "Focused", level: "focused" };
   return { label: "Very specific", level: "specific" };
+}
+
+function huntAttributeFilterCount(hunt: Hunt): number {
+  return Object.keys(hunt.attributes).filter(
+    (k) => attributeValues(hunt, k as AttrKey).length > 0
+  ).length;
+}
+
+const TIGHTNESS_RANK: Record<
+  ReturnType<typeof huntTightness>["level"],
+  number
+> = {
+  specific: 4,
+  focused: 3,
+  loose: 2,
+  wide: 1,
+};
+
+/** Most specific → most loose, then highest hearts first. */
+export function compareSavedHunts(a: Hunt, b: Hunt): number {
+  const rankA = TIGHTNESS_RANK[huntTightness(a).level];
+  const rankB = TIGHTNESS_RANK[huntTightness(b).level];
+  if (rankA !== rankB) return rankB - rankA;
+
+  const countA = huntAttributeFilterCount(a);
+  const countB = huntAttributeFilterCount(b);
+  if (countA !== countB) return countB - countA;
+
+  return (b.hearts ?? 0) - (a.hearts ?? 0);
+}
+
+export function sortSavedHunts(hunts: Hunt[]): Hunt[] {
+  return hunts.filter((h) => h.saved).sort(compareSavedHunts);
+}
+
+export type HuntListCategory = "specific" | "taste";
+
+/** Gender-only (or fully open) hunts vs hunts with attribute filters. */
+export function huntListCategory(hunt: Hunt): HuntListCategory {
+  return huntTightness(hunt).level === "wide" ? "taste" : "specific";
+}
+
+export function partitionSavedHunts(hunts: Hunt[]): {
+  specific: Hunt[];
+  taste: Hunt[];
+} {
+  const saved = hunts.filter((h) => h.saved);
+  return {
+    specific: saved.filter((h) => huntListCategory(h) === "specific"),
+    taste: saved.filter((h) => huntListCategory(h) === "taste"),
+  };
+}
+
+export type HuntFilterPill =
+  | { kind: "gender"; label: string; value: HuntGender; required?: boolean }
+  | { kind: "attr"; key: AttrKey; label: string; value: string; required?: boolean };
+
+export function collectHuntFilterPills(hunt: Hunt): HuntFilterPill[] {
+  const pills: HuntFilterPill[] = [];
+  const gender = hunt.gender ?? "both";
+
+  if (gender !== "both") {
+    const genderLabel =
+      HUNT_GENDER_OPTIONS.find((o) => o.value === gender)?.label ?? gender;
+    pills.push({
+      kind: "gender",
+      label: genderLabel,
+      value: gender,
+      required: isGenderRequired(hunt) ? true : undefined,
+    });
+  }
+
+  for (const key of SUMMARY_ORDER) {
+    const attr = hunt.attributes[key];
+    const values = attributeValues(hunt, key);
+    for (const value of values) {
+      pills.push({
+        kind: "attr",
+        key,
+        label: value,
+        value,
+        required: isRequiredPick(attr, value) ? true : undefined,
+      });
+    }
+  }
+
+  return pills;
+}
+
+export function partitionHuntFilterPills(hunt: Hunt): {
+  mustHave: HuntFilterPill[];
+  interested: HuntFilterPill[];
+} {
+  const mustHave: HuntFilterPill[] = [];
+  const interested: HuntFilterPill[] = [];
+  for (const pill of collectHuntFilterPills(hunt)) {
+    if (pill.required) mustHave.push(pill);
+    else interested.push(pill);
+  }
+  return { mustHave, interested };
+}
+
+function joinPillLabels(pills: HuntFilterPill[]): string {
+  return pills.map((p) => p.label).join(", ");
+}
+
+/** One-line summary for the hunt builder card header. */
+export function buildHuntHuntingForLine(hunt: Hunt): string {
+  const { mustHave, interested } = partitionHuntFilterPills(hunt);
+  const gender = hunt.gender ?? "both";
+
+  if (mustHave.length === 0 && interested.length === 0) {
+    return gender === "both"
+      ? "Listings matching any vintage Timex."
+      : `Listings matching ${HUNT_GENDER_OPTIONS.find((o) => o.value === gender)?.label ?? gender}.`;
+  }
+
+  const parts: string[] = [];
+  if (mustHave.length > 0) {
+    parts.push(`Must have ${joinPillLabels(mustHave)}`);
+  }
+  if (interested.length > 0) {
+    parts.push(`also interested in ${joinPillLabels(interested)}`);
+  }
+  return `${parts.join(" · ")}.`;
 }
 
 export function simulateListingParse(url: string): Record<string, string> {

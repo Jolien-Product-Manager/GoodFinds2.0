@@ -8,10 +8,12 @@ export const HUNT_HEARTS_MIN = 1;
 export const HUNT_HEARTS_MAX = 4;
 
 interface HuntHeartsPickerProps {
-  value: number;
+  value: HuntHearts | null;
   onChange?: (hearts: HuntHearts) => void;
   size?: "sm" | "xs";
   className?: string;
+  /** Highlight when unset and required. */
+  required?: boolean;
 }
 
 export function HuntHeartsPicker({
@@ -19,19 +21,28 @@ export function HuntHeartsPicker({
   onChange,
   size = "sm",
   className,
+  required = false,
 }: HuntHeartsPickerProps) {
-  const clamped = Math.min(HUNT_HEARTS_MAX, Math.max(HUNT_HEARTS_MIN, value));
   const iconClass = size === "xs" ? "h-3 w-3" : "h-3.5 w-3.5";
   const interactive = onChange != null;
+  const unset = value == null;
 
   return (
     <div
-      className={cn("inline-flex items-center gap-0.5", className)}
+      className={cn(
+        "inline-flex items-center gap-0.5",
+        required && unset && "rounded-sm ring-1 ring-steal/40 ring-offset-1",
+        className
+      )}
       role={interactive ? "group" : undefined}
-      aria-label={`${clamped} of ${HUNT_HEARTS_MAX} hearts`}
+      aria-label={
+        unset
+          ? `Choose urgency — 1 to ${HUNT_HEARTS_MAX} hearts`
+          : `${value} of ${HUNT_HEARTS_MAX} hearts`
+      }
     >
       {Array.from({ length: HUNT_HEARTS_MAX }, (_, i) => i + 1).map((n) => {
-        const filled = n <= clamped;
+        const filled = value != null && n <= value;
         const heart = (
           <Heart
             className={cn(
