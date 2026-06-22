@@ -1,49 +1,116 @@
 # GoodFinds
 
-**A vintage Timex hunting assistant** — aggregate listings from eBay, Chrono24, and Etsy; triage in a ranked feed; define hunts for what you're looking for.
+**A vintage Timex hunting assistant** that unifies listings from eBay, Chrono24, and Etsy into one ranked feed — so collectors spend less time searching and more time finding watches worth buying.
+
+Instead of repeating the same queries across marketplaces, you define what you're looking for as **hunts**: gender, dial traits, collaborations, and priority hearts. GoodFinds scores every listing against your taste, surfaces the strongest matches first, and remembers what you've dismissed or saved.
 
 **Repo:** https://github.com/Jolien-Product-Manager/GoodFinds2.0
 
 ---
 
-## What problem this solves
+## The problem
 
-Vintage Timex collectors hunt across multiple marketplaces, know taste when they see it but can't write it as a filter, and waste attention re-judging listings they've already dismissed. GoodFinds addresses three jobs:
+Vintage Timex collectors know exactly what they're hunting — a specific Marlin dial, a 1970s Electric, a Peanuts collab. The hard part is the work: manually checking eBay, Chrono24, and Etsy every day, maintaining a mental list of what to look for, and never quite being sure something good didn't slip past.
 
-- **Surfacing** — stop manually checking eBay, Chrono24, and Etsy with the same queries
-- **Taste capture** — store what "interesting" means via hunts (gender, hearts, attribute chips), not boolean query strings
-- **Triage** — rank viable listings, flag the strongest candidates, and remember dismissals and saves
+**Core job-to-be-done:** *I want a better way to stay on top of interesting vintage Timex listings across the market.*
+
+Three failure modes today:
+
+| | What's broken |
+|---|---|
+| **Surfacing** | No single source. Inventory is spread across three marketplaces. Taste must be re-encoded on every platform. Good pieces sell fast — miss a day and you miss a find. |
+| **Constraints** | Total landed cost (item + shipping + duties) matters, not list price alone. Listings that can't ship to you waste attention. The sub-$50 budget is intrinsic to this hobby. |
+| **Trust** | Listings mislabel model, era, and condition. The same watch can appear on multiple platforms. You end up re-reviewing listings you've already judged. |
 
 ---
 
-## Key design decisions
+## Core features
 
-| Decision | Rationale |
-|----------|-----------|
-| **Gates exclude, taste ranks** | Price, shipping, condition, and dismissals remove listings. Hunt matching scores and orders what remains — imperfect matches stay visible. |
-| **Snapshot ingestion** | eBay/Etsy sync offline to JSON; page loads read disk, not live APIs. Avoids rate limits and keeps the feed fast on serverless. |
-| **Fetch ≠ filter** | Marketplace queries pull a broad candidate pool. Per-user gates (postal code, price ceiling) run after merge. |
-| **Additive hunt scoring** | A listing's score is the sum of points from all matching hunts. Perfect matches sort first, then score, then recency. |
-| **Stateless feed API** | Client sends full filter + action state with each `POST /api/feed` request. Server has no per-user feed session. |
+- **Unified feed** — One scrollable view of vintage Timex listings from eBay, Chrono24, and Etsy
+- **Hunt builder** — Capture taste with attribute chips, gender, and 1–4 heart priority — not brittle search strings
+- **Smart matching** — Score listings against your hunts; Perfect / Close / Loose badges with clear match reasons on every card
+- **Fast triage** — Dismiss, star, or open in one tap; New, All, Starred, and Dismissed tabs
+- **Buy-ability filters** — Price ceiling, ships-to-me, and condition gates so only realistic picks surface
+- **Cross-device sync** — Optional magic-link sign-in; hunts, dismissals, and saves follow you across devices
+
+---
+
+## What has to work
+
+Four things make this worth opening every day:
+
+- **Coverage** — Earns trust. The greater our share of the vintage Timex market, the less reason to check elsewhere.
+- **Taste capture** — A fast, intuitive way to encode what you're looking for — not a search box.
+- **Signal-to-noise** — Surface the right listing first, with the reason visible at a glance.
+- **Memory** — Never evaluate the same listing twice. Dismissals and stars persist across sessions and devices.
+
+---
+
+## How it works
+
+### Hunts: gates exclude, taste ranks
+
+**Global gates** are hard filters that apply to every hunt. A listing that fails a gate never appears — no matter how well it scores on taste.
+
+- Price ceiling — maximum total landed cost (item + shipping)
+- Ships-to-me — postal code check; excludes undeliverable listings
+
+**Hunt attributes** rank what remains. The hunt builder pairs free-text search with structured chips across nine dimensions (model, era, gender, collab, dial traits, and more). For each attribute, you mark it as a must-have or nice-to-have — must-haves gate results, nice-to-haves boost the score.
+
+The design principle: gates exclude, taste ranks. Mismatches rank lower; they don't disappear silently.
+
+### Scoring and match labels
+
+Once listings clear the gates, each listing is scored against every active hunt:
+
+```
+pointsContributed = categoriesPassed × heartsMultiplier
+listingScore = Σ pointsContributed (across all matching hunts)
+```
+
+Hearts multiplier: 1♥ = 0.25 · 2♥ = 0.5 · 3♥ = 0.75 · 4♥ = 1.0
+
+A listing that satisfies two hunts scores higher than one that satisfies one hunt equally well. Match labels come from the top contributing hunt's category pass ratio:
+
+| Label | Criteria |
+|---|---|
+| **Perfect Match** | All categories in the hunt passed |
+| **Close Match** | More than 50% of categories passed |
+| **Loose Match** | At least one category passed, but ≤ 50% |
+
+**Feed sort (New tab):** Perfect matches first → listing score descending → recency descending. Unseen listings float above already-seen ones.
+
+Every card shows a "why note" — which attributes matched, which didn't, and the contributing hunt.
+
+### Marketplace coverage
+
+| Marketplace | Approx. listings | Share | Connection |
+|---|---|---|---|
+| **eBay** | ~13,500 | ~79% | Browse API — wristwatch category + Timex brand filter |
+| **Etsy** | ~3,000 | ~18% | Open API v3 (bundled fallback snapshot) |
+| **Chrono24** | ~500 | ~3% | Offline Python scraper via FlareSolverr |
+
+These three cover the vast majority of addressable vintage Timex inventory. Facebook Marketplace and Reddit have meaningful activity but add complexity for smaller incremental gain — structured sources came first.
 
 ---
 
 ## What's built
 
-- **3 marketplace connectors** — Chrono24 (Python scrape), eBay Browse API, Etsy Open API → normalized `AppListing` pool
-- **Feed** — All / New / Starred / Dismissed views; infinite scroll; listing detail panel; swipe-to-dismiss
+- **3 marketplace connectors** — eBay Browse API, Etsy Open API, Chrono24 Python scraper → normalized `AppListing` pool
+- **Feed** — All / New / Starred / Dismissed views; infinite scroll; listing detail panel; swipe-to-dismiss; bulk actions
 - **Hunt builder** — 9 attribute categories + gender, hearts (1–4), must-have vs interested, purchased watches log
-- **Matching** — Feature extraction from titles; additive hunt scoring (`categoriesPassed × hearts`); Perfect / Close / Loose badges with match reasons on cards
+- **Matching** — Feature extraction from titles (model, era, gender, collab, condition); additive hunt scoring; Perfect / Close / Loose badges with match reasons
 - **Filters** — Multi-select hunt filters + match-quality filters; marketplace filter; global buy-ability gates on `/hunts`
 - **Persistence** — Zustand + localStorage; debounced sync to Supabase (magic-link auth) or local file fallback
 - **Production** — Vercel deploy; committed JSON snapshots; bundled Etsy fallback for serverless
 
-## What's not built
+### What's not built yet
 
 - Push/email alerts or scheduled ingestion at runtime
 - Purchased watches influencing hunt matching
-- Dealbreaker taste weights (`hiddenListings` / `dislikedModels` in schema, no UI)
+- Dealbreaker taste weights (designed, not shipped)
 - Live Chrono24 calls at runtime
+- Vision-based dial recognition from listing photos
 
 ---
 
@@ -73,6 +140,12 @@ flowchart LR
 
 **Stack:** Next.js 15 (App Router), React 19, Tailwind 4, shadcn/Radix, Zustand, Zod, Supabase.
 
+**Data flow:**
+- eBay: `npm run sync:ebay` → Browse API → `data/ebay/vintage_timex.json`
+- Etsy: `npm run sync:etsy` → Open API v3 → `data/etsy/vintage_timex.json`
+- Chrono24: offline Python scraper → `npm run sync:listings` → `data/chrono24/`
+- All three merge in `loadAllListings()` → `normalize.ts` → `AppListing[]`
+
 ---
 
 ## Run locally
@@ -88,9 +161,9 @@ Open [http://localhost:3000](http://localhost:3000). Hunts at `/hunts`.
 Sample snapshots ship in `data/` — the app runs without API keys. Refresh listings:
 
 ```bash
-npm run sync:ebay      # needs EBAY_CLIENT_ID + EBAY_CLIENT_SECRET
-npm run sync:etsy      # needs ETSY_API_KEY
-npm run sync:listings  # copy Chrono24 scraper output
+npm run sync:ebay        # needs EBAY_CLIENT_ID + EBAY_CLIENT_SECRET
+npm run sync:etsy        # needs ETSY_API_KEY
+npm run sync:listings    # copy Chrono24 scraper output
 ```
 
 **Supabase (optional):** run `supabase/schema.sql`, set `NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_ANON_KEY`, configure redirect `http://localhost:3000/auth/callback`. Without it, state saves to `data/store/state.json` locally.
@@ -99,22 +172,16 @@ npm run sync:listings  # copy Chrono24 scraper output
 
 ---
 
-## Interview FAQ
+## What's next
 
-**Why snapshots instead of live API calls?**  
-eBay/Etsy rate limits and serverless cold starts make live fetch unreliable for every page view. Sync scripts refresh data on demand; the app reads JSON at runtime.
-
-**How does hunt matching work?**  
-Per listing × hunt: gender gate → count attribute categories that pass → `points = categoriesPassed × heartsMultiplier`. Listing score = sum across hunts. Perfect matches sort first. Match quality (Perfect / Close / Loose) comes from the top hunt's category pass ratio.
-
-**How is state persisted?**  
-Zustand hydrates from localStorage, then merges server state when signed in. Every store change debounces to `POST /api/state` → Supabase `user_state` jsonb column.
-
-**What would you add next?**  
-Scheduled sync + alert notifications when new listings match a hunt; richer feature extraction (dial/case from images); purchased-watch → hunt suggestions.
+- **Mobile app + push** — Collectors check listings on their phones. Push flips the model: the feed comes to them when a hunt matches.
+- **Deeper feature extraction** — Vision-based dial recognition from photos, granular condition inference, dealbreaker weighting.
+- **Learn from behavior** — Quietly tune hunt scoring from taps, dismissals, and dwell time.
+- **Affiliate links** — eBay, Etsy, and Chrono24 all run affiliate programs; zero-friction monetisation on existing purchase intent.
+- **Expand to other brands** — Architecture is brand-agnostic; adding Seiko or G-Shock means new queries and a model catalog, not a rebuild.
 
 ---
 
 ## Docs
 
-Product specs: [`.cursor/docs/`](.cursor/docs/) — start with [feature-list and build-plan.md](.cursor/docs/feature-list%20and%20build-plan.md).
+Product strategy and specs: [`.cursor/docs/`](.cursor/docs/) — start with [goodfinds-product-strategy.md](.cursor/docs/goodfinds-product-strategy.md).
